@@ -6,8 +6,12 @@ ALL:
 * check each page for adequate h2 coverage
 
 * deduping pass!
+* 1-up/0-up -> one-up/zero-up everywhere
 
 ----------------------------------------------------------------
+E glossary page
+  - spell out all acronyms directly there
+
 E fill out flatten/unflatten page
 E fill out memory/streaming page
   - rename maybe? add note on threading and how it scales on multicore arches
@@ -19,6 +23,7 @@ E fill out arrays page
 E fill out maps page
   - xref to fla/unfla page
   - move from reference-dsl-variables
+E show-all-flags help -- fully alpha, or alpha-by-type ...
 
 c GOMAXPROCS -- up it? separate page maybe -- ?
   - note one goroutine for in, out, & each verb
@@ -85,7 +90,6 @@ reference-main-null-data:
 ? Records with one or more empty sort-field values sort after records with all sort-field values present -> apparently not true for sort -nr
 
 reference-main-arithmetic:
-? remove references to put/filter -F -- note stats1 keeps -F so maybe we should here as well -- ? or nah?
 ? test stats1/step -F flag
 ? The following, however, produce integer output if their inputs are integers: + - * / // % abs ceil floor max min round roundm sgn. As well, stats1 -a min, stats1 -a max, stats1 -a sum, step -a delta, and step -a rsum produce integer output if their inputs are integers. -> test all
 
@@ -119,5 +123,15 @@ E Keep in mind that out-of-stream variables are a nested, multi-level hashmap (d
   o 2 examples not 3?
   o why not '--oflatsep /' respected?
 
+diffs other langs:
+e slice incl/excl; split-in-half
+e localvars in if/else
+e elif
+
+contributing:
+* kitchen-sink-builder script
+
 manpage:
 ? [NEEDS READ-THROUGH]
+
+mk-func-table.rb: port comments from sphinx to mkdocs

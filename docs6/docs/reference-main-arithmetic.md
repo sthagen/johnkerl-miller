@@ -5,7 +5,11 @@
 
 Numbers in Miller are double-precision float or 64-bit signed integers. Anything scannable as int, e.g `123` or `0xabcd`, is treated as an integer; otherwise, input scannable as float (`4.56` or `8e9`) is treated as float; everything else is a string.
 
-If you want all numbers to be treated as floats, then you may use `float()` in your filter/put expressions (e.g. replacing `$c = $a * $b` with `$c = float($a) * float($b)`) -- or, more simply, use `mlr filter -F` and `mlr put -F` which forces all numeric input, whether from expression literals or field values, to float. Likewise `mlr stats1 -F` and `mlr step -F` force integerable accumulators (such as `count`) to be done in floating-point.
+If you want all numbers to be treated as floats, then you may use `float()` in your filter/put expressions (e.g. replacing `$c = $a * $b` with `$c = float($a) * float($b)`).
+
+<!--- TODO: probably remove this entirely for Miller6.
+Or, more simply, use `mlr filter -F` and `mlr put -F` which forces all numeric input, whether from expression literals or field values, to float. Likewise `mlr stats1 -F` and `mlr step -F` force integerable accumulators (such as `count`) to be done in floating-point.
+-->
 
 ## Conversion by math routines
 

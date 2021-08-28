@@ -9,6 +9,8 @@ Quick links:
 &nbsp;
 <a href="reference-dsl-builtin-functions/index.html">[functions]</a>
 &nbsp;
+<a href="glossary/index.html">[glossary]</a>
+&nbsp;
 <a href="https://github.com/johnkerl/miller">[repository]</a>
 </span>
 </div>
