@@ -1,4 +1,17 @@
 <!---  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. --->
+<div>
+<span class="quicklinks">
+Quick links:
+&nbsp;
+<a class="quicklink" href="../reference-verbs/index.html">Verb list</a>
+&nbsp;
+<a class="quicklink" href="../reference-dsl-builtin-functions/index.html">Function list</a>
+&nbsp;
+<a class="quicklink" href="../glossary/index.html">Glossary</a>
+&nbsp;
+<a class="quicklink" href="https://github.com/johnkerl/miller" target="_blank">Repository ↗</a>
+</span>
+</div>
 # Installing Miller
 
 You can install Miller for various platforms as follows.
@@ -7,7 +20,7 @@ You can install Miller for various platforms as follows.
     * You can get latest Miller 6 builds for Linux, MacOS, and Windows by visiting [https://github.com/johnkerl/miller/actions](https://github.com/johnkerl/miller/actions), selecting the latest build, and clicking _Artifacts_. (These are retained for 5 days after each commit.)
     * See also the [build page](build.md) if you prefer -- in particular, if your platform's package manager doesn't have the latest release.
 * Miller 5 is released, and is described by [https://miller.readthedocs.io](https://miller.readthedocs.io).
-    * Linux: `yum install miller` or `apt-get install miller` depending on your flavor of Linux.
+    * Linux: `yum install miller` or `apt-get install miller` depending on your flavor of Linux, or [Homebrew](https://docs.brew.sh/linux).
     * MacOS: `brew install miller` or `port install miller` depending on your preference of [Homebrew](https://brew.sh) or [MacPorts](https://macports.org).
     * Windows: `choco install miller` using [Chocolatey](https://chocolatey.org).
 
