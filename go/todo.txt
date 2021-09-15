@@ -197,6 +197,8 @@ BLOCKERS
 ================================================================
 NON-BLOCKERS
 
+* unarrayify function
+
 * XYZWasSpecified -> XYZ = "default" w/ check-after -- ?
 
 * parquet -- ?
@@ -276,6 +278,8 @@ d type up a note somewhere in the regtest tree that all the .mlrs and the -f 00n
     -> most definitely needed
   o multiple-valued return/assign -- ?
     - array destructure at LHS for multi-retval assign (maps too?)
+
+* UT per se for lrec ops
 
 * "Miller: " prefixes on all errors.New
 * libify errors.New callsites for DSL/CST
@@ -580,3 +584,6 @@ DOC6:
 * dotted-map doc ...
   o $*.foo["bar"] = NR b04k b/c precedence :(
   o change precedence?
+
+? * would LOVE to have small prev-page/next-page links at the *top* not bottom ...
+  https://squidfunk.github.io/mkdocs-material/customization/#extending-the-theme
