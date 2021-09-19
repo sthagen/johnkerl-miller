@@ -7,7 +7,7 @@ import (
 	"mlr/src/lib"
 )
 
-// ----------------------------------------------------------------
+// IsEmpty determines if an map is empty.
 func (mlrmap *Mlrmap) IsEmpty() bool {
 	return mlrmap.Head == nil
 }
@@ -17,8 +17,7 @@ func (mlrmap *Mlrmap) Has(key string) bool {
 	return mlrmap.findEntry(key) != nil
 }
 
-// ----------------------------------------------------------------
-// Copies the key and value (deep-copying in case the value is array/map).
+// PutCpoy copies the key and value (deep-copying in case the value is array/map).
 // This is safe for DSL use. See also PutReference.
 func (mlrmap *Mlrmap) PutCopy(key string, value *Mlrval) {
 	pe := mlrmap.findEntry(key)
@@ -42,10 +41,10 @@ func (mlrmap *Mlrmap) PutCopy(key string, value *Mlrval) {
 	}
 }
 
-// Copies the key but not the value. This is not safe for DSL use, where we
-// could create undesired references between different objects.  Only intended
-// to be used at callsites which allocate a mlrval solely for the purpose of
-// putting into a map, e.g. input-record readers.
+// PutReference copies the key but not the value. This is not safe for DSL use,
+// where we could create undesired references between different objects.  Only
+// intended to be used at callsites which allocate a mlrval solely for the
+// purpose of putting into a map, e.g. input-record readers.
 func (mlrmap *Mlrmap) PutReference(key string, value *Mlrval) {
 	pe := mlrmap.findEntry(key)
 	if pe == nil {
@@ -133,7 +132,7 @@ func (mlrmap *Mlrmap) PutCopyWithMlrvalIndex(key *Mlrval, value *Mlrval) error {
 		return nil
 	} else {
 		return errors.New(
-			"Miller: record/map indices must be string or int; got " + key.GetTypeName(),
+			"mlr: record/map indices must be string or int; got " + key.GetTypeName(),
 		)
 	}
 }
@@ -245,7 +244,7 @@ func (mlrmap *Mlrmap) getWithMlrvalArrayIndex(index *Mlrval) (*Mlrval, error) {
 		if i < n-1 {
 			if !next.IsMap() {
 				return nil, errors.New(
-					"Miller: cannot multi-index non-map.",
+					"mlr: cannot multi-index non-map.",
 				)
 			}
 			current = next.mapval
@@ -856,4 +855,29 @@ func (mlrmap *Mlrmap) pop() *MlrmapEntry {
 		mlrmap.Unlink(pe)
 		return pe
 	}
+}
+
+// ----------------------------------------------------------------
+
+// ToPairsArray is used for sorting maps by key/value/etc, e.g. the sortmf DSL function.
+func (mlrmap *Mlrmap) ToPairsArray() []MlrmapPair {
+	pairsArray := make([]MlrmapPair, mlrmap.FieldCount)
+	i := 0
+	for pe := mlrmap.Head; pe != nil; pe = pe.Next {
+		pairsArray[i].Key = pe.Key
+		pairsArray[i].Value = pe.Value.Copy()
+		i++
+	}
+
+	return pairsArray
+}
+
+// MlrmapFromPairsArray is used for sorting maps by key/value/etc, e.g. the sortmf DSL function.
+func MlrmapFromPairsArray(pairsArray []MlrmapPair) *Mlrmap {
+	mlrmap := NewMlrmap()
+	for i := range pairsArray {
+		mlrmap.PutCopy(pairsArray[i].Key, pairsArray[i].Value)
+	}
+
+	return mlrmap
 }

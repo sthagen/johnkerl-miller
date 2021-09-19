@@ -9,9 +9,28 @@
 package cst
 
 import (
+	"fmt"
+	"os"
+	"sort"
+
 	"mlr/src/dsl"
 	"mlr/src/lib"
+	"mlr/src/runtime"
+	"mlr/src/types"
 )
+
+// ----------------------------------------------------------------
+
+// BinaryFuncWithState is for the sortaf and sortmf functions.  Most function
+// types are in the mlr/src/types packae. This type, though, includes functions
+// which need to access CST state in order to call back to user-defined
+// functions.  To avoid a package-cycle dependency, they are defined here.
+type BinaryFuncWithState func(
+	input1 *types.Mlrval,
+	input2 *types.Mlrval,
+	state *runtime.State,
+	udfManager *UDFManager,
+) *types.Mlrval
 
 // ----------------------------------------------------------------
 // Function lookup:
@@ -98,4 +117,158 @@ func (root *RootNode) BuildFunctionCallsiteNode(astNode *dsl.ASTNode) (IEvaluabl
 		udfCallsiteNode := NewUDFCallsite(argumentNodes, udf)
 		return udfCallsiteNode, nil
 	}
+}
+
+// ================================================================
+// Most DSL functions are implemented in the types package. But these call UDFs
+// which are here in the dsl/cst package, so they can't be in the types package
+
+// tSortXFSpace is the datatype for the getSortXFSpace cache-manager.
+type tSortXFSpace struct {
+	udfCallsite *UDFCallsite
+	argsArray   []*types.Mlrval
+}
+
+var sortXFCache map[string]*tSortXFSpace = make(map[string]*tSortXFSpace)
+
+// getSortXFSpace manages a cache for the data needed by sortaf/sortmf.  Those
+// functions may be invoked on every record of a big data file, so we try to
+// cache data they need for UDF-callsite setup.
+func getSortXFSpace(
+	udfName string,
+	udfManager *UDFManager,
+	arity int, // 2 for sortaf, 4 for sortmf
+) *tSortXFSpace {
+	entry := sortXFCache[udfName]
+	if entry != nil {
+		return entry
+	}
+
+	udf, err := udfManager.LookUp(udfName, arity)
+	if err != nil { // e.g. exists with wrong arity
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	if udf == nil { // e.g. does not exist at all
+		fmt.Fprintf(os.Stderr, "mlr: sortaf: comparator function \"%s\" not found.\n", udfName)
+		os.Exit(1)
+	}
+
+	udfCallsite := NewUDFCallsiteForSortF(udf)
+	argsArray := make([]*types.Mlrval, arity)
+
+	entry = &tSortXFSpace{
+		udfCallsite: udfCallsite,
+		argsArray:   argsArray,
+	}
+
+	sortXFCache[udfName] = entry
+	return entry
+}
+
+// ----------------------------------------------------------------
+
+// SortAF implements the sortaf function, which takes an array as first
+// argument and string UDF-name as second argument. It sorts the array using
+// the UDF as the comparator.
+// Example forward sort: func f(a,b) { return a <=> b }.
+// Example reverse sort: func f(a,b) { return b <=> a }.
+func SortAF(
+	input1 *types.Mlrval,
+	input2 *types.Mlrval,
+	state *runtime.State,
+	udfManager *UDFManager,
+) *types.Mlrval {
+	inputArray := input1.GetArray()
+	if inputArray == nil { // not an array
+		return input1
+	}
+	if !input2.IsString() {
+		return types.MLRVAL_ERROR
+	}
+	udfName := input2.String()
+
+	sortAFSpace := getSortXFSpace(udfName, udfManager, 2)
+	udfCallsite := sortAFSpace.udfCallsite
+	argsArray := sortAFSpace.argsArray
+
+	outputArray := types.CopyMlrvalArray(inputArray)
+
+	sort.Slice(outputArray, func(i, j int) bool {
+		argsArray[0] = &outputArray[i]
+		argsArray[1] = &outputArray[j]
+		// Call the user's comparator function.
+		mret := udfCallsite.EvaluateWithArguments(state, argsArray)
+		// Unpack the types.Mlrval return value into a number.
+		nret, ok := mret.GetNumericToFloatValue()
+		if !ok {
+			fmt.Fprintf(
+				os.Stderr,
+				"mlr: sortaf: comparator function \"%s\" returned non-number \"%s\".\n",
+				udfName,
+				mret.String(),
+			)
+			os.Exit(1)
+		}
+		lib.InternalCodingErrorIf(!ok)
+		// Go sort-callback conventions: true if a < b, false otherwise.
+		return nret < 0
+	})
+	return types.MlrvalPointerFromArrayReference(outputArray)
+}
+
+// ----------------------------------------------------------------
+
+// SortMF implements the sortmf function, which takes a map as first argument
+// and string UDF-name as second argument. It sorts the map using the UDF as
+// the comparator.
+// Example forward sort by key: func f(ak,av,bk,bv) { return ak <=> bk }
+// Example reverse sort by value: func f(ak,av,bk,bv) { return bv <=> av }
+func SortMF(
+	input1 *types.Mlrval,
+	input2 *types.Mlrval,
+	state *runtime.State,
+	udfManager *UDFManager,
+) *types.Mlrval {
+	inputMap := input1.GetMap()
+	if inputMap == nil { // not a map
+		return input1
+	}
+	if !input2.IsString() {
+		return types.MLRVAL_ERROR
+	}
+
+	pairsArray := inputMap.ToPairsArray()
+
+	udfName := input2.String()
+	sortAFSpace := getSortXFSpace(udfName, udfManager, 4)
+	udfCallsite := sortAFSpace.udfCallsite
+	argsArray := sortAFSpace.argsArray
+
+	sort.Slice(pairsArray, func(i, j int) bool {
+		argsArray[0] = types.MlrvalPointerFromString(pairsArray[i].Key)
+		argsArray[1] = pairsArray[i].Value
+		argsArray[2] = types.MlrvalPointerFromString(pairsArray[j].Key)
+		argsArray[3] = pairsArray[j].Value
+
+		// Call the user's comparator function.
+		mret := udfCallsite.EvaluateWithArguments(state, argsArray)
+		// Unpack the types.Mlrval return value into a number.
+		nret, ok := mret.GetNumericToFloatValue()
+		if !ok {
+			fmt.Fprintf(
+				os.Stderr,
+				"mlr: sortaf: comparator function \"%s\" returned non-number \"%s\".\n",
+				udfName,
+				mret.String(),
+			)
+			os.Exit(1)
+		}
+		lib.InternalCodingErrorIf(!ok)
+		// Go sort-callback conventions: true if a < b, false otherwise.
+		return nret < 0
+	})
+
+	sortedMap := types.MlrmapFromPairsArray(pairsArray)
+	return types.MlrvalPointerFromMapReferenced(sortedMap)
 }
