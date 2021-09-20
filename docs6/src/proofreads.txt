@@ -1,20 +1,15 @@
 ----------------------------------------------------------------
 ! try to godoc a few functions on every commit ... accumulate over time ...
-  - particular focus on -----$ etc
-? godoc -> publish at jko -- ? in kitchen-sink builder -- ?
-
-c array+string slice UTs
-? nidx no output-coloring?
-
-C! repifs !! https://pkg.go.dev/regexp#Regexp.Split 2-for-1 -- get regexp as well ?
-C fix -I + auto-decompress
 
 ? twi-dm re all-contribs: all-contributors.org
 * nikos materials -> fold in
 
-----------------------------------------------------------------
+C! repifs !! https://pkg.go.dev/regexp#Regexp.Split 2-for-1 -- get regexp as well ?
+
 * r-strings branch!
-* deduping pass!
+C stats1 --fr
+
+----------------------------------------------------------------
 e fzf-ish w/ head -n 4, --from, up-arrow & append verb, then cat -- find & update the existing section
 
 ! https://github.com/johnkerl/miller/issues/653 -- stats1 w/ empties? check stats2
@@ -23,11 +18,12 @@ e fzf-ish w/ head -n 4, --from, up-arrow & append verb, then cat -- find & updat
 * regex: more about what is / is not
   https://github.com/johnkerl/miller/issues/77#issuecomment-538553828
 
-c? mlr -S / -F outside of put/filter -- ?
-
 c! seps \001 etc !
   mlrc --iusv --oxtab cat regtest/input/example.usv
   mlr  --iusv --oxtab cat regtest/input/example.usv
+
+o check for determinism regtest/cases/verb-join-prepipe/0003/cmd
+* UT for https://github.com/johnkerl/miller/issues/653
 
 ----------------------------------------------------------------
 
