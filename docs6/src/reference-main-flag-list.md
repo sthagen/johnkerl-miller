@@ -128,9 +128,9 @@ These are flags which are applicable to CSV format.
 
 * `--allow-ragged-csv-input or --ragged
 `: If a data line has fewer fields than the header line, fill remaining keys with empty string. If a data line has more fields than the header line, use integer field labels as in the implicit-header case.
-* `--headerless-csv-output
+* `--headerless-csv-output or --ho
 `: Print only CSV data lines; do not print CSV header lines.
-* `--implicit-csv-header
+* `--implicit-csv-header or --headerless-csv-input or --hi
 `: Use 1,2,3,... as field labels, rather than from line 1 of input files. Tip: combine with `label` to recreate missing headers.
 * `--no-implicit-csv-header
 `: Opposite of `--implicit-csv-header`. This is the default anyway -- the main use is for the flags to `mlr join` if you have main file(s) which are headerless but you want to join in on a file which does have a CSV header. Then you could use `mlr --csv --implicit-csv-header join --no-implicit-csv-header -l your-join-in-with-header.csv ... your-headerless.csv`.
@@ -324,7 +324,7 @@ These are flags which don't fit into any other category.
 * `--mload {filenames}
 `: Like `--load` but works with more than one filename, e.g. `--mload *.mlr --`.
 * `--ofmt {format}
-`: E.g. %.18f, %.0f, %9.6e. Please use sprintf-style codes for floating-point nummbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.
+`: E.g. `%.18f`, `%.0f`, `%9.6e`. Please use sprintf-style codes for floating-point nummbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.
 * `--seed {n}
 `: with `n` of the form `12345678` or `0xcafefeed`. For `put`/`filter` `urand`, `urandint`, and `urand32`.
 * `-I
@@ -489,6 +489,17 @@ Notes about all other separators:
   - C-style escape sequences, e.g. `--rs '\r\n' --fs '\t'`.
   - To avoid backslashing, you can use any of the following names:
 
+          ascii_esc  = "\x1b"
+          ascii_etx  = "\x04"
+          ascii_fs   = "\x1c"
+          ascii_gs   = "\x1d"
+          ascii_null = "\x01"
+          ascii_rs   = "\x1e"
+          ascii_soh  = "\x02"
+          ascii_stx  = "\x03"
+          ascii_us   = "\x1f"
+          asv_fs     = "\x1f"
+          asv_rs     = "\x1e"
           colon      = ":"
           comma      = ","
           cr         = "\r"
@@ -503,7 +514,12 @@ Notes about all other separators:
           semicolon  = ";"
           slash      = "/"
           space      = " "
+          spaces     = "( )+"
           tab        = "\t"
+          tabs       = "(\t)+"
+          usv_fs     = "\xe2\x90\x9f"
+          usv_rs     = "\xe2\x90\x9e"
+          whitespace = "([ \t])+"
 
 * Default separators by format:
 

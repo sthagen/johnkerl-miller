@@ -333,6 +333,13 @@ functions which are present in Miller.
 See the [page on user-defined functions](reference-dsl-user-defined-functions.md) for how
 to write your own functions.
 
+## function literal
+
+A function without a name, like `func(a,b) { return a + 2*b + 7}`, assigned to
+a local variable or passed to a [higher-order
+function](reference-dsl-higher-order-functions.md) like `apply` or `sort`.  See
+the [section on function literals](reference-dsl-user-defined-functions.md#function-literals).
+
 ## GZIP / .gz
 
 A [data-compression format supported by Miller](reference-main-compressed-data.md).
@@ -357,6 +364,13 @@ and the [Miller CSV section](file-formats.md#csvtsvasvusvetc).
 
 Referring to data where all records have the same keys, in the same order.  See the
 [record-heterogeneity page](record-heterogeneity.md#homogeneousrectangular-data).
+
+## higher-order function
+
+A function which takes another function as an argument, such as
+[`select`](reference-dsl-builtin-functions.md#select) or
+[`apply`](reference-dsl-builtin-functions.md#apply). See the [page on
+higher-order functions](reference-dsl-higher-order-functions.md).
 
 ## if
 
@@ -764,6 +778,10 @@ Stands for _tab-separated values_.
 A popular [file format](file-formats.md#csvtsvasvusvetc) for tabular data
 (tab-separated values) supported by Miller.
 
+## UDF
+
+A [user-defined function](reference-dsl-user-defined-functions.md) in the [Miller programming language](miller-programming-language.md).
+
 ## unflatten
 
 To undo the [flatten](#flatten) operation, restoring map-valued and/or
@@ -786,6 +804,10 @@ Moreover, several of Miller's [verbs](reference-verbs.md) are designed
 to imitate some of the programs in the Unix toolkit, but with ability
 to operate on richer [file formats](file-formats.md) such as [CSV](#csv), [TSV](#tsv),
 [JSON](#json), and others.
+
+## unnamed function
+
+See [function literal](#function-literal).
 
 ## unset
 

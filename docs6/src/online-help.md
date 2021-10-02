@@ -49,6 +49,7 @@ Essentials:
   mlr help file-formats
 Flags:
   mlr help flags
+  mlr help list-separator-aliases
   mlr help comments-in-data-flags
   mlr help compressed-data-flags
   mlr help csv-only-flags
@@ -102,6 +103,7 @@ Essentials:
   mlr help file-formats
 Flags:
   mlr help flags
+  mlr help list-separator-aliases
   mlr help comments-in-data-flags
   mlr help compressed-data-flags
   mlr help csv-only-flags
@@ -237,7 +239,8 @@ No exact match for "split". Inexact matches:
 <b>mlr help function splita</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-splita  (class=conversion #args=2) Splits string into array with type inference. Example: splita("3,4,5", ",") = [3,4,5]
+splita  (class=conversion #args=2) Splits string into array with type inference.
+Example: splita("3,4,5", ",") = [3,4,5]
 </pre>
 
 Etc.

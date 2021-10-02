@@ -51,8 +51,10 @@ JSON support is improved:
 * Direct support for arrays means that you can now use Miller to process more JSON files.
 * Streamable JSON parsing: Miller's internal record-processing pipeline starts as soon as the first record is read (which was already the case for other file formats). This means that, unless records are wrapped with outermost `[...]`, Miller now handles JSON in `tail -f` contexts like it does for other file formats.
 * Flatten/unflatten -- conversion of JSON nested data structures (arrays and/or maps in record values) to/from non-JSON formats is a powerful new feature, discussed in the page [Flatten/unflatten: JSON vs. tabular formats](flatten-unflatten.md).
+* Since types are better handled now, the workaround flags `--jvquoteall` and `--jknquoteint` no longer have meaning -- although they're accepted as no-ops at the command line for backward compatibility.
+* Multi-line JSON is now the default. Use `--no-jvstack` for Miller-5 style, which required `--jvstack` to get multiline output.
 
-See the [Arrays reference](reference-main-arrays.md) for more information.
+See also the [Arrays reference](reference-main-arrays.md) for more information.
 
 ## Improved Windows experience
 
@@ -60,6 +62,10 @@ Stronger support for Windows (with or without MSYS2), with a couple of
 exceptions.  See [Miller on Windows](miller-on-windows.md) for more information.
 
 Binaries are reliably available using GitHub Actions: see also [Installation](installation.md).
+
+## In-process support for compressed input
+
+In addition to `--prepipe gunzip`, you can now use the `--gzin` flag. In fact, if your files end in `.gz` you don't even need to do that -- Miller will autodetect by file extension and automatically uncompress `mlr --csv cat foo.csv.gz`. Similarly for `.z` and `.bz2` files.  Please see the page on [Compressed data](reference-main-compressed-data.md) for more information.
 
 ## Support for reading web URLs
 
@@ -82,10 +88,6 @@ yellow,triangle,true,1,11,43.6498,9.8870
 purple,triangle,false,5,51,81.2290,8.5910
 purple,triangle,false,7,65,80.1405,5.8240
 </pre>
-
-## In-process support for compressed input
-
-In addition to `--prepipe gunzip`, you can now use the `--gzin` flag. In fact, if your files end in `.gz` you don't even need to do that -- Miller will autodetect by file extension and automatically uncompress `mlr --csv cat foo.csv.gz`. Similarly for `.z` and `.bz2` files.  Please see the page on [Compressed data](reference-main-compressed-data.md) for more information.
 
 ## Output colorization
 
@@ -137,11 +139,27 @@ For example (see [https://github.com/johnkerl/miller/issues/178](https://github.
 
 Miller now has a read-evaluate-print-loop ([REPL](repl.md)) where you can single-step through your data-file record, express arbitrary statements to converse with the data, etc.
 
+## Regex support for IFS and IPS
+
+You can now split fields on whitespace when whitespace is a mix of tabs and
+spaces.  As well, you can use regular expressions for the input field-separator
+and the input pair-separator.  Please see the section on
+[multi-character and regular-expression separators](reference-main-separators.md#multi-character-and-regular-expression-separators).
+
+In particular, for NIDX format, the default IFS now allows splitting on one or more of space or tab.
+
 ## Case-folded sorting options
 
 The [sort](reference-verbs.md#sort) verb now accepts `-c` and `-cr` options for case-folded ascending/descending sort, respetively.
 
 ## New DSL functions / operators
+
+* Higher-order functions [`select`](reference-dsl-builtin-functions.md#select), [`apply`](reference-dsl-builtin-functions.md#apply), [`reduce`](reference-dsl-builtin-functions.md#reduce), [`fold`](reference-dsl-builtin-functions.md#fold), and [`sort`](reference-dsl-builtin-functions.md#sort).  See the [sorting page](sorting.md) and the [higher-order-functions page](reference-dsl-higher-order-functions.md) for more information.
+
+* Absent-coalesce operator [`??`](reference-dsl-builtin-functions.md#absent-coalesce) along with `??=`;
+absent-empty-coalesce operator [`???`](reference-dsl-builtin-functions.md#absent-empty-coalesce) along with `???=`.
+
+* The dot operator is not new, but it has a new role: in addition to its existing use for string-concatenation like `"a"."b" = "ab"`, you can now also use it for keying maps. For example, `$req.headers.host` is the same as `$req["headers"]["host"]`. See the [dot-operator reference](reference-dsl-operators.md#the-double-purpose-dot-operator) for more information.
 
 * String-hashing functions [md5](reference-dsl-builtin-functions.md#md5), [sha1](reference-dsl-builtin-functions.md#sha1), [sha256](reference-dsl-builtin-functions.md#sha256), and [sha512](reference-dsl-builtin-functions.md#sha512).
 
@@ -149,20 +167,13 @@ The [sort](reference-verbs.md#sort) verb now accepts `-c` and `-cr` options for 
 
 * Unsigned right-shift [`>>>`](reference-dsl-builtin-functions.md#ursh) along with `>>>=`.
 
-* Absent-coalesce operator [`??`](reference-dsl-builtin-functions.md#absent-coalesce) along with `??=`;
-absent-empty-coalesce operator [`???`](reference-dsl-builtin-functions.md#absent-empty-coalesce) along with `???=`.
-
-* Sorting functions [`sorta`](reference-dsl-builtin-functions.md#sorta), [`sortaf`](reference-dsl-builtin-functions.md#sortaf), [`sortmk`](reference-dsl-builtin-functions.md#sortmk), and [`sortmf`](reference-dsl-builtin-functions.md#sortmf).  See the [sorting page](sorting.md) for more information.
-
-* The dot operator is not new, but it has a new role: in addition to its existing use for string-concatenation like `"a"."b" = "ab"`, you can now also use it for keying maps. For example, `$req.headers.host` is the same as `$req["headers"]["host"]`. See the [dot-operator reference](reference-dsl-operators.md#the-double-purpose-dot-operator) for more information.
-
 ## Improved command-line parsing
 
 Miller 6 has getoptish command-line parsing ([pull request 467](https://github.com/johnkerl/miller/pull/467)):
 
 * `-xyz` expands automatically to `-x -y -z`, so (for example) `mlr cut -of shape,flag` is the same as `mlr cut -o -f shape,flag`.
 * `--foo=bar` expands automatically to  `--foo bar`, so (for example) `mlr --ifs=comma` is the same as `mlr --ifs comma`.
-* `--mfrom`, `--load`, `--mload` as described on the [keystroke-savers page](keystroke-savers.md).
+* `--mfrom`, `--load`, `--mload` as described in the [flags reference](reference-main-flag-list.md#miscellaneous-flags).
 
 ## Improved error messages for DSL parsing
 
