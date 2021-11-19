@@ -1,4 +1,0 @@
-@a[NR]=$a;
-@b[NR]=$b;
-@ab = {"a": @a, "b": @b};
-emitp > @CASEDIR."/out.".$a.$b, @ab, "NR";

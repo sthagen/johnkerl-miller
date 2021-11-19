@@ -12,7 +12,7 @@ positionally-indexed.  Then, on the fly, you can add new fields which are
 functions of existing fields, drop fields, sort, aggregate statistically,
 pretty-print, and more.
 
-![cover-art](./docs/coverart/cover-combined.png)
+![cover-art](./docs/src/coverart/cover-combined.png)
 
 * Miller operates on **key-value-pair data** while the familiar
 Unix tools operate on integer-indexed fields: if the natural data structure for
@@ -23,31 +23,25 @@ insertion-ordered hash map.
 including but not limited to the familiar **CSV**, **TSV**, and **JSON**.
 (Miller can handle **positionally-indexed data** too!)
 
-In the above image (color added for the illustration) you can see how Miller embraces the common themes
-of key-value-pair data in a variety of data formats.
+In the above image you can see how Miller embraces the common themes of
+key-value-pair data in a variety of data formats.
 
 # Getting started
 
+* [Miller in 10 minutes](https://miller.readthedocs.io/en/latest/10min)
 * [A quick tutorial on Miller](https://www.ict4g.net/adolfo/notes/data-analysis/miller-quick-tutorial.html)
 * [Tools to manipulate CSV files from the Command Line](https://www.ict4g.net/adolfo/notes/data-analysis/tools-to-manipulate-csv.html)
 * [www.togaware.com/linux/survivor/CSV_Files.html](https://www.togaware.com/linux/survivor/CSV_Files.html)
 * [MLR for CSV manipulation](https://guillim.github.io/terminal/2018/06/19/MLR-for-CSV-manipulation.html)
-* [Miller in 10 minutes](https://miller.readthedocs.io/en/latest/10min.html)
 * [Linux Magazine: Process structured text files with Miller](https://www.linux-magazine.com/Issues/2016/187/Miller)
 * [Miller: Command Line CSV File Processing](https://onepointzero.app/posts/miller-command-line-csv-file-processing/)
 
 # More documentation links
 
 * [**Full documentation**](https://miller.readthedocs.io/)
-* [Miller's license is two-clause BSD](https://github.com/johnkerl/miller/blob/master/LICENSE.txt)
+* [Miller's license is two-clause BSD](https://github.com/johnkerl/miller/blob/main/LICENSE.txt)
 * [Notes about issue-labeling in the Github repo](https://github.com/johnkerl/miller/wiki/Issue-labeling)
 * [Active issues](https://github.com/johnkerl/miller/issues?q=is%3Aissue+is%3Aopen+sort%3Aupdated-desc)
-
-# Miller 6 pre-release
-
-* Pre-release/WIP docs are at [http://johnkerl.org/miller6](http://johnkerl.org/miller6)
-* [go/README.md](./go/README.md)
-* [Tracking issue](https://github.com/johnkerl/miller/issues/372)
 
 # Installing
 
@@ -65,6 +59,7 @@ There's a good chance you can get Miller pre-built for your system:
 [![NetBSD](https://img.shields.io/badge/distros-netbsd-f26711.svg)](http://pkgsrc.se/textproc/miller)
 [![FreeBSD](https://img.shields.io/badge/distros-freebsd-8c0707.svg)](https://www.freshports.org/textproc/miller/)
 
+[![Anaconda](https://img.shields.io/badge/distros-anaconda-63ad41.svg)](https://anaconda.org/conda-forge/miller/)
 [![Homebrew/MacOSX](https://img.shields.io/badge/distros-macosxbrew-ba832b.svg)](https://github.com/Homebrew/homebrew-core/search?utf8=%E2%9C%93&q=miller)
 [![MacPorts/MacOSX](https://img.shields.io/badge/distros-macports-1376ec.svg)](https://www.macports.org/ports.php?by=name&substr=miller)
 [![Chocolatey](https://img.shields.io/badge/distros-chocolatey-red.svg)](https://chocolatey.org/packages/miller)
@@ -81,9 +76,15 @@ See also [building from source](https://miller.readthedocs.io/en/latest/build.ht
 
 [![Go-port multi-platform build status](https://github.com/johnkerl/miller/actions/workflows/go.yml/badge.svg)](https://github.com/johnkerl/miller/actions)
 
-[License: BSD2](https://github.com/johnkerl/miller/blob/master/LICENSE.txt)
+# Building from source
 
-[Docs](https://miller.readthedocs.io/en/latest/?badge=latest)
+* `make` and `make check`
+* The Miller executable is `./mlr` (or `.\mlr.exe` on Windows)
+* For more developer information please see [README-go-port.md](./README-go-port.md)
+
+# License
+
+[License: BSD2](https://github.com/johnkerl/miller/blob/main/LICENSE.txt)
 
 # Community
 
