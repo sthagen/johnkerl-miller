@@ -1,12 +1,14 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -152,39 +154,38 @@ func NewTransformerCount(
 
 func (tr *TransformerCount) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCount) countUngrouped(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		tr.ungroupedCount++
 	} else {
-		newrec := types.NewMlrmapAsRecord()
-		newrec.PutCopy(tr.outputFieldName, types.MlrvalFromInt(tr.ungroupedCount))
+		newrec := mlrval.NewMlrmapAsRecord()
+		newrec.PutCopy(tr.outputFieldName, mlrval.FromInt(tr.ungroupedCount))
+		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &inrecAndContext.Context))
 
-		outputChannel <- types.NewRecordAndContext(newrec, &inrecAndContext.Context)
-
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCount) countGrouped(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -209,16 +210,16 @@ func (tr *TransformerCount) countGrouped(
 
 	} else {
 		if tr.showCountsOnly {
-			newrec := types.NewMlrmapAsRecord()
-			newrec.PutCopy(tr.outputFieldName, types.MlrvalFromInt(tr.groupedCounts.FieldCount))
+			newrec := mlrval.NewMlrmapAsRecord()
+			newrec.PutCopy(tr.outputFieldName, mlrval.FromInt(tr.groupedCounts.FieldCount))
 
 			outrecAndContext := types.NewRecordAndContext(newrec, &inrecAndContext.Context)
-			outputChannel <- outrecAndContext
+			outputRecordsAndContexts.PushBack(outrecAndContext)
 
 		} else {
 			for outer := tr.groupedCounts.Head; outer != nil; outer = outer.Next {
 				groupingKey := outer.Key
-				newrec := types.NewMlrmapAsRecord()
+				newrec := mlrval.NewMlrmapAsRecord()
 
 				// Example:
 				// * Suppose group-by fields are a,b.
@@ -227,7 +228,7 @@ func (tr *TransformerCount) countGrouped(
 				// * Grouping values for key is ["foo", "bar"]
 				// Here we populate a record with "a=foo,b=bar".
 
-				groupingValuesForKey := tr.groupingValues.Get(groupingKey).([]*types.Mlrval)
+				groupingValuesForKey := tr.groupingValues.Get(groupingKey).([]*mlrval.Mlrval)
 				i := 0
 				for _, groupingValueForKey := range groupingValuesForKey {
 					newrec.PutCopy(tr.groupByFieldNames[i], groupingValueForKey)
@@ -235,13 +236,13 @@ func (tr *TransformerCount) countGrouped(
 				}
 
 				countForGroup := outer.Value.(int)
-				newrec.PutCopy(tr.outputFieldName, types.MlrvalFromInt(countForGroup))
+				newrec.PutCopy(tr.outputFieldName, mlrval.FromInt(countForGroup))
 
 				outrecAndContext := types.NewRecordAndContext(newrec, &inrecAndContext.Context)
-				outputChannel <- outrecAndContext
+				outputRecordsAndContexts.PushBack(outrecAndContext)
 			}
 		}
 
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

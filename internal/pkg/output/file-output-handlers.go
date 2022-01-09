@@ -13,7 +13,8 @@
 package output
 
 import (
-	"errors"
+	"bufio"
+	"container/list"
 	"fmt"
 	"io"
 	"os"
@@ -48,7 +49,7 @@ type MultiOutputHandlerManager struct {
 	// For stdout or stderr
 	singleHandler *FileOutputHandler
 
-	// TOOD: make an enum
+	// TODO: make an enum
 	append              bool // True for ">>", false for ">" and "|"
 	pipe                bool // True for "|", false for ">" and ">>"
 	recordWriterOptions *cli.TWriterOptions
@@ -200,9 +201,10 @@ func (manager *MultiOutputHandlerManager) Close() []error {
 
 // ================================================================
 type FileOutputHandler struct {
-	filename  string
-	handle    io.WriteCloser
-	closeable bool
+	filename             string
+	handle               io.WriteCloser
+	bufferedOutputStream *bufio.Writer
+	closeable            bool
 
 	// This will be nil if WriteRecordAndContext has never been called. It's
 	// lazily created on WriteRecord. The record-writer / channel parts are
@@ -210,7 +212,7 @@ type FileOutputHandler struct {
 	// print and dump variants call WriteString.
 	recordWriterOptions *cli.TWriterOptions
 	recordWriter        IRecordWriter
-	recordOutputChannel chan *types.RecordAndContext
+	recordOutputChannel chan *list.List // list of *types.RecordAndContext
 	recordDoneChannel   chan bool
 }
 
@@ -221,9 +223,10 @@ func newOutputHandlerCommon(
 	recordWriterOptions *cli.TWriterOptions,
 ) *FileOutputHandler {
 	return &FileOutputHandler{
-		filename:  filename,
-		handle:    handle,
-		closeable: closeable,
+		filename:             filename,
+		handle:               handle,
+		bufferedOutputStream: bufio.NewWriter(handle),
+		closeable:            closeable,
 
 		recordWriterOptions: recordWriterOptions,
 		recordWriter:        nil,
@@ -279,13 +282,7 @@ func NewPipeWriteOutputHandler(
 ) (*FileOutputHandler, error) {
 	writePipe, err := lib.OpenOutboundHalfPipe(commandString)
 	if err != nil {
-		return nil, errors.New(
-			fmt.Sprintf(
-				"%s: could not launch command \"%s\" for pipe-to.",
-				"mlr",
-				commandString,
-			),
-		)
+		return nil, fmt.Errorf("could not launch command \"%s\" for pipe-to.", commandString)
 	}
 
 	return newOutputHandlerCommon(
@@ -320,7 +317,7 @@ func newStderrOutputHandler(
 
 // ----------------------------------------------------------------
 func (handler *FileOutputHandler) WriteString(outputString string) error {
-	_, err := handler.handle.Write([]byte(outputString))
+	_, err := handler.bufferedOutputStream.WriteString(outputString)
 	return err
 }
 
@@ -336,7 +333,10 @@ func (handler *FileOutputHandler) WriteRecordAndContext(
 		}
 	}
 
-	handler.recordOutputChannel <- outrecAndContext
+	// TODO: myybe refactor to batch better
+	ell := list.New()
+	ell.PushBack(outrecAndContext)
+	handler.recordOutputChannel <- ell
 	return nil
 }
 
@@ -351,14 +351,15 @@ func (handler *FileOutputHandler) setUpRecordWriter() error {
 	}
 	handler.recordWriter = recordWriter
 
-	handler.recordOutputChannel = make(chan *types.RecordAndContext, 1)
+	handler.recordOutputChannel = make(chan *list.List, 1) // list of *types.RecordAndContext
 	handler.recordDoneChannel = make(chan bool, 1)
 
 	go ChannelWriter(
 		handler.recordOutputChannel,
 		handler.recordWriter,
+		handler.recordWriterOptions,
 		handler.recordDoneChannel,
-		handler.handle,
+		handler.bufferedOutputStream,
 		false, // outputIsStdout
 	)
 
@@ -370,7 +371,7 @@ func (handler *FileOutputHandler) Close() error {
 	if handler.recordOutputChannel != nil {
 		// TODO: see if we need a real context
 		emptyContext := types.Context{}
-		handler.recordOutputChannel <- types.NewEndOfStreamMarker(&emptyContext)
+		handler.recordOutputChannel <- types.NewEndOfStreamMarkerList(&emptyContext)
 
 		// Wait for the output channel to drain
 		done := false
@@ -383,6 +384,7 @@ func (handler *FileOutputHandler) Close() error {
 		}
 	}
 
+	handler.bufferedOutputStream.Flush()
 	if handler.closeable {
 		return handler.handle.Close()
 	} else {

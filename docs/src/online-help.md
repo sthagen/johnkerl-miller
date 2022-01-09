@@ -50,6 +50,7 @@ Essentials:
 Flags:
   mlr help flags
   mlr help list-separator-aliases
+  mlr help list-separator-regex-aliases
   mlr help comments-in-data-flags
   mlr help compressed-data-flags
   mlr help csv-only-flags
@@ -61,6 +62,7 @@ Flags:
   mlr help miscellaneous-flags
   mlr help output-colorization-flags
   mlr help pprint-only-flags
+  mlr help profiling-flags
   mlr help separator-flags
 Verbs:
   mlr help list-verbs

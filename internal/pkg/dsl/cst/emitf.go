@@ -6,11 +6,11 @@
 package cst
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/output"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
 	"github.com/johnkerl/miller/internal/pkg/types"
@@ -27,7 +27,7 @@ import (
 // in the CST logic, to keep this parser/AST logic simpler.
 
 type tEmitFToRedirectFunc func(
-	newrec *types.Mlrmap,
+	newrec *mlrval.Mlrmap,
 	state *runtime.State,
 ) error
 
@@ -119,12 +119,7 @@ func (root *RootNode) BuildEmitFStatementNode(astNode *dsl.ASTNode) (IExecutable
 			} else if redirectorNode.Type == dsl.NodeTypeRedirectPipe {
 				retval.outputHandlerManager = output.NewPipeWriteHandlerManager(root.recordWriterOptions)
 			} else {
-				return nil, errors.New(
-					fmt.Sprintf(
-						"%s: unhandled redirector node type %s.",
-						"mlr", string(redirectorNode.Type),
-					),
-				)
+				return nil, fmt.Errorf("mlr: unhandled redirector node type %s.", string(redirectorNode.Type))
 			}
 		}
 	}
@@ -139,7 +134,7 @@ func (root *RootNode) BuildEmitFStatementNode(astNode *dsl.ASTNode) (IExecutable
 }
 
 func (node *EmitFStatementNode) Execute(state *runtime.State) (*BlockExitPayload, error) {
-	newrec := types.NewMlrmapAsRecord()
+	newrec := mlrval.NewMlrmapAsRecord()
 	for i, emitfEvaluable := range node.emitfEvaluables {
 		emitfName := node.emitfNames[i]
 		emitfValue := emitfEvaluable.Evaluate(state)
@@ -168,22 +163,17 @@ func getNameFromNamedNode(astNode *dsl.ASTNode, description string) (string, err
 	} else if astNode.Type == dsl.NodeTypeDirectFieldValue {
 		return string(astNode.Token.Lit), nil
 	}
-	return "", errors.New(
-		fmt.Sprintf(
-			"%s: can't get name of node type \"%s\" for %s.",
-			"mlr", string(astNode.Type), description,
-		),
-	)
+	return "", fmt.Errorf("mlr: can't get name of node type \"%s\" for %s.", string(astNode.Type), description)
 }
 
 // ----------------------------------------------------------------
 func (node *EmitFStatementNode) emitfToRecordStream(
-	outrec *types.Mlrmap,
+	outrec *mlrval.Mlrmap,
 	state *runtime.State,
 ) error {
 	// The output channel is always non-nil, except for the Miller REPL.
-	if state.OutputChannel != nil {
-		state.OutputChannel <- types.NewRecordAndContext(outrec, state.Context)
+	if state.OutputRecordsAndContexts != nil {
+		state.OutputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, state.Context))
 	} else {
 		fmt.Println(outrec.String())
 	}
@@ -192,17 +182,12 @@ func (node *EmitFStatementNode) emitfToRecordStream(
 
 // ----------------------------------------------------------------
 func (node *EmitFStatementNode) emitfToFileOrPipe(
-	outrec *types.Mlrmap,
+	outrec *mlrval.Mlrmap,
 	state *runtime.State,
 ) error {
 	redirectorTarget := node.redirectorTargetEvaluable.Evaluate(state)
 	if !redirectorTarget.IsString() {
-		return errors.New(
-			fmt.Sprintf(
-				"%s: output redirection yielded %s, not string.",
-				"mlr", redirectorTarget.GetTypeName(),
-			),
-		)
+		return fmt.Errorf("mlr: output redirection yielded %s, not string.", redirectorTarget.GetTypeName())
 	}
 	outputFileName := redirectorTarget.String()
 

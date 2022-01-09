@@ -1,11 +1,13 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -121,7 +123,7 @@ type TransformerFillDown struct {
 	onlyIfAbsent       bool
 
 	// state
-	lastNonNullValues map[string]*types.Mlrval
+	lastNonNullValues map[string]*mlrval.Mlrval
 
 	recordTransformerFunc RecordTransformerFunc
 }
@@ -134,7 +136,7 @@ func NewTransformerFillDown(
 	tr := &TransformerFillDown{
 		fillDownFieldNames: fillDownFieldNames,
 		onlyIfAbsent:       onlyIfAbsent,
-		lastNonNullValues:  make(map[string]*types.Mlrval),
+		lastNonNullValues:  make(map[string]*mlrval.Mlrval),
 	}
 
 	if doAll {
@@ -150,20 +152,20 @@ func NewTransformerFillDown(
 
 func (tr *TransformerFillDown) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerFillDown) transformSpecified(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -174,7 +176,7 @@ func (tr *TransformerFillDown) transformSpecified(
 			if tr.onlyIfAbsent {
 				present = value != nil
 			} else {
-				present = value != nil && !value.IsEmpty()
+				present = value != nil && !value.IsVoid()
 			}
 
 			if present {
@@ -189,19 +191,19 @@ func (tr *TransformerFillDown) transformSpecified(
 			}
 		}
 
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerFillDown) transformAll(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -213,7 +215,7 @@ func (tr *TransformerFillDown) transformAll(
 			if tr.onlyIfAbsent {
 				present = value != nil
 			} else {
-				present = value != nil && !value.IsEmpty()
+				present = value != nil && !value.IsVoid()
 			}
 
 			if present {
@@ -228,9 +230,9 @@ func (tr *TransformerFillDown) transformAll(
 			}
 		}
 
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

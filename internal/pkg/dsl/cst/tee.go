@@ -5,11 +5,11 @@
 package cst
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/output"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
 	"github.com/johnkerl/miller/internal/pkg/types"
@@ -58,7 +58,7 @@ import (
 
 // ================================================================
 type tTeeToRedirectFunc func(
-	outrec *types.Mlrmap,
+	outrec *mlrval.Mlrmap,
 	state *runtime.State,
 ) error
 
@@ -121,12 +121,7 @@ func (root *RootNode) BuildTeeStatementNode(astNode *dsl.ASTNode) (IExecutable, 
 		} else if redirectorNode.Type == dsl.NodeTypeRedirectPipe {
 			retval.outputHandlerManager = output.NewPipeWriteHandlerManager(root.recordWriterOptions)
 		} else {
-			return nil, errors.New(
-				fmt.Sprintf(
-					"%s: unhandled redirector node type %s.",
-					"mlr", string(redirectorNode.Type),
-				),
-			)
+			return nil, fmt.Errorf("mlr: unhandled redirector node type %s.", string(redirectorNode.Type))
 		}
 	}
 
@@ -143,12 +138,7 @@ func (root *RootNode) BuildTeeStatementNode(astNode *dsl.ASTNode) (IExecutable, 
 func (node *TeeStatementNode) Execute(state *runtime.State) (*BlockExitPayload, error) {
 	expression := node.expressionEvaluable.Evaluate(state)
 	if !expression.IsMap() {
-		return nil, errors.New(
-			fmt.Sprintf(
-				"%s: tee-evaluaiton yielded %s, not map.",
-				"mlr", expression.GetTypeName(),
-			),
-		)
+		return nil, fmt.Errorf("mlr: tee-evaluaiton yielded %s, not map.", expression.GetTypeName())
 	}
 	err := node.teeToRedirectFunc(expression.GetMap(), state)
 	return nil, err
@@ -156,17 +146,12 @@ func (node *TeeStatementNode) Execute(state *runtime.State) (*BlockExitPayload, 
 
 // ----------------------------------------------------------------
 func (node *TeeStatementNode) teeToFileOrPipe(
-	outrec *types.Mlrmap,
+	outrec *mlrval.Mlrmap,
 	state *runtime.State,
 ) error {
 	redirectorTarget := node.redirectorTargetEvaluable.Evaluate(state)
 	if !redirectorTarget.IsString() {
-		return errors.New(
-			fmt.Sprintf(
-				"%s: output redirection yielded %s, not string.",
-				"mlr", redirectorTarget.GetTypeName(),
-			),
-		)
+		return fmt.Errorf("mlr: output redirection yielded %s, not string.", redirectorTarget.GetTypeName())
 	}
 	outputFileName := redirectorTarget.String()
 

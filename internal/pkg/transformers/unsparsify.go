@@ -8,6 +8,7 @@ import (
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -110,7 +111,7 @@ func transformerUnsparsifyParseCLI(
 
 // ----------------------------------------------------------------
 type TransformerUnsparsify struct {
-	fillerMlrval          *types.Mlrval
+	fillerMlrval          *mlrval.Mlrval
 	recordsAndContexts    *list.List
 	fieldNamesSeen        *lib.OrderedMap
 	recordTransformerFunc RecordTransformerFunc
@@ -127,7 +128,7 @@ func NewTransformerUnsparsify(
 	}
 
 	tr := &TransformerUnsparsify{
-		fillerMlrval:       types.MlrvalFromString(fillerString),
+		fillerMlrval:       mlrval.FromString(fillerString),
 		recordsAndContexts: list.New(),
 		fieldNamesSeen:     fieldNamesSeen,
 	}
@@ -145,20 +146,20 @@ func NewTransformerUnsparsify(
 
 func (tr *TransformerUnsparsify) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerUnsparsify) transformNonStreaming(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -174,7 +175,7 @@ func (tr *TransformerUnsparsify) transformNonStreaming(
 			outrecAndContext := e.Value.(*types.RecordAndContext)
 			outrec := outrecAndContext.Record
 
-			newrec := types.NewMlrmapAsRecord()
+			newrec := mlrval.NewMlrmapAsRecord()
 			for pe := tr.fieldNamesSeen.Head; pe != nil; pe = pe.Next {
 				fieldName := pe.Key
 				if !outrec.Has(fieldName) {
@@ -184,19 +185,19 @@ func (tr *TransformerUnsparsify) transformNonStreaming(
 				}
 			}
 
-			outputChannel <- types.NewRecordAndContext(newrec, &outrecAndContext.Context)
+			outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &outrecAndContext.Context))
 		}
 
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerUnsparsify) transformStreaming(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -207,9 +208,9 @@ func (tr *TransformerUnsparsify) transformStreaming(
 			}
 		}
 
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

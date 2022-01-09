@@ -1,3 +1,4 @@
+// ================================================================
 // Miller main command-line parsing.
 //
 // Before Miller 6 the ordering was:
@@ -65,6 +66,7 @@
 // foo.csv' the '--csv' looks like it belongs to the 'head' verb. When people
 // use '#!/bin/sh' scripts they need to insert the '--' in 'mlr head -n 10 --
 // --csv foo.csv'; for 'mlr -s' we insert the '--' for them.
+// ================================================================
 
 package climain
 
@@ -75,8 +77,8 @@ import (
 	"github.com/johnkerl/miller/internal/pkg/auxents/help"
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/transformers"
-	"github.com/johnkerl/miller/internal/pkg/types"
 	"github.com/johnkerl/miller/internal/pkg/version"
 )
 
@@ -128,12 +130,7 @@ func parseCommandLinePassOne(
 		oargi := argi
 
 		if args[argi][0] == '-' {
-
-			if args[argi] == "--cpuprofile" {
-				// Already handled in main(); ignore here, and don't send it to pass two.
-				cli.CheckArgCount(args, argi, argc, 1)
-				argi += 2
-			} else if args[argi] == "--version" {
+			if args[argi] == "--version" {
 				// Exiting flag: handle it immediately.
 				fmt.Printf("mlr %s\n", version.STRING)
 				os.Exit(0)
@@ -277,7 +274,7 @@ func parseCommandLinePassTwo(
 
 	// Set an optional global formatter for floating-point values
 	if options.WriterOptions.FPOFMT != "" {
-		err = types.SetMlrvalFloatOutputFormat(options.WriterOptions.FPOFMT)
+		err = mlrval.SetFloatOutputFormat(options.WriterOptions.FPOFMT)
 		if err != nil {
 			return options, recordTransformers, err
 		}
@@ -304,7 +301,7 @@ func parseCommandLinePassTwo(
 			options,
 			true, // false for first pass of CLI-parse, true for second pass -- this is the first pass
 		)
-		// Unparseable verb-setups should have been found in pass one.
+		// Unparsable verb-setups should have been found in pass one.
 		lib.InternalCodingErrorIf(transformer == nil)
 		// Make sure we consumed the entire verb sequence as parsed by pass one.
 		lib.InternalCodingErrorIf(argi != argc)
@@ -324,7 +321,7 @@ func parseCommandLinePassTwo(
 	if cli.DecideFinalFlatten(&options.WriterOptions) {
 		// E.g. '{"req": {"method": "GET", "path": "/api/check"}}' becomes
 		// req.method=GET,req.path=/api/check.
-		transformer, err := transformers.NewTransformerFlatten(options.WriterOptions.FLATSEP, nil)
+		transformer, err := transformers.NewTransformerFlatten(options.WriterOptions.FLATSEP, options, nil)
 		lib.InternalCodingErrorIf(err != nil)
 		lib.InternalCodingErrorIf(transformer == nil)
 		recordTransformers = append(recordTransformers, transformer)
@@ -333,7 +330,7 @@ func parseCommandLinePassTwo(
 	if cli.DecideFinalUnflatten(options) {
 		// E.g.  req.method=GET,req.path=/api/check becomes
 		// '{"req": {"method": "GET", "path": "/api/check"}}'
-		transformer, err := transformers.NewTransformerUnflatten(options.WriterOptions.FLATSEP, nil)
+		transformer, err := transformers.NewTransformerUnflatten(options.WriterOptions.FLATSEP, options, nil)
 		lib.InternalCodingErrorIf(err != nil)
 		lib.InternalCodingErrorIf(transformer == nil)
 		recordTransformers = append(recordTransformers, transformer)

@@ -1,6 +1,7 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -70,6 +71,16 @@ func transformerHeadParseCLI(
 		} else if opt == "-n" {
 			headCount = cli.VerbGetIntArgOrDie(verb, opt, args, &argi, argc)
 
+			// This is a bit of a hack. In our Getoptify routine we preprocess
+			// the command line sending '-xyz' to '-x -y -z', but leaving
+			// '--xyz' as-is. Also, Unix-like tools often support 'head -n4'
+			// and 'tail -n4' in addition to 'head -n 4' and 'tail -n 4'.  Our
+			// getoptify paradigm, combined with syntax familiar to users,
+			// means we get '-n -4' here. So, take the absolute value to handle this.
+			if headCount < 0 {
+				headCount = -headCount
+			}
+
 		} else if opt == "-g" {
 			groupByFieldNames = cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 
@@ -136,41 +147,42 @@ func NewTransformerHead(
 
 func (tr *TransformerHead) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 func (tr *TransformerHead) transformUnkeyed(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		tr.unkeyedRecordCount++
 		if tr.unkeyedRecordCount <= tr.headCount {
-			outputChannel <- inrecAndContext
+			outputRecordsAndContexts.PushBack(inrecAndContext)
 		} else if !tr.wroteDownstreamDone {
 			// Signify to data producers upstream that we'll ignore further
 			// data, so as far as we're concerned they can stop sending it. See
 			// ChainTransformer.
+			//TODO: maybe remove: outputRecordsAndContexts.PushBack(types.NewEndOfStreamMarker(&inrecAndContext.Context))
 			outputDownstreamDoneChannel <- true
 			tr.wroteDownstreamDone = true
 		}
 	} else {
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }
 
 func (tr *TransformerHead) transformKeyed(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -190,10 +202,10 @@ func (tr *TransformerHead) transformKeyed(
 		}
 
 		if count <= tr.headCount {
-			outputChannel <- inrecAndContext
+			outputRecordsAndContexts.PushBack(inrecAndContext)
 		}
 
 	} else {
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }

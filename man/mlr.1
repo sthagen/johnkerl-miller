@@ -2,12 +2,12 @@
 .\"     Title: mlr
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: ./mkman.rb
-.\"      Date: 2021-11-24
+.\"      Date: 2022-01-08
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "MILLER" "1" "2021-11-24" "\ \&" "\ \&"
+.TH "MILLER" "1" "2022-01-08" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Portability definitions
 .\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -47,7 +47,7 @@ on integer-indexed fields: if the natural data structure for the latter is the
 array, then Miller's natural data structure is the insertion-ordered hash map.
 This encompasses a variety of data formats, including but not limited to the
 familiar CSV, TSV, and JSON.  (Miller can handle positionally-indexed data as
-a special case.) This manpage documents mlr 6.0.0-dev.
+a special case.) This manpage documents mlr 6.0.0-rc1.
 .SH "EXAMPLES"
 .sp
 
@@ -146,6 +146,7 @@ Essentials:
 Flags:
   mlr help flags
   mlr help list-separator-aliases
+  mlr help list-separator-regex-aliases
   mlr help comments-in-data-flags
   mlr help compressed-data-flags
   mlr help csv-only-flags
@@ -157,6 +158,7 @@ Flags:
   mlr help miscellaneous-flags
   mlr help output-colorization-flags
   mlr help pprint-only-flags
+  mlr help profiling-flags
   mlr help separator-flags
 Verbs:
   mlr help list-verbs
@@ -234,9 +236,9 @@ sec2gmt sec2gmtdate sec2hms sec2localdate sec2localtime select sgn sha1 sha256
 sha512 sin sinh sort splita splitax splitkv splitkvx splitnv splitnvx sqrt
 ssub strftime strftime_local string strip strlen strptime strptime_local sub
 substr substr0 substr1 system systime systimeint tan tanh tolower toupper
-truncate typeof unflatten uptime urand urand32 urandint urandrange version !
-!= !=~ % & && * ** + - . .* .+ .- ./ / // < << <= <=> == =~ > >= >> >>> ?: ??
-??? ^ ^^ | || ~
+truncate typeof unflatten uptime urand urand32 urandelement urandint
+urandrange version ! != !=~ % & && * ** + - . .* .+ .- ./ / // < << <= <=> ==
+=~ > >= >> >>> ?: ?? ??? ^ ^^ | || ~
 .fi
 .if n \{\
 .RE
@@ -447,7 +449,7 @@ are overridden in all cases by setting output format to `format2`.
 .RS 0
 .\}
 .nf
-These flags control how Miller converts record values which are maps or arrays, when input is JSON and ouput is non-JSON (flattening) or input is non-JSON and output is JSON (unflattening).
+These flags control how Miller converts record values which are maps or arrays, when input is JSON and output is non-JSON (flattening) or input is non-JSON and output is JSON (unflattening).
 
 See the Flatten/unflatten doc page for more information.
 
@@ -538,9 +540,6 @@ They are accepted as no-op flags in order to keep old scripts from breaking.
                          preserved throughout the processing stream.
 --mmap                   Miller no longer uses memory-mapping to access data
                          files.
---no-fflush              The current implementation of Miller does not use
-                         buffered output, so there is no longer anything to
-                         suppress here.
 --no-mmap                Miller no longer uses memory-mapping to access data
                          files.
 --ojsonx                 The `--jvstack` flag is now default true in Miller 6.
@@ -567,16 +566,33 @@ They are accepted as no-op flags in order to keep old scripts from breaking.
 .\}
 .nf
 These are flags which don't fit into any other category.
+--fflush                 Force buffered output to be written after every
+                         output record. The default is flush output after
+                         every record if the output is to the terminal, or
+                         less often if the output is to a file or a pipe. The
+                         default is a significant performance optimization for
+                         large files. Use this flag to force frequent updates
+                         even when output is to a pipe or file, at a
+                         performance cost.
 --from {filename}        Use this to specify an input file before the verb(s),
                          rather than after. May be used more than once.
                          Example: `mlr --from a.dat --from b.dat cat` is the
                          same as `mlr cat a.dat b.dat`.
+--hash-records           This is an internal parameter which normally does not
+                         need to be modified. It controls the mechanism by
+                         which Miller accesses fields within records. In
+                         general --no-hash-records is faster, and is the
+                         default. For specific use-cases involving data having
+                         many fields, and many of them being processed during
+                         a given processing run, --hash-records might offer a
+                         slight performance benefit.
 --infer-int-as-float or -A
                          Cast all integers in data files to floats.
---infer-no-octal or -O   Treat numbers like 0123 in data files as string
-                         "0123", not octal for decimal 83 etc.
 --infer-none or -S       Don't treat values like 123 or 456.7 in data files as
                          int/float; leave them as strings.
+--infer-octal or -O      Treat numbers like 0123 in data files as numeric;
+                         default is string. Note that 00--07 etc scan as int;
+                         08-09 scan as float.
 --load {filename}        Load DSL script file for all put/filter operations on
                          the command line. If the name following `--load` is a
                          directory, load all `*.mlr` files in that directory.
@@ -591,12 +607,33 @@ These are flags which don't fit into any other category.
                          what you might hope but `--mfrom *.csv --` does.
 --mload {filenames}      Like `--load` but works with more than one filename,
                          e.g. `--mload *.mlr --`.
+--no-dedupe-field-names  By default, if an input record has a field named `x`
+                         and another also named `x`, the second will be
+                         renamed `x_2`, and so on. With this flag provided,
+                         the second `x`'s value will replace the first `x`'s
+                         value when the record is read. This flag has no
+                         effect on JSON input records, where duplicate keys
+                         always result in the last one's value being retained.
+--no-fflush              Let buffered output not be written after every output
+                         record. The default is flush output after every
+                         record if the output is to the terminal, or less
+                         often if the output is to a file or a pipe. The
+                         default is a significant performance optimization for
+                         large files. Use this flag to allow less-frequent
+                         updates when output is to the terminal. This is
+                         unlikely to be a noticeable performance improvement,
+                         since direct-to-screen output for large files has its
+                         own overhead.
+--no-hash-records        See --hash-records.
 --nr-progress-mod {m}    With m a positive integer: print filename and record
                          count to os.Stderr every m input records.
 --ofmt {format}          E.g. `%.18f`, `%.0f`, `%9.6e`. Please use
-                         sprintf-style codes for floating-point nummbers. If
+                         sprintf-style codes for floating-point numbers. If
                          not specified, default formatting is used. See also
                          the `fmtnum` function and the `format-values` verb.
+--records-per-batch {n}  This is an internal parameter for maximum number of
+                         records in a batch size. Normally this does not need
+                         to be modified.
 --seed {n}               with `n` of the form `12345678` or `0xcafefeed`. For
                          `put`/`filter` `urand`, `urandint`, and `urand32`.
 --tz {timezone}          Specify timezone, overriding `$TZ` environment
@@ -717,6 +754,28 @@ These are flags which are applicable to PPRINT output format.
 .fi
 .if n \{\
 .RE
+.SH "PROFILING FLAGS"
+.sp
+
+.if n \{\
+.RS 0
+.\}
+.nf
+These are flags for profiling Miller performance.
+--cpuprofile {CPU-profile file name}
+                         Create a CPU-profile file for performance analysis.
+                         Instructions will be printed to stderr. This flag
+                         must be the very first thing after 'mlr' on the
+                         command line.
+--time                   Print elapsed execution time in seconds to stderr at
+                         the end of the execution of the program.
+--traceprofile           Create a trace-profile file for performance analysis.
+                         Instructions will be printed to stderr. This flag
+                         must be the very first thing after 'mlr' on the
+                         command line.
+.fi
+.if n \{\
+.RE
 .SH "SEPARATOR FLAGS"
 .sp
 
@@ -796,11 +855,14 @@ Notes about all other separators:
           semicolon  = ";"
           slash      = "/"
           space      = " "
-          spaces     = "( )+"
           tab        = "\et"
-          tabs       = "(\et)+"
           usv_fs     = "\exe2\ex90\ex9f"
           usv_rs     = "\exe2\ex90\ex9e"
+
+  - Similarly, you can use the following for `--ifs-regex` and `--ips-regex`:
+
+          spaces     = "( )+"
+          tabs       = "(\et)+"
           whitespace = "([ \et])+"
 
 * Default separators by format:
@@ -817,12 +879,10 @@ Notes about all other separators:
 
 --fs {string}            Specify FS for input and output.
 --ifs {string}           Specify FS for input.
+--ifs-regex {string}     Specify FS for input as a regular expression.
 --ips {string}           Specify PS for input.
+--ips-regex {string}     Specify PS for input as a regular expression.
 --irs {string}           Specify RS for input.
---no-ifs-regex           Don't treat IFS value as a regular expression. Useful
-                         if your IFS is ".".
---no-ips-regex           Don't treat IPS value as a regular expression. Useful
-                         if your IPS is ".".
 --ofs {string}           Specify FS for output.
 --ops {string}           Specify PS for output.
 --ors {string}           Specify RS for output.
@@ -847,6 +907,7 @@ Available subcommands:
   help
   regtest
   repl
+  version
 For more information, please invoke mlr {subcommand} --help.
 .fi
 .if n \{\
@@ -884,7 +945,8 @@ How to specify location of .mlrrc:
   o If $HOME/.mlrrc exists, it's then processed as above.
   o If ./.mlrrc exists, it's then also processed as above.
   (I.e. current-directory .mlrrc defaults are stacked over home-directory .mlrrc defaults.)
-
+* The command-line flag "--norc" can be used to suppress loading the .mlrrc file even when other
+  conditions are met.
 See also:
 https://miller.readthedocs.io/en/latest/customization.html
 .fi
@@ -1519,7 +1581,6 @@ the main "mlr --help" for more information on syntax for these arguments:
   --ifs {field-separator character}
   --ips {pair-separator character}
   --repifs
-  --repips
   --implicit-csv-header
   --no-implicit-csv-header
 For example, if you have 'mlr --csv ... join -l foo ... ' then the left-file format will
@@ -3976,6 +4037,15 @@ Int-valued example: '$n=floor(20+urand()*11)'.
 .fi
 .if n \{\
 .RE
+.SS "urandelement"
+.if n \{\
+.RS 0
+.\}
+.nf
+ (class=math #args=1) Random sample from the first argument, which must be an non-empty array.
+.fi
+.if n \{\
+.RE
 .SS "urandint"
 .if n \{\
 .RS 0
@@ -4676,6 +4746,17 @@ C-style for-loop:
 func: used for defining a user-defined function.
 
   Example: 'func f(a,b) { return sqrt(a**2+b**2)} $d = f($x, $y)'
+.fi
+.if n \{\
+.RE
+.SS "funct"
+.if n \{\
+.RS 0
+.\}
+.nf
+funct: used for saying that a function argument is a user-defined function.
+
+  Example: 'func g(num a, num b, funct f) :num { return f(a**2+b**2) }'
 .fi
 .if n \{\
 .RE

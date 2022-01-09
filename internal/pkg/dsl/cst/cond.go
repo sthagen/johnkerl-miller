@@ -6,12 +6,12 @@
 package cst
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
-	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 type CondBlockNode struct {
@@ -46,7 +46,7 @@ func (root *RootNode) BuildCondBlockNode(astNode *dsl.ASTNode) (*CondBlockNode, 
 func (node *CondBlockNode) Execute(
 	state *runtime.State,
 ) (*BlockExitPayload, error) {
-	condition := types.MLRVAL_TRUE
+	condition := mlrval.TRUE
 	if node.conditionNode != nil {
 		condition = node.conditionNode.Evaluate(state)
 	}
@@ -57,7 +57,7 @@ func (node *CondBlockNode) Execute(
 		boolValue = false
 	} else if !isBool {
 		// TODO: line-number/token info for the DSL expression.
-		return nil, errors.New("mlr: conditional expression did not evaluate to boolean.")
+		return nil, fmt.Errorf("mlr: conditional expression did not evaluate to boolean.")
 	}
 
 	if boolValue == true {

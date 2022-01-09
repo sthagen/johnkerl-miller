@@ -1,12 +1,14 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -197,26 +199,26 @@ func NewTransformerHistogram(
 
 func (tr *TransformerHistogram) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerHistogram) transformNonAuto(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		tr.ingestNonAuto(inrecAndContext)
 	} else {
-		tr.emitNonAuto(&inrecAndContext.Context, outputChannel)
-		outputChannel <- inrecAndContext // end-of-stream marker
+		tr.emitNonAuto(&inrecAndContext.Context, outputRecordsAndContexts)
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
@@ -249,47 +251,47 @@ func (tr *TransformerHistogram) ingestNonAuto(
 
 func (tr *TransformerHistogram) emitNonAuto(
 	endOfStreamContext *types.Context,
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 ) {
 	countFieldNames := make(map[string]string)
 	for _, valueFieldName := range tr.valueFieldNames {
 		countFieldNames[valueFieldName] = tr.outputPrefix + valueFieldName + "_count"
 	}
 	for i := 0; i < tr.nbins; i++ {
-		outrec := types.NewMlrmapAsRecord()
+		outrec := mlrval.NewMlrmapAsRecord()
 
 		outrec.PutReference(
 			tr.outputPrefix+"bin_lo",
-			types.MlrvalFromFloat64((tr.lo+float64(i))/tr.mul),
+			mlrval.FromFloat((tr.lo+float64(i))/tr.mul),
 		)
 		outrec.PutReference(
 			tr.outputPrefix+"bin_hi",
-			types.MlrvalFromFloat64((tr.lo+float64(i+1))/tr.mul),
+			mlrval.FromFloat((tr.lo+float64(i+1))/tr.mul),
 		)
 
 		for _, valueFieldName := range tr.valueFieldNames {
 			outrec.PutReference(
 				countFieldNames[valueFieldName],
-				types.MlrvalFromInt(tr.countsByField[valueFieldName][i]),
+				mlrval.FromInt(tr.countsByField[valueFieldName][i]),
 			)
 		}
 
-		outputChannel <- types.NewRecordAndContext(outrec, endOfStreamContext)
+		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, endOfStreamContext))
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerHistogram) transformAuto(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		tr.ingestAuto(inrecAndContext)
 	} else {
-		tr.emitAuto(&inrecAndContext.Context, outputChannel)
-		outputChannel <- inrecAndContext // end-of-stream marker
+		tr.emitAuto(&inrecAndContext.Context, outputRecordsAndContexts)
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
@@ -308,7 +310,7 @@ func (tr *TransformerHistogram) ingestAuto(
 
 func (tr *TransformerHistogram) emitAuto(
 	endOfStreamContext *types.Context,
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 ) {
 	haveLoHi := false
 	lo := 0.0
@@ -362,24 +364,24 @@ func (tr *TransformerHistogram) emitAuto(
 	}
 
 	for i := 0; i < nbins; i++ {
-		outrec := types.NewMlrmapAsRecord()
+		outrec := mlrval.NewMlrmapAsRecord()
 
 		outrec.PutReference(
 			tr.outputPrefix+"bin_lo",
-			types.MlrvalFromFloat64((lo+float64(i))/mul),
+			mlrval.FromFloat((lo+float64(i))/mul),
 		)
 		outrec.PutReference(
 			tr.outputPrefix+"bin_hi",
-			types.MlrvalFromFloat64((lo+float64(i+1))/mul),
+			mlrval.FromFloat((lo+float64(i+1))/mul),
 		)
 
 		for _, valueFieldName := range tr.valueFieldNames {
 			outrec.PutReference(
 				countFieldNames[valueFieldName],
-				types.MlrvalFromInt(tr.countsByField[valueFieldName][i]),
+				mlrval.FromInt(tr.countsByField[valueFieldName][i]),
 			)
 		}
 
-		outputChannel <- types.NewRecordAndContext(outrec, endOfStreamContext)
+		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, endOfStreamContext))
 	}
 }

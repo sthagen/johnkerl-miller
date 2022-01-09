@@ -8,10 +8,12 @@ package auxents
 import (
 	"fmt"
 	"os"
+	"runtime"
 
 	"github.com/johnkerl/miller/internal/pkg/auxents/help"
 	"github.com/johnkerl/miller/internal/pkg/auxents/regtest"
 	"github.com/johnkerl/miller/internal/pkg/auxents/repl"
+	"github.com/johnkerl/miller/internal/pkg/version"
 )
 
 // tAuxMain is a function-pointer type for the entrypoint handler for a given auxent,
@@ -38,6 +40,7 @@ func init() {
 		{"help", help.HelpMain},
 		{"regtest", regtest.RegTestMain},
 		{"repl", repl.ReplMain},
+		{"version", showVersion},
 	}
 }
 
@@ -59,14 +62,6 @@ func Dispatch(args []string) {
 	// Else, return control to main for the rest of Miller.
 }
 
-// auxListUsage shows the available auxents.
-func auxListUsage(verbName string, o *os.File, exitCode int) {
-	fmt.Fprintf(o, "Usage: mlr %s [options]\n", verbName)
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-h or --help: print this message\n")
-	os.Exit(exitCode)
-}
-
 // auxListMain is the handler for 'mlr aux-list'.
 func auxListMain(args []string) int {
 	ShowAuxEntries(os.Stdout)
@@ -81,4 +76,9 @@ func ShowAuxEntries(o *os.File) {
 	}
 
 	fmt.Fprintf(o, "For more information, please invoke mlr {subcommand} --help.\n")
+}
+
+func showVersion(args []string) int {
+	fmt.Printf("mlr version %s for %s/%s/%s\n", version.STRING, runtime.GOOS, runtime.GOARCH, runtime.Version())
+	return 0
 }

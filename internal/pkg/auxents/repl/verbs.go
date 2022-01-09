@@ -5,6 +5,7 @@
 package repl
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/dsl/cst"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -163,7 +165,7 @@ func handleLoad(repl *Repl, args []string) bool {
 // ----------------------------------------------------------------
 func usageOpen(repl *Repl) {
 	fmt.Printf(
-		":open {one or more data-file names in the format specifed by %s %s}.\n",
+		":open {one or more data-file names in the format specified by %s %s}.\n",
 		repl.exeName, repl.replName,
 	)
 	fmt.Print(
@@ -218,14 +220,14 @@ func (repl *Repl) openFiles(filenames []string) {
 	// Remember for :reopen
 	repl.options.FileNames = filenames
 
-	repl.inputChannel = make(chan *types.RecordAndContext, 10)
+	repl.readerChannel = make(chan *list.List, 2) // list of *types.RecordAndContext
 	repl.errorChannel = make(chan error, 1)
 	repl.downstreamDoneChannel = make(chan bool, 1)
 
 	go repl.recordReader.Read(
 		filenames,
 		*repl.runtimeState.Context,
-		repl.inputChannel,
+		repl.readerChannel,
 		repl.errorChannel,
 		repl.downstreamDoneChannel,
 	)
@@ -265,16 +267,16 @@ func handleRead(repl *Repl, args []string) bool {
 	if len(args) != 0 {
 		return false
 	}
-	if repl.inputChannel == nil {
+	if repl.readerChannel == nil {
 		fmt.Println("No open files")
 		return true
 	}
 
-	var recordAndContext *types.RecordAndContext = nil
+	var recordsAndContexts *list.List // list of *types.RecordAndContext
 	var err error = nil
 
 	select {
-	case recordAndContext = <-repl.inputChannel:
+	case recordsAndContexts = <-repl.readerChannel:
 		break
 	case err = <-repl.errorChannel:
 		break
@@ -282,12 +284,16 @@ func handleRead(repl *Repl, args []string) bool {
 
 	if err != nil {
 		fmt.Println(err)
-		repl.inputChannel = nil
+		repl.readerChannel = nil
 		repl.errorChannel = nil
 		return true
 	}
 
-	if recordAndContext != nil {
+	if recordsAndContexts != nil {
+		// TODO: comment and make very clear we've set this all up to batch by 1 for the REPL
+		lib.InternalCodingErrorIf(recordsAndContexts.Len() != 1)
+		recordAndContext := recordsAndContexts.Front().Value.(*types.RecordAndContext)
+
 		skipOrProcessRecord(
 			repl,
 			recordAndContext,
@@ -330,7 +336,7 @@ func usageSkip(repl *Repl) {
 }
 
 func handleSkip(repl *Repl, args []string) bool {
-	if repl.inputChannel == nil {
+	if repl.readerChannel == nil {
 		fmt.Println("No open files")
 		return true
 	}
@@ -379,7 +385,7 @@ func usageProcess(repl *Repl) {
 }
 
 func handleProcess(repl *Repl, args []string) bool {
-	if repl.inputChannel == nil {
+	if repl.readerChannel == nil {
 		fmt.Println("No open files")
 		return true
 	}
@@ -414,12 +420,12 @@ func handleProcess(repl *Repl, args []string) bool {
 
 // ----------------------------------------------------------------
 func handleSkipOrProcessN(repl *Repl, n int, processingNotSkipping bool) {
-	var recordAndContext *types.RecordAndContext = nil
+	var recordsAndContexts *list.List // list of *types.RecordAndContext
 	var err error = nil
 
 	for i := 1; i <= n; i++ {
 		select {
-		case recordAndContext = <-repl.inputChannel:
+		case recordsAndContexts = <-repl.readerChannel:
 			break
 		case err = <-repl.errorChannel:
 			break
@@ -429,12 +435,16 @@ func handleSkipOrProcessN(repl *Repl, n int, processingNotSkipping bool) {
 
 		if err != nil {
 			fmt.Println(err)
-			repl.inputChannel = nil
+			repl.readerChannel = nil
 			repl.errorChannel = nil
 			return
 		}
 
-		if recordAndContext != nil {
+		if recordsAndContexts != nil {
+			// TODO: comment and make very clear we've set this all up to batch by 1 for the REPL
+			lib.InternalCodingErrorIf(recordsAndContexts.Len() != 1)
+			recordAndContext := recordsAndContexts.Front().Value.(*types.RecordAndContext)
+
 			shouldBreak := skipOrProcessRecord(
 				repl,
 				recordAndContext,
@@ -472,12 +482,12 @@ func handleSkipOrProcessUntil(repl *Repl, dslString string, processingNotSkippin
 		return
 	}
 
-	var recordAndContext *types.RecordAndContext = nil
+	var recordsAndContexts *list.List // list of *types.RecordAndContext
 
 	for {
 		doubleBreak := false
 		select {
-		case recordAndContext = <-repl.inputChannel:
+		case recordsAndContexts = <-repl.readerChannel:
 			break
 		case err = <-repl.errorChannel:
 			break
@@ -491,17 +501,21 @@ func handleSkipOrProcessUntil(repl *Repl, dslString string, processingNotSkippin
 
 		if err != nil {
 			fmt.Println(err)
-			repl.inputChannel = nil
+			repl.readerChannel = nil
 			repl.errorChannel = nil
 			return
 		}
 
-		if recordAndContext != nil {
+		if recordsAndContexts != nil {
+			// TODO: comment and make very clear we've set this all up to batch by 1 for the REPL
+			lib.InternalCodingErrorIf(recordsAndContexts.Len() != 1)
+			recordAndContext := recordsAndContexts.Front().Value.(*types.RecordAndContext)
+
 			shouldBreak := skipOrProcessRecord(
 				repl,
 				recordAndContext,
 				processingNotSkipping,
-				true, // testingByFilterExpression -- since we're continuing until the filter expresssion is true
+				true, // testingByFilterExpression -- since we're continuing until the filter expression is true
 			)
 			if shouldBreak {
 				break
@@ -537,7 +551,7 @@ func skipOrProcessRecord(
 	// End-of-stream marker
 	if recordAndContext.EndOfStream == true {
 		fmt.Println("End of record stream")
-		repl.inputChannel = nil
+		repl.readerChannel = nil
 		repl.errorChannel = nil
 		return true
 	}
@@ -545,7 +559,8 @@ func skipOrProcessRecord(
 	// Strings to be printed from put/filter DSL print/dump/etc statements.
 	if recordAndContext.Record == nil {
 		if processingNotSkipping {
-			fmt.Fprint(repl.outputStream, recordAndContext.OutputString)
+			repl.bufferedRecordOutputStream.WriteString(recordAndContext.OutputString)
+			repl.bufferedRecordOutputStream.Flush()
 		}
 		return false
 	}
@@ -582,7 +597,7 @@ func skipOrProcessRecord(
 // ----------------------------------------------------------------
 func usageWrite(repl *Repl) {
 	fmt.Println(":write with no arguments.")
-	fmt.Println("Sends the current record (maybe modifed by statements you enter)")
+	fmt.Println("Sends the current record (maybe modified by statements you enter)")
 	fmt.Printf("to standard output, with format as specified by %s %s.\n",
 		repl.exeName, repl.replName)
 }
@@ -594,7 +609,7 @@ func handleWrite(repl *Repl, args []string) bool {
 	return true
 }
 
-func writeRecord(repl *Repl, outrec *types.Mlrmap) {
+func writeRecord(repl *Repl, outrec *mlrval.Mlrmap) {
 	if outrec != nil {
 		// E.g. '{"req": {"method": "GET", "path": "/api/check"}}' becomes
 		// req.method=GET,req.path=/api/check.
@@ -607,7 +622,8 @@ func writeRecord(repl *Repl, outrec *types.Mlrmap) {
 			outrec.Unflatten(repl.options.WriterOptions.FLATSEP)
 		}
 	}
-	repl.recordWriter.Write(outrec, repl.outputStream, true /*outputIsStdout*/)
+	repl.recordWriter.Write(outrec, repl.bufferedRecordOutputStream, true /*outputIsStdout*/)
+	repl.bufferedRecordOutputStream.Flush()
 }
 
 // ----------------------------------------------------------------
@@ -633,8 +649,8 @@ func usageRedirectWrite(repl *Repl) {
 func handleRedirectWrite(repl *Repl, args []string) bool {
 	args = args[1:] // strip off verb
 	if len(args) == 0 {
-		// TODO: fclose old if not already os.Stdout
-		repl.outputStream = os.Stdout
+		repl.closeBufferedOutputStream()
+		repl.setBufferedOutputStream("(stdout)", os.Stdout)
 		return true
 	}
 
@@ -656,8 +672,8 @@ func handleRedirectWrite(repl *Repl, args []string) bool {
 	}
 	fmt.Printf("Redirecting record output to \"%s\"\n", filename)
 
-	// TODO: fclose old if not already os.Stdout
-	repl.outputStream = handle
+	repl.closeBufferedOutputStream()
+	repl.setBufferedOutputStream(filename, handle)
 
 	return true
 }
@@ -687,8 +703,8 @@ func handleRedirectAppend(repl *Repl, args []string) bool {
 	}
 	fmt.Printf("Redirecting record output to \"%s\"\n", filename)
 
-	// TODO: fclose old if not already os.Stdout
-	repl.outputStream = handle
+	repl.closeBufferedOutputStream()
+	repl.setBufferedOutputStream(filename, handle)
 
 	return true
 }

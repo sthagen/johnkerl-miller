@@ -1,11 +1,13 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -148,46 +150,46 @@ func NewTransformerCat(
 
 func (tr *TransformerCat) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCat) simpleCat(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCat) countersUngrouped(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		tr.counter++
 		key := tr.counterFieldName
-		inrec.PrependCopy(key, types.MlrvalFromInt(tr.counter))
+		inrec.PrependCopy(key, mlrval.FromInt(tr.counter))
 	}
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCat) countersGrouped(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -209,7 +211,7 @@ func (tr *TransformerCat) countersGrouped(
 		}
 
 		key := tr.counterFieldName
-		inrec.PrependCopy(key, types.MlrvalFromInt(counter))
+		inrec.PrependCopy(key, mlrval.FromInt(counter))
 	}
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }

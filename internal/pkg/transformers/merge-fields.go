@@ -1,7 +1,7 @@
 package transformers
 
 import (
-	"errors"
+	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -256,11 +256,9 @@ func NewTransformerMergeFields(
 
 	for _, accumulatorName := range accumulatorNameList {
 		if !utils.ValidateStats1AccumulatorName(accumulatorName) {
-			return nil, errors.New(
-				fmt.Sprintf(
-					"%s %s: accumulator \"%s\" not found.\n",
-					"mlr", verbNameMergeFields, accumulatorName,
-				),
+			return nil, fmt.Errorf(
+				"mlr %s: accumulator \"%s\" not found.\n",
+				verbNameMergeFields, accumulatorName,
 			)
 		}
 	}
@@ -317,23 +315,23 @@ func NewTransformerMergeFields(
 
 func (tr *TransformerMergeFields) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerMergeFields) transformByNameList(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if inrecAndContext.EndOfStream {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 		return
 	}
 
@@ -350,7 +348,7 @@ func (tr *TransformerMergeFields) transformByNameList(
 			continue
 		}
 
-		if mvalue.IsEmpty() { // key present with empty value
+		if mvalue.IsVoid() { // key present with empty value
 			if !tr.keepInputFields {
 				inrec.Remove(valueFieldName)
 			}
@@ -373,18 +371,18 @@ func (tr *TransformerMergeFields) transformByNameList(
 		inrec.PutReference(key, value)
 	}
 
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerMergeFields) transformByNameRegex(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if inrecAndContext.EndOfStream {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 		return
 	}
 
@@ -417,7 +415,7 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 			continue
 		}
 
-		if mvalue.IsEmpty() { // Key present with empty value
+		if mvalue.IsVoid() { // Key present with empty value
 			if !tr.keepInputFields { // We are modifying the record while iterating over it.
 				next := pe.Next
 				inrec.Unlink(pe)
@@ -448,7 +446,7 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 		inrec.PutReference(key, value)
 	}
 
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }
 
 // ----------------------------------------------------------------
@@ -460,12 +458,12 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 
 func (tr *TransformerMergeFields) transformByCollapsing(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if inrecAndContext.EndOfStream {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 		return
 	}
 
@@ -520,7 +518,7 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 		// The accumulator has been initialized with default values; continue
 		// here. (If we were to continue before namedAccumulators.Put(...) we
 		// would be failing to construct the accumulator.)
-		if mvalue.IsEmpty() { // key present with empty value
+		if mvalue.IsVoid() { // key present with empty value
 			if !tr.keepInputFields { // We are modifying the record while iterating over it.
 				next := pe.Next
 				inrec.Unlink(pe)
@@ -554,5 +552,5 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 		}
 	}
 
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }

@@ -1,69 +1,18 @@
 ================================================================
 PUNCHDOWN LIST
 
-* blockers:
-  - keep checking issues
-  - verslink old relnotes
-  - fractional-strptime
-  - cmp-matrices
-  - all-contribs: twi dm
-  - license triple-checks
-  - `mlr put` -> coverart
-  - #756 octal
-  - 0b1011 olh/webdoc
-  - rtd links somewhere
-
-* shebang
-  - maybe multiple -s -- ? []args would continue growing during parse ...
-  - try mlr -s on windows; maybe consolation for shebang-bash -- ?
-  - doc re where to put --norc
-    > it needn't be first (after -s) anymore
-  - olh
-  - webdocs
-  - want:
-    > myscript.mlr --c2j input.csv
-
-* release ordering?
-  conda
-  brew macports chocolatey
-  ubuntu debian fedora gentoo prolinux archlinux
-  netbsd freebsd
-
-* post-release:
-  w installing-miller.md.in
-
-* nikos materials -> fold in
-
-* cases/dsl-min-max-types: cmp-matrices need to be fixed to follow the advertised rule for mixed types
-  NUMERICS < BOOL < VOID < STRING
-
-* regex
-  o authoritative regex docs accompanied by thorough UT
-    - expand existing regex webdoc
-  o r-strings/implicit-r/297: double-check end of reference-main-data-types.md.in
-  o reference-main-regular-expressions:
-    separate escaping for "\t" etc in arg-2/regex position -- "\t"."\t" example as well ...
-
-* datetime
-  o sysdate, sysdate_local; datediff ...
-  o .6S bugfix -- separate PR -- ?
-  o strptime w/ ...00.Z -> error
-  o strptime/strftime experiments ...
-    - verb sec2gmtdate
-      > leaves non-numbers as-is -- ?
-      > check sec2gmt as well -- ?
-    ! strptime:
-      strptime("1970-01-01T00:00:00.Z", "%Y-%m-%dT%H:%M:%SZ")
-      (error)
-
-* kw olh for func and funct both
-
-* pre-release:
-  o check issues
-  o TODO in *.go & *.mi
+* compat emph
+* document cloudthings, e.g.
+  o go.yml
+  o codespell.yml
+    - codespell  --check-filenames --skip *.csv,*.dkvp,*.txt,*.js,*.html,*.map,./tags,./test/cases --ignore-words-list denom,inTerm,inout,iput,nd,nin,numer,Wit,te,wee
+  o readthedocs triggers
+* ngrams.sh -v -o 1 one-word-list.txt
+* sync-print option; or (yuck) another xprint variant; or ...; emph dump/eprint
+? trace-mode ?
 
 * doc
-  o new-in-miller-6: missings:
+  o new-in-miller-6: missing:
     - dump syntax -- ?
     - emittable constraints -- ?
   o wut h1 spacing before/after ...
@@ -77,7 +26,7 @@ PUNCHDOWN LIST
       once for NR=2, etc.
   o C-style triple-for loops: loop to NR -> NO!!!
   o Since uninitialized out-of-stream variables default to 0 for
-    addition/substraction and 1 for multiplication when they appear on expression
+    addition/subtraction and 1 for multiplication when they appear on expression
     right-hand sides (not quite as in awk, where they'd default to 0 either way)
     <-> xlink to other page
   r fzf-ish w/ head -n 4, --from, up-arrow & append verb, then cat -- find & update the existing section
@@ -85,13 +34,89 @@ PUNCHDOWN LIST
     - needs UTs as well
   o while-read example from issues
 
-* pv: 'mlr --prepipex pv --gzin tail -n 10 ~/tmp/zhuge.gz' needs --gzin & --prepipex both
-  o plus corresponding docwork
+* release ordering?
+  conda
+  brew macports chocolatey
+  ubuntu debian fedora gentoo prolinux archlinux
+  netbsd freebsd
 
-? BIFs as FCFs?
+* post-release:
+  w installing-miller.md.in
 
 ================================================================
 NON-BLOCKERS
+
+* Better functions for values manipulation, e.g. easier conversion of strings like "$1,234.56" into numeric values
+
+* IP addresses and ranges as a datatype so one could do membership tests like "if 10.10.10.10 in 10.0.0.0/8".
+
+* Ability to specify some formats that are fixed. Like we can process
+  "5d18h53m20s" format in *dhms* commands, but what about "5-18:53:20"? This is
+  a common format used by the SLURM resource manager.
+
+* csvstat / Panda's describe
+
+* cmp for array & map
+
+* r-strings/implicit-r/297: double-check end of reference-main-data-types.md.in
+
+* sysdate, sysdate_local; datediff ...
+
+* JSON perf -- try alternate packages to encoding/json
+
+* strptime w/ ...00.Z -> error
+
+* pos/neg 0x/0b/0o UTs
+
+* 0o into BNF
+
+? BIFs as FCFs?
+
+* pv: 'mlr --prepipex pv --gzin tail -n 10 ~/tmp/zhuge.gz' needs --gzin & --prepipex both
+  o plus corresponding docwork
+
+* JIT follow-ons:
+  o UT:
+    - JSON I/O
+    - mlrval_cmp.go
+    - mv from-array/from-map w/ copy & mutate orig & check new -- & vice versa
+    - dash-O and octal infer
+    - populate each bifs/X_test.go for each bifs/X.go etc etc
+  o neatens
+    - carefully read all $mlv files
+    - check $types & $bifs as well
+    - proofread all mlrval_cmp.go dispo mxes
+    - update rmds x several
+  o misc
+    - grep tmiller map put ref vs map put copy
+    - krepl miller6 new doclink-comments
+    - git rm cmd/mprof{n}
+
+* https://staticcheck.io/docs
+  o lots of nice little things to clean up -- no bugs per se, all stylistic i *think* ...
+
+* xtab splitter UT; nidx too
+
+* integrate:
+  o https://www.libhunt.com/r/miller
+  o https://repology.org/project/miller/information
+
+* verslink old relnotes
+
+* more perf?
+  - batchify source-quench -- experiment 1st
+  - further channelize (CSV-first focus) mlrval infer vs record-put ?
+  ? coalesce errchan & done-writing w/ Err to RAC, and close-chan *and* EOSMarker -- ?
+
+* []Mlrval -> []*Mlrval ?
+
+* funcptr away the ifs/ifsregex check in record-readers
+
+* handling for --cpuprofile not at args[1] slot
+
+* try simpler-than-regex-split-string for repeated-single -- especially for XTAB reader
+
+* UT-per-se of XTAB channelizedStanzaScanner
 
 * main-level (verb-level?) flag for "," -> X in verbs -- in case commas in field names
 * golinter
@@ -229,7 +254,6 @@ t* ranspose ...
 * UDF nexts:
   o more functions (see below)
   o strmatch https://github.com/johnkerl/miller/issues/77#issuecomment-538790927
-  o DSL sort function https://github.com/johnkerl/miller/issues/77#issuecomment-321916921
 
 * bash completion script https://github.com/johnkerl/miller/issues/77#issuecomment-308247402
   https://iridakos.com/programming/2018/03/01/bash-programmable-completion-tutorial#:~:text=Bash%20completion%20is%20a%20functionality,key%20while%20typing%20a%20command.
@@ -239,9 +263,6 @@ t* ranspose ...
 
 * double-check rand-seeding
   o all rand invocations should go through the seeder for UT/other determinism
-
-* comment-handling
-  - delegator for CSV ...
 
 ! quoted NIDX
   - how with whitespace regex -- ?
@@ -264,8 +285,6 @@ t* ranspose ...
   done by ChannelWriter, which is very small. opportunity to refactor.
 * address all manner of xxx and TODO comments
 * empty csv ... reminder ...
-
-* functions as first-class objects; then sortaf/sortmf take f not "f"
 
 * godoc notes:
   o go get golang.org/x/tools/cmd/godoc
@@ -330,6 +349,9 @@ no need to bootstrap a parser for the parser-generator language
 
 ----------------------------------------------------------------
 INFO
+
+i https://github.com/all-contributors/all-contributors
+  yarn all-contributors add namegoeshere ideas
 
 i go tool nm -size mlr | sort -nrk 2
 
@@ -413,7 +435,6 @@ i https://en.wikipedia.org/wiki/Delimiter#Delimiter_collision
 * short 'asserting' functions (absent/error); and/or put --strict or somesuch
 * function metadata: auto-sort on mlr -f?
 * --x2b @ help-doc .go; etc
-? remove flagSet x all -- ? for consistency?
 * os.Args[0] etc -> "mlr" throughout the codebase
 * emitx later: 'emit([a,b,c],d,e,f)' for SR-conflict issues
 
@@ -519,10 +540,6 @@ DOC6:
 * window.mlr, window2.mlr -> doc somewhere
 * doc: substr in inferred-numeric fields: https://github.com/johnkerl/miller/issues/290.
   o xref to 1-up note.
-* document --jvstack is now the default; --no-jvstack
-* doc about put -S/-F cannot make sense anymore
-* why not flagSet. can't be supported everywhere, so don't confuse the user by
-  supporting it some places and not others.
 * back-incompat:
   mlr -n put $vflag '@x=1; dump > stdout, @x'
   mlr -n put $vflag '@x=1; dump > stdout @x'
@@ -530,6 +547,9 @@ DOC6:
 * document tee -p
 
 * why no flagSet:
+
+  can't be supported everywhere, so don't confuse the user by supporting it
+  some places and not others.
 
 	Unlike other transformers, we can't use flagSet here. The syntax of 'mlr
 	sort' is it needs to take things like 'mlr sort -f a -n b -n c', i.e.
@@ -541,12 +561,11 @@ DOC6:
 	and 'mlr filter' is they need to be able to take -f and/or -e more than
 	once, and Go flags can't handle that.
 
-* doc re multi-load: can't '$x >' and '3' in separate -f anymore. no worries.
 * sec2gmt --millis/--micros/--nanos doc
 * sort-within-records --recursive doc
 
 * docs nest simplers now that we have getoptish
-* mongo examples to doc :D
+* mongo examples to doc
 * doclink re https://readthedocs.org/projects/miller/ & https://github.com/johnkerl/miller/settings/hooks
 * dotted-map doc ...
   o $*.foo["bar"] = NR b04k b/c precedence :(
@@ -554,22 +573,3 @@ DOC6:
 
 ? * would LOVE to have small prev-page/next-page links at the *top* not bottom ...
   https://squidfunk.github.io/mkdocs-material/customization/#extending-the-theme
-
-* go test single files:
-  $ go test src/types/mlrval_functions_test.go $(ls src/types/*.go | grep -v test)
-  ok   command-line-arguments 0.100s
-  $ lsr \*test\*.go
-  ./regression_test.go
-  ./src/types/mlrval_functions_test.go
-  ./src/types/mlrval_format_test.go
-  ./src/auxents/regtest/regtester.go
-  ./src/lib/regex_test.go
-  ./src/lib/unbackslash_test.go
-  $ go test src/types/mlrval_functions_test.go $(ls src/types/*.go|grep -v test)
-  ok   command-line-arguments 0.097s
-  $ go test src/types/mlrval_format_test.go $(ls src/types/*.go|grep -v test)
-  ok   command-line-arguments 0.093s
-  $ go test src/lib/regex_test.go src/lib/regex.go
-  ok   command-line-arguments 0.083s
-  $ go test src/lib/unbackslash_test.go src/lib/unbackslash.go
-  ok   command-line-arguments 0.081s

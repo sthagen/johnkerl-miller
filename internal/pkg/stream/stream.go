@@ -1,6 +1,8 @@
 package stream
 
 import (
+	"bufio"
+	"container/list"
 	"fmt"
 	"io"
 	"os"
@@ -44,18 +46,12 @@ func Stream(
 
 	// Since Go is concurrent, the context struct needs to be duplicated and
 	// passed through the channels along with each record.
-	initialContext := types.NewContext(
-		options.ReaderOptions.IPS,
-		options.ReaderOptions.IFS,
-		options.ReaderOptions.IRS,
-		options.WriterOptions.OPS,
-		options.WriterOptions.OFS,
-		options.WriterOptions.ORS,
-		options.WriterOptions.FLATSEP,
-	)
+	initialContext := types.NewContext()
 
-	// Instantiate the record-reader
-	recordReader, err := input.Create(&options.ReaderOptions)
+	// Instantiate the record-reader.
+	// RecordsPerBatch is tracked separately from ReaderOptions since join/repl
+	// may use batch size of 1.
+	recordReader, err := input.Create(&options.ReaderOptions, options.ReaderOptions.RecordsPerBatch)
 	if err != nil {
 		return err
 	}
@@ -67,8 +63,8 @@ func Stream(
 	}
 
 	// Set up the reader-to-transformer and transformer-to-writer channels.
-	inputChannel := make(chan *types.RecordAndContext, 10)
-	outputChannel := make(chan *types.RecordAndContext, 1)
+	readerChannel := make(chan *list.List, 2) // list of *types.RecordAndContext
+	writerChannel := make(chan *list.List, 1) // list of *types.RecordAndContext
 
 	// We're done when a fatal error is registered on input (file not found,
 	// etc) or when the record-writer has written all its output. We use
@@ -85,11 +81,13 @@ func Stream(
 
 	// Start the reader, transformer, and writer. Let them run until fatal input
 	// error or end-of-processing happens.
+	bufferedOutputStream := bufio.NewWriter(outputStream)
 
-	go recordReader.Read(fileNames, *initialContext, inputChannel, errorChannel, readerDownstreamDoneChannel)
-	go transformers.ChainTransformer(inputChannel, readerDownstreamDoneChannel, recordTransformers, outputChannel,
-		options)
-	go output.ChannelWriter(outputChannel, recordWriter, doneWritingChannel, outputStream, outputIsStdout)
+	go recordReader.Read(fileNames, *initialContext, readerChannel, errorChannel, readerDownstreamDoneChannel)
+	go transformers.ChainTransformer(readerChannel, readerDownstreamDoneChannel, recordTransformers,
+		writerChannel, options)
+	go output.ChannelWriter(writerChannel, recordWriter, &options.WriterOptions, doneWritingChannel,
+		bufferedOutputStream, outputIsStdout)
 
 	done := false
 	for !done {
@@ -102,6 +100,8 @@ func Stream(
 			break
 		}
 	}
+
+	bufferedOutputStream.Flush()
 
 	return nil
 }

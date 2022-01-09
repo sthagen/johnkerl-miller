@@ -1,11 +1,13 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -92,7 +94,7 @@ func transformerFillEmptyParseCLI(
 
 // ----------------------------------------------------------------
 type TransformerFillEmpty struct {
-	fillValue *types.Mlrval
+	fillValue *mlrval.Mlrval
 }
 
 func NewTransformerFillEmpty(
@@ -101,9 +103,9 @@ func NewTransformerFillEmpty(
 ) (*TransformerFillEmpty, error) {
 	tr := &TransformerFillEmpty{}
 	if inferType {
-		tr.fillValue = types.MlrvalFromInferredType(fillString)
+		tr.fillValue = mlrval.FromInferredType(fillString)
 	} else {
-		tr.fillValue = types.MlrvalFromString(fillString)
+		tr.fillValue = mlrval.FromString(fillString)
 	}
 	return tr, nil
 }
@@ -112,23 +114,23 @@ func NewTransformerFillEmpty(
 
 func (tr *TransformerFillEmpty) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 
 		for pe := inrec.Head; pe != nil; pe = pe.Next {
-			if pe.Value.IsEmpty() {
+			if pe.Value.IsVoid() {
 				pe.Value = tr.fillValue
 			}
 		}
 
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 
 	} else { // end of record stream
-		outputChannel <- inrecAndContext // emit end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
 	}
 }

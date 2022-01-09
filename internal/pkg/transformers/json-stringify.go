@@ -1,12 +1,14 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -83,11 +85,11 @@ func transformerJSONStringifyParseCLI(
 		}
 	}
 
-	var jsonFormatting types.TJSONFormatting = types.JSON_SINGLE_LINE
+	var jsonFormatting mlrval.TJSONFormatting = mlrval.JSON_SINGLE_LINE
 	if jvStack {
-		jsonFormatting = types.JSON_MULTILINE
+		jsonFormatting = mlrval.JSON_MULTILINE
 	} else {
-		jsonFormatting = types.JSON_SINGLE_LINE
+		jsonFormatting = mlrval.JSON_SINGLE_LINE
 	}
 
 	*pargi = argi
@@ -110,7 +112,7 @@ func transformerJSONStringifyParseCLI(
 // ----------------------------------------------------------------
 type TransformerJSONStringify struct {
 	// input
-	jsonFormatting types.TJSONFormatting
+	jsonFormatting mlrval.TJSONFormatting
 	fieldNameSet   map[string]bool
 
 	// state
@@ -118,7 +120,7 @@ type TransformerJSONStringify struct {
 }
 
 func NewTransformerJSONStringify(
-	jsonFormatting types.TJSONFormatting,
+	jsonFormatting mlrval.TJSONFormatting,
 	fieldNames []string,
 ) (*TransformerJSONStringify, error) {
 	var fieldNameSet map[string]bool = nil
@@ -143,38 +145,38 @@ func NewTransformerJSONStringify(
 
 func (tr *TransformerJSONStringify) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerJSONStringify) jsonStringifyAll(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		for pe := inrec.Head; pe != nil; pe = pe.Next {
 			pe.JSONStringifyInPlace(tr.jsonFormatting)
 		}
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerJSONStringify) jsonStringifySome(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -183,8 +185,8 @@ func (tr *TransformerJSONStringify) jsonStringifySome(
 				pe.JSONStringifyInPlace(tr.jsonFormatting)
 			}
 		}
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

@@ -1,11 +1,13 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -150,9 +152,9 @@ func NewTransformerSec2GMT(
 
 func (tr *TransformerSec2GMT) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
@@ -162,7 +164,7 @@ func (tr *TransformerSec2GMT) Transform(
 			if value != nil {
 				floatval, ok := value.GetNumericToFloatValue()
 				if ok {
-					newValue := types.MlrvalFromString(lib.Sec2GMT(
+					newValue := mlrval.FromString(lib.Sec2GMT(
 						floatval/tr.preDivide,
 						tr.numDecimalPlaces,
 					))
@@ -170,9 +172,9 @@ func (tr *TransformerSec2GMT) Transform(
 				}
 			}
 		}
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 
 	} else { // End of record stream
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

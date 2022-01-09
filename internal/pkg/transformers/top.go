@@ -1,12 +1,14 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/transformers/utils"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
@@ -140,7 +142,7 @@ type TransformerTop struct {
 	// Two-level map from grouping key (string of joined-together group-by field values),
 	// to string value-field name, to *utils.TopKeeper
 	groups                           *lib.OrderedMap
-	groupingKeysToGroupByFieldValues map[string][]*types.Mlrval
+	groupingKeysToGroupByFieldValues map[string][]*mlrval.Mlrval
 }
 
 // ----------------------------------------------------------------
@@ -162,29 +164,26 @@ func NewTransformerTop(
 		outputFieldName:   outputFieldName,
 
 		groups:                           lib.NewOrderedMap(),
-		groupingKeysToGroupByFieldValues: make(map[string][]*types.Mlrval),
+		groupingKeysToGroupByFieldValues: make(map[string][]*mlrval.Mlrval),
 	}
 
 	return tr, nil
 }
 
-// ----------------------------------------------------------------
-
 func (tr *TransformerTop) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
 		tr.ingest(inrecAndContext)
 	} else {
-		tr.emit(inrecAndContext, outputChannel)
+		tr.emit(inrecAndContext, outputRecordsAndContexts)
 	}
 }
 
-// ----------------------------------------------------------------
 func (tr *TransformerTop) ingest(
 	inrecAndContext *types.RecordAndContext,
 ) {
@@ -237,7 +236,7 @@ func (tr *TransformerTop) ingest(
 // ----------------------------------------------------------------
 func (tr *TransformerTop) emit(
 	inrecAndContext *types.RecordAndContext,
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 ) {
 	for pa := tr.groups.Head; pa != nil; pa = pa.Next {
 		groupingKey := pa.Key
@@ -251,14 +250,14 @@ func (tr *TransformerTop) emit(
 			for pb := secondLevel.Head; pb != nil; pb = pb.Next {
 				topKeeper := pb.Value.(*utils.TopKeeper)
 				for i := 0; i < topKeeper.GetSize(); i++ {
-					outputChannel <- topKeeper.TopRecordsAndContexts[i].Copy()
+					outputRecordsAndContexts.PushBack(topKeeper.TopRecordsAndContexts[i].Copy())
 				}
 			}
 
 		} else {
 
 			for i := 0; i < tr.topCount; i++ {
-				newrec := types.NewMlrmapAsRecord()
+				newrec := mlrval.NewMlrmapAsRecord()
 
 				// Add in a=s,b=t fields:
 				for j := range tr.groupByFieldNames {
@@ -272,18 +271,18 @@ func (tr *TransformerTop) emit(
 					topKeeper := pb.Value.(*utils.TopKeeper)
 					key := valueFieldName + "_top"
 					if i < topKeeper.GetSize() {
-						newrec.PutReference(tr.outputFieldName, types.MlrvalFromInt(i+1))
+						newrec.PutReference(tr.outputFieldName, mlrval.FromInt(i+1))
 						newrec.PutReference(key, topKeeper.TopValues[i].Copy())
 					} else {
-						newrec.PutReference(tr.outputFieldName, types.MlrvalFromInt(i+1))
-						newrec.PutCopy(key, types.MLRVAL_VOID)
+						newrec.PutReference(tr.outputFieldName, mlrval.FromInt(i+1))
+						newrec.PutCopy(key, mlrval.VOID)
 					}
 				}
 
-				outputChannel <- types.NewRecordAndContext(newrec, &inrecAndContext.Context)
+				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &inrecAndContext.Context))
 			}
 		}
 	}
 
-	outputChannel <- inrecAndContext // emit end-of-stream marker
+	outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
 }

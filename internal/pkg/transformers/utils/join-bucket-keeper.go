@@ -116,6 +116,7 @@ import (
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/input"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -123,10 +124,10 @@ import (
 // Data stored in this class
 type JoinBucketKeeper struct {
 	// For streaming through the left-side file
-	recordReader input.IRecordReader
-	context      *types.Context
-	inputChannel <-chan *types.RecordAndContext
-	errorChannel chan error
+	recordReader  input.IRecordReader
+	context       *types.Context
+	readerChannel <-chan *list.List // list of *types.RecordAndContext
+	errorChannel  chan error
 	// TODO: merge with leof flag
 	recordReaderDone bool
 
@@ -165,7 +166,7 @@ func NewJoinBucketKeeper(
 ) *JoinBucketKeeper {
 
 	// Instantiate the record-reader
-	recordReader, err := input.Create(joinReaderOptions)
+	recordReader, err := input.Create(joinReaderOptions, 1) // TODO: maybe increase records per batch
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr join: %v", err)
 		os.Exit(1)
@@ -178,18 +179,18 @@ func NewJoinBucketKeeper(
 	initialContext.UpdateForStartOfFile(leftFileName)
 
 	// Set up channels for the record-reader
-	inputChannel := make(chan *types.RecordAndContext, 10)
+	readerChannel := make(chan *list.List, 2) // list of *types.RecordAndContext
 	errorChannel := make(chan error, 1)
 	downstreamDoneChannel := make(chan bool, 1)
 
 	// Start the record-reader in its own goroutine.
 	leftFileNameArray := [1]string{leftFileName}
-	go recordReader.Read(leftFileNameArray[:], *initialContext, inputChannel, errorChannel, downstreamDoneChannel)
+	go recordReader.Read(leftFileNameArray[:], *initialContext, readerChannel, errorChannel, downstreamDoneChannel)
 
 	keeper := &JoinBucketKeeper{
 		recordReader:     recordReader,
 		context:          initialContext,
-		inputChannel:     inputChannel,
+		readerChannel:    readerChannel,
 		errorChannel:     errorChannel,
 		recordReaderDone: false,
 
@@ -251,7 +252,7 @@ func (keeper *JoinBucketKeeper) computeState() tJoinBucketKeeperState {
 // will also be moved to keeper.leftUnpaired.
 
 func (keeper *JoinBucketKeeper) FindJoinBucket(
-	rightFieldValues []*types.Mlrval, // nil means right-file EOF
+	rightFieldValues []*mlrval.Mlrval, // nil means right-file EOF
 ) bool {
 	// TODO: comment me
 	isPaired := false
@@ -325,7 +326,7 @@ func (keeper *JoinBucketKeeper) FindJoinBucket(
 }
 
 // ----------------------------------------------------------------
-// This finds the first peek record which posseses all the necessary join-field
+// This finds the first peek record which possesses all the necessary join-field
 // keys.  Any other records found along the way, lacking the necessary
 // join-field keys, are moved to the left-unpaired list.
 
@@ -367,7 +368,7 @@ func (keeper *JoinBucketKeeper) prepareForFirstJoinBucket() {
 //   leftvals < rightvals && !eof.
 
 func (keeper *JoinBucketKeeper) prepareForNewJoinBucket(
-	rightFieldValues []*types.Mlrval,
+	rightFieldValues []*mlrval.Mlrval,
 ) {
 	if !keeper.JoinBucket.WasPaired {
 		moveRecordsAndContexts(keeper.leftUnpaireds, keeper.JoinBucket.RecordsAndContexts)
@@ -465,7 +466,7 @@ func (keeper *JoinBucketKeeper) fillNextJoinBucket() {
 		os.Exit(1)
 	}
 
-	keeper.JoinBucket.leftFieldValues = types.CopyMlrvalPointerArray(peekFieldValues)
+	keeper.JoinBucket.leftFieldValues = mlrval.CopyMlrvalPointerArray(peekFieldValues)
 	keeper.JoinBucket.RecordsAndContexts.PushBack(keeper.peekRecordAndContext)
 	keeper.JoinBucket.WasPaired = false
 
@@ -529,7 +530,7 @@ func (keeper *JoinBucketKeeper) markRemainingsAsUnpaired() {
 // ----------------------------------------------------------------
 // TODO: comment
 func (keeper *JoinBucketKeeper) OutputAndReleaseLeftUnpaireds(
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 ) {
 	for {
 		element := keeper.leftUnpaireds.Front()
@@ -537,13 +538,13 @@ func (keeper *JoinBucketKeeper) OutputAndReleaseLeftUnpaireds(
 			break
 		}
 		recordAndContext := element.Value.(*types.RecordAndContext)
-		outputChannel <- recordAndContext
+		outputRecordsAndContexts.PushBack(recordAndContext)
 		keeper.leftUnpaireds.Remove(element)
 	}
 }
 
 func (keeper *JoinBucketKeeper) ReleaseLeftUnpaireds(
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 ) {
 	for {
 		element := keeper.leftUnpaireds.Front()
@@ -570,7 +571,10 @@ func (keeper *JoinBucketKeeper) readRecord() *types.RecordAndContext {
 	case err := <-keeper.errorChannel:
 		fmt.Fprintln(os.Stderr, "mlr", ": ", err)
 		os.Exit(1)
-	case leftrecAndContext := <-keeper.inputChannel:
+	case leftrecsAndContexts := <-keeper.readerChannel:
+		// TODO: temp
+		lib.InternalCodingErrorIf(leftrecsAndContexts.Len() != 1)
+		leftrecAndContext := leftrecsAndContexts.Front().Value.(*types.RecordAndContext)
 		if leftrecAndContext.EndOfStream { // end-of-stream marker
 			keeper.recordReaderDone = true
 			return nil
@@ -604,8 +608,8 @@ func moveRecordsAndContexts(
 // for numerical values).
 
 func compareLexically(
-	leftFieldValues []*types.Mlrval,
-	rightFieldValues []*types.Mlrval,
+	leftFieldValues []*mlrval.Mlrval,
+	rightFieldValues []*mlrval.Mlrval,
 ) int {
 	lib.InternalCodingErrorIf(len(leftFieldValues) != len(rightFieldValues))
 	n := len(leftFieldValues)
@@ -656,7 +660,7 @@ func (keeper *JoinBucketKeeper) dump(prefix string) {
 	fmt.Printf("------------------------------------------------------\n")
 }
 
-func dumpFieldValues(name string, values []*types.Mlrval) {
+func dumpFieldValues(name string, values []*mlrval.Mlrval) {
 	for i, value := range values {
 		fmt.Printf("-- %s[%d] = %s\n", name, i, value.String())
 	}

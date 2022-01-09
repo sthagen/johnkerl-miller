@@ -1,21 +1,49 @@
 package output
 
 import (
-	"fmt"
-	"io"
+	"bufio"
+	"container/list"
 
+	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 func ChannelWriter(
-	outputChannel <-chan *types.RecordAndContext,
+	writerChannel <-chan *list.List, // list of *types.RecordAndContext
 	recordWriter IRecordWriter,
+	writerOptions *cli.TWriterOptions,
 	doneChannel chan<- bool,
-	ostream io.WriteCloser,
+	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
+
 	for {
-		recordAndContext := <-outputChannel
+		recordsAndContexts := <-writerChannel
+		done := channelWriterHandleBatch(
+			recordsAndContexts,
+			recordWriter,
+			writerOptions,
+			bufferedOutputStream,
+			outputIsStdout,
+		)
+		if done {
+			doneChannel <- true
+			break
+		}
+	}
+}
+
+// TODO: comment
+// Returns true on end of record stream
+func channelWriterHandleBatch(
+	recordsAndContexts *list.List,
+	recordWriter IRecordWriter,
+	writerOptions *cli.TWriterOptions,
+	bufferedOutputStream *bufio.Writer,
+	outputIsStdout bool,
+) bool {
+	for e := recordsAndContexts.Front(); e != nil; e = e.Next() {
+		recordAndContext := e.Value.(*types.RecordAndContext)
 
 		// Three things can come through:
 		// * End-of-stream marker
@@ -27,15 +55,18 @@ func ChannelWriter(
 		//   output ordering.
 
 		if !recordAndContext.EndOfStream {
-
 			record := recordAndContext.Record
 			if record != nil {
-				recordWriter.Write(record, ostream, outputIsStdout)
+				recordWriter.Write(record, bufferedOutputStream, outputIsStdout)
 			}
 
 			outputString := recordAndContext.OutputString
 			if outputString != "" {
-				fmt.Print(outputString)
+				bufferedOutputStream.WriteString(outputString)
+			}
+
+			if writerOptions.FlushOnEveryRecord {
+				bufferedOutputStream.Flush()
 			}
 
 		} else {
@@ -43,9 +74,9 @@ func ChannelWriter(
 			// queued up. For example, PPRINT needs to see all same-schema
 			// records before printing any, since it needs to compute max width
 			// down columns.
-			recordWriter.Write(nil, ostream, outputIsStdout)
-			doneChannel <- true
-			break
+			recordWriter.Write(nil, bufferedOutputStream, outputIsStdout)
+			return true
 		}
 	}
+	return false
 }

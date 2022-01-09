@@ -1,6 +1,7 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -182,25 +184,25 @@ func NewTransformerCut(
 
 func (tr *TransformerCut) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 // mlr cut -f a,b,c
 func (tr *TransformerCut) includeWithInputOrder(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		outrec := types.NewMlrmap()
+		outrec := mlrval.NewMlrmap()
 		for pe := inrec.Head; pe != nil; pe = pe.Next {
 			fieldName := pe.Key
 			_, wanted := tr.fieldNameSet[fieldName]
@@ -209,9 +211,9 @@ func (tr *TransformerCut) includeWithInputOrder(
 			}
 		}
 		outrecAndContext := types.NewRecordAndContext(outrec, &inrecAndContext.Context)
-		outputChannel <- outrecAndContext
+		outputRecordsAndContexts.PushBack(outrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }
 
@@ -219,13 +221,13 @@ func (tr *TransformerCut) includeWithInputOrder(
 // mlr cut -o -f a,b,c
 func (tr *TransformerCut) includeWithArgOrder(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		outrec := types.NewMlrmap()
+		outrec := mlrval.NewMlrmap()
 		for _, fieldName := range tr.fieldNameList {
 			value := inrec.Get(fieldName)
 			if value != nil {
@@ -233,9 +235,9 @@ func (tr *TransformerCut) includeWithArgOrder(
 			}
 		}
 		outrecAndContext := types.NewRecordAndContext(outrec, &inrecAndContext.Context)
-		outputChannel <- outrecAndContext
+		outputRecordsAndContexts.PushBack(outrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }
 
@@ -243,9 +245,9 @@ func (tr *TransformerCut) includeWithArgOrder(
 // mlr cut -x -f a,b,c
 func (tr *TransformerCut) exclude(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -255,19 +257,19 @@ func (tr *TransformerCut) exclude(
 			}
 		}
 	}
-	outputChannel <- inrecAndContext
+	outputRecordsAndContexts.PushBack(inrecAndContext)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCut) processWithRegexes(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		newrec := types.NewMlrmapAsRecord()
+		newrec := mlrval.NewMlrmapAsRecord()
 		for pe := inrec.Head; pe != nil; pe = pe.Next {
 			matchesAny := false
 			for _, regex := range tr.regexes {
@@ -283,8 +285,8 @@ func (tr *TransformerCut) processWithRegexes(
 				newrec.PutReference(pe.Key, pe.Value)
 			}
 		}
-		outputChannel <- types.NewRecordAndContext(newrec, &inrecAndContext.Context)
+		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &inrecAndContext.Context))
 	} else {
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }

@@ -11,7 +11,7 @@ theme:
   custom_dir: overrides
 repo_url: https://github.com/johnkerl/miller
 repo_name: miller
-edit_uri: edit/master/main/docs/src
+edit_uri: edit/main/docs/src
 docs_dir: './src'
 extra_css: ['extra.css']
 extra_javascript:
@@ -38,7 +38,6 @@ nav:
     - "Syntax highlighting: vimrc": "vimrc.md"
     - "The REPL": "repl.md"
     - "Online help": "online-help.md"
-    - "What's new in Miller 6": "new-in-miller-6.md"
     - "How to contribute": "contributing.md"
   - 'FAQs and examples':
     - "CSV, with and without headers": "csv-with-and-without-headers.md"
@@ -78,6 +77,7 @@ nav:
     - "Streaming processing, and memory usage": "streaming-and-memory.md"
     - "Compressed data": "reference-main-compressed-data.md"
     - "CPU/multicore usage": "cpu.md"
+    - "Scripting with Miller": "scripting.md"
     - "Miller environment variables": "reference-main-env-vars.md"
   - 'Types reference':
     - "Data types": "reference-main-data-types.md"
@@ -109,3 +109,4 @@ nav:
     - "Building from source": "build.md"
     - "Documents for previous releases": "release-docs.md"
     - "Glossary": "glossary.md"
+  - "What's new in Miller 6": "new-in-miller-6.md"

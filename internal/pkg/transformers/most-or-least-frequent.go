@@ -1,6 +1,7 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"sort"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -177,7 +179,7 @@ type TransformerMostOrLeastFrequent struct {
 	outputFieldName   string
 	descending        bool
 	countsByGroup     *lib.OrderedMap // map[string]int
-	valuesForGroup    map[string][]*types.Mlrval
+	valuesForGroup    map[string][]*mlrval.Mlrval
 }
 
 type tMostOrLeastFrequentSortPair struct {
@@ -200,7 +202,7 @@ func NewTransformerMostOrLeastFrequent(
 		outputFieldName:   outputFieldName,
 		descending:        descending,
 		countsByGroup:     lib.NewOrderedMap(),
-		valuesForGroup:    make(map[string][]*types.Mlrval),
+		valuesForGroup:    make(map[string][]*mlrval.Mlrval),
 	}
 
 	return tr, nil
@@ -210,9 +212,9 @@ func NewTransformerMostOrLeastFrequent(
 
 func (tr *TransformerMostOrLeastFrequent) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
@@ -273,7 +275,7 @@ func (tr *TransformerMostOrLeastFrequent) Transform(
 			outputLength = tr.maxOutputLength
 		}
 		for i := 0; i < outputLength; i++ {
-			outrec := types.NewMlrmapAsRecord()
+			outrec := mlrval.NewMlrmapAsRecord()
 			groupByFieldValues := tr.valuesForGroup[sortPairs[i].groupingKey]
 			for j := range tr.groupByFieldNames {
 				outrec.PutCopy(
@@ -283,11 +285,11 @@ func (tr *TransformerMostOrLeastFrequent) Transform(
 			}
 
 			if tr.showCounts {
-				outrec.PutReference(tr.outputFieldName, types.MlrvalFromInt(sortPairs[i].count))
+				outrec.PutReference(tr.outputFieldName, mlrval.FromInt(sortPairs[i].count))
 			}
-			outputChannel <- types.NewRecordAndContext(outrec, &inrecAndContext.Context)
+			outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 		}
 
-		outputChannel <- inrecAndContext // End-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // End-of-stream marker
 	}
 }

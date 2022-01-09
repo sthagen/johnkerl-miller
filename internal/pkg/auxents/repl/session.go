@@ -1,7 +1,7 @@
 // ================================================================
 // Top-level handler for a REPL session, including setup/construction, and
 // ingesting command-lines. Command-line strings are triaged and send off to
-// the appropriate handlers: DSL parse/execute if the comand is a DSL statement
+// the appropriate handlers: DSL parse/execute if the command is a DSL statement
 // (like '$z = $x + $y'); REPL-command-line parse/execute otherwise (like
 // ':open foo.dat' or ':help').
 //
@@ -29,6 +29,7 @@ import (
 	"github.com/johnkerl/miller/internal/pkg/dsl/cst"
 	"github.com/johnkerl/miller/internal/pkg/input"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/output"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
 	"github.com/johnkerl/miller/internal/pkg/types"
@@ -43,9 +44,11 @@ func NewRepl(
 	astPrintMode ASTPrintMode,
 	doWarnings bool,
 	options *cli.TOptions,
+	recordOutputFileName string,
+	recordOutputStream *os.File,
 ) (*Repl, error) {
 
-	recordReader, err := input.Create(&options.ReaderOptions)
+	recordReader, err := input.Create(&options.ReaderOptions, 1) // recordsPerBatch
 	if err != nil {
 		return nil, err
 	}
@@ -54,28 +57,20 @@ func NewRepl(
 	if err != nil {
 		return nil, err
 	}
-	outputStream := os.Stdout
 
 	// $* is the empty map {} until/unless the user opens a file and reads records from it.
-	inrec := types.NewMlrmapAsRecord()
+	inrec := mlrval.NewMlrmapAsRecord()
 	// NR is 0, etc until/unless the user opens a file and reads records from it.
-	context := types.NewContext(
-		options.ReaderOptions.IPS,
-		options.ReaderOptions.IFS,
-		options.ReaderOptions.IRS,
-		options.WriterOptions.OPS,
-		options.WriterOptions.OFS,
-		options.WriterOptions.ORS,
-		options.WriterOptions.FLATSEP,
-	)
-	runtimeState := runtime.NewEmptyState()
+	context := types.NewContext()
+
+	runtimeState := runtime.NewEmptyState(options)
 	runtimeState.Update(inrec, context)
 	// The filter expression for the main Miller DSL is any non-assignment
-	// statment like 'true' or '$x > 0.5' etc. For the REPL, we re-use this for
+	// statement like 'true' or '$x > 0.5' etc. For the REPL, we re-use this for
 	// interactive expressions to be printed to the terminal. For the main DSL,
-	// the default is types.MlrvalFromTrue(); for the REPL, the default is
-	// types.MLRVAL_VOID.
-	runtimeState.FilterExpression = types.MLRVAL_VOID
+	// the default is mlrval.FromTrue(); for the REPL, the default is
+	// mlrval.VOID.
+	runtimeState.FilterExpression = mlrval.VOID
 
 	// For control-C handling
 	sysToSignalHandlerChannel := make(chan os.Signal, 1) // Our signal handler reads system notification here
@@ -114,17 +109,18 @@ func NewRepl(
 		doWarnings:   doWarnings,
 		cstRootNode:  cstRootNode,
 
-		options:      options,
-		inputChannel: nil,
-		errorChannel: nil,
-		recordReader: recordReader,
-		recordWriter: recordWriter,
-		outputStream: outputStream,
+		options:       options,
+		readerChannel: nil,
+		errorChannel:  nil,
+		recordReader:  recordReader,
+		recordWriter:  recordWriter,
 
 		runtimeState:                 runtimeState,
 		sysToSignalHandlerChannel:    sysToSignalHandlerChannel,
 		appSignalNotificationChannel: appSignalNotificationChannel,
 	}
+
+	repl.setBufferedOutputStream(recordOutputFileName, recordOutputStream)
 
 	for _, dslString := range dslStrings {
 		err := repl.handleDSLStringBulk(dslString, doWarnings)
@@ -246,5 +242,25 @@ func (repl *Repl) handleMultiLine(
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
+	}
+}
+
+func (repl *Repl) setBufferedOutputStream(
+	recordOutputFileName string,
+	recordOutputStream *os.File,
+) {
+	repl.recordOutputFileName = recordOutputFileName
+	repl.recordOutputStream = recordOutputStream
+	repl.bufferedRecordOutputStream = bufio.NewWriter(recordOutputStream)
+}
+
+func (repl *Repl) closeBufferedOutputStream() {
+	if repl.recordOutputStream != os.Stdout {
+		err := repl.recordOutputStream.Close()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "mlr repl: error on redirect close of %s: %v\n",
+				repl.recordOutputFileName, err)
+			os.Exit(1)
+		}
 	}
 }

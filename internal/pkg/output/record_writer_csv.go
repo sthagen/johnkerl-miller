@@ -1,14 +1,14 @@
 package output
 
 import (
+	"bufio"
 	"encoding/csv"
-	"errors"
-	"io"
+	"fmt"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/colorizer"
-	"github.com/johnkerl/miller/internal/pkg/types"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 )
 
 type RecordWriterCSV struct {
@@ -23,22 +23,22 @@ type RecordWriterCSV struct {
 
 func NewRecordWriterCSV(writerOptions *cli.TWriterOptions) (*RecordWriterCSV, error) {
 	if len(writerOptions.OFS) != 1 {
-		return nil, errors.New("CSV OFS can only be a single character")
+		return nil, fmt.Errorf("for CSV, OFS can only be a single character")
 	}
 	if writerOptions.ORS != "\n" && writerOptions.ORS != "\r\n" {
-		return nil, errors.New("CSV ORS cannot be altered")
+		return nil, fmt.Errorf("for CSV, ORS cannot be altered")
 	}
 	return &RecordWriterCSV{
 		writerOptions:      writerOptions,
-		csvWriter:          nil, // will be set on first Write() wherein we have the ostream
+		csvWriter:          nil, // will be set on first Write() wherein we have the output stream
 		lastJoinedHeader:   nil,
 		justWroteEmptyLine: false,
 	}, nil
 }
 
 func (writer *RecordWriterCSV) Write(
-	outrec *types.Mlrmap,
-	ostream io.WriteCloser,
+	outrec *mlrval.Mlrmap,
+	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
 	// End of record stream: nothing special for this output format
@@ -47,13 +47,13 @@ func (writer *RecordWriterCSV) Write(
 	}
 
 	if writer.csvWriter == nil {
-		writer.csvWriter = csv.NewWriter(ostream)
+		writer.csvWriter = csv.NewWriter(bufferedOutputStream)
 		writer.csvWriter.Comma = rune(writer.writerOptions.OFS[0]) // xxx temp
 	}
 
 	if outrec.IsEmpty() {
 		if !writer.justWroteEmptyLine {
-			ostream.Write([]byte("\n"))
+			bufferedOutputStream.WriteString("\n")
 		}
 		joinedHeader := ""
 		writer.lastJoinedHeader = &joinedHeader
@@ -66,7 +66,7 @@ func (writer *RecordWriterCSV) Write(
 	if writer.lastJoinedHeader == nil || *writer.lastJoinedHeader != joinedHeader {
 		if writer.lastJoinedHeader != nil {
 			if !writer.justWroteEmptyLine {
-				ostream.Write([]byte("\n"))
+				bufferedOutputStream.WriteString("\n")
 			}
 			writer.justWroteEmptyLine = true
 		}
@@ -91,6 +91,5 @@ func (writer *RecordWriterCSV) Write(
 		i++
 	}
 	writer.csvWriter.Write(fields)
-	writer.csvWriter.Flush()
 	writer.justWroteEmptyLine = false
 }

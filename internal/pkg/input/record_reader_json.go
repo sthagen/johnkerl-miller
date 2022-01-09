@@ -2,7 +2,7 @@ package input
 
 import (
 	"bufio"
-	"errors"
+	"container/list"
 	"fmt"
 	"io"
 	"strings"
@@ -11,23 +11,29 @@ import (
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 type RecordReaderJSON struct {
-	readerOptions *cli.TReaderOptions
+	readerOptions   *cli.TReaderOptions
+	recordsPerBatch int // distinct from readerOptions.RecordsPerBatch for join/repl
 }
 
-func NewRecordReaderJSON(readerOptions *cli.TReaderOptions) (*RecordReaderJSON, error) {
+func NewRecordReaderJSON(
+	readerOptions *cli.TReaderOptions,
+	recordsPerBatch int,
+) (*RecordReaderJSON, error) {
 	return &RecordReaderJSON{
-		readerOptions: readerOptions,
+		readerOptions:   readerOptions,
+		recordsPerBatch: recordsPerBatch,
 	}, nil
 }
 
 func (reader *RecordReaderJSON) Read(
 	filenames []string,
 	context types.Context,
-	inputChannel chan<- *types.RecordAndContext,
+	readerChannel chan<- *list.List, // list of *types.RecordAndContext
 	errorChannel chan error,
 	downstreamDoneChannel <-chan bool, // for mlr head
 ) {
@@ -41,7 +47,7 @@ func (reader *RecordReaderJSON) Read(
 			if err != nil {
 				errorChannel <- err
 			}
-			reader.processHandle(handle, "(stdin)", &context, inputChannel, errorChannel, downstreamDoneChannel)
+			reader.processHandle(handle, "(stdin)", &context, readerChannel, errorChannel, downstreamDoneChannel)
 		} else {
 			for _, filename := range filenames {
 				handle, err := lib.OpenFileForRead(
@@ -53,48 +59,55 @@ func (reader *RecordReaderJSON) Read(
 				if err != nil {
 					errorChannel <- err
 				} else {
-					reader.processHandle(handle, filename, &context, inputChannel, errorChannel, downstreamDoneChannel)
+					reader.processHandle(handle, filename, &context, readerChannel, errorChannel, downstreamDoneChannel)
 					handle.Close()
 				}
 			}
 		}
 	}
-	inputChannel <- types.NewEndOfStreamMarker(&context)
+	readerChannel <- types.NewEndOfStreamMarkerList(&context)
 }
 
 func (reader *RecordReaderJSON) processHandle(
 	handle io.Reader,
 	filename string,
 	context *types.Context,
-	inputChannel chan<- *types.RecordAndContext,
+	readerChannel chan<- *list.List, // list of *types.RecordAndContext
 	errorChannel chan error,
 	downstreamDoneChannel <-chan bool, // for mlr head
 ) {
 	context.UpdateForStartOfFile(filename)
+	// TODO: comment
+	recordsPerBatch := reader.recordsPerBatch
 
 	if reader.readerOptions.CommentHandling != cli.CommentsAreData {
-		handle = NewJSONCommentEnabledReader(handle, reader.readerOptions, inputChannel)
+		handle = NewJSONCommentEnabledReader(handle, reader.readerOptions, readerChannel)
 	}
 	decoder := json.NewDecoder(handle)
+	recordsAndContexts := list.New()
 
 	eof := false
+	i := 0
 	for {
-
 		// See if downstream processors will be ignoring further data (e.g. mlr
 		// head).  If so, stop reading. This makes 'mlr head hugefile' exit
-		// quickly, as it should.
-		select {
-		case _ = <-downstreamDoneChannel:
-			eof = true
-			break
-		default:
-			break
-		}
-		if eof {
-			break
+		// quickly, as it should. Do this channel-check every so often to avoid
+		// scheduler overhead.
+		i++
+		if i%recordsPerBatch == 0 {
+			select {
+			case _ = <-downstreamDoneChannel:
+				eof = true
+				break
+			default:
+				break
+			}
+			if eof {
+				break
+			}
 		}
 
-		mlrval, eof, err := types.MlrvalDecodeFromJSON(decoder)
+		mlrval, eof, err := mlrval.MlrvalDecodeFromJSON(decoder)
 		if eof {
 			break
 		}
@@ -112,53 +125,58 @@ func (reader *RecordReaderJSON) processHandle(
 			// TODO: make a helper method
 			record := mlrval.GetMap()
 			if record == nil {
-				errorChannel <- errors.New("Internal coding error detected in JSON record-reader")
+				errorChannel <- fmt.Errorf("internal coding error detected in JSON record-reader")
 				return
 			}
 			context.UpdateForInputRecord()
-			inputChannel <- types.NewRecordAndContext(
-				record,
-				context,
-			)
+			recordsAndContexts.PushBack(types.NewRecordAndContext(record, context))
+
+			if recordsAndContexts.Len() >= recordsPerBatch {
+				readerChannel <- recordsAndContexts
+				recordsAndContexts = list.New()
+			}
+
 		} else if mlrval.IsArray() {
 			records := mlrval.GetArray()
 			if records == nil {
-				errorChannel <- errors.New("Internal coding error detected in JSON record-reader")
+				errorChannel <- fmt.Errorf("internal coding error detected in JSON record-reader")
 				return
 			}
+
 			for _, mlrval := range records {
 				if !mlrval.IsMap() {
 					// TODO: more context
-					errorChannel <- errors.New(
-						fmt.Sprintf(
-							"Valid but unmillerable JSON. Expected map (JSON object); got %s.",
-							mlrval.GetTypeName(),
-						),
+					errorChannel <- fmt.Errorf(
+						"valid but unmillerable JSON. Expected map (JSON object); got %s.",
+						mlrval.GetTypeName(),
 					)
 					return
 				}
 				record := mlrval.GetMap()
 				if record == nil {
-					errorChannel <- errors.New("Internal coding error detected in JSON record-reader")
+					errorChannel <- fmt.Errorf("internal coding error detected in JSON record-reader")
 					return
 				}
 				context.UpdateForInputRecord()
-				inputChannel <- types.NewRecordAndContext(
-					record,
-					context,
-				)
+				recordsAndContexts.PushBack(types.NewRecordAndContext(record, context))
 
+				if recordsAndContexts.Len() >= recordsPerBatch {
+					readerChannel <- recordsAndContexts
+					recordsAndContexts = list.New()
+				}
 			}
 
 		} else {
-			errorChannel <- errors.New(
-				fmt.Sprintf(
-					"Valid but unmillerable JSON. Expected map (JSON object); got %s.",
-					mlrval.GetTypeName(),
-				),
+			errorChannel <- fmt.Errorf(
+				"valid but unmillerable JSON. Expected map (JSON object); got %s.",
+				mlrval.GetTypeName(),
 			)
 			return
 		}
+	}
+
+	if recordsAndContexts.Len() > 0 {
+		readerChannel <- recordsAndContexts
 	}
 }
 
@@ -167,7 +185,7 @@ func (reader *RecordReaderJSON) processHandle(
 //
 // Miller lets users (on an opt-in basis) have comments in their data files,
 // for all formats including JSON. Comments are only honored at start of line.
-// Users can have them be printed to stdout straightaway, or simply discarded.
+// Users can have them be printed to stdout straight away, or simply discarded.
 //
 // For most file formats Miller is doing line-based I/O and can deal with
 // comment lines easily and simply. But for JSON, the Go library needs an
@@ -187,8 +205,8 @@ func (reader *RecordReaderJSON) processHandle(
 type JSONCommentEnabledReader struct {
 	lineScanner   *bufio.Scanner
 	readerOptions *cli.TReaderOptions
-	context       *types.Context // Needed for channelized stdout-printing logic
-	inputChannel  chan<- *types.RecordAndContext
+	context       *types.Context    // Needed for channelized stdout-printing logic
+	readerChannel chan<- *list.List // list of *types.RecordAndContext
 
 	// In case a line was ingested which was longer than the read-buffer passed
 	// to us, in which case we need to split up that line and return it over
@@ -199,13 +217,13 @@ type JSONCommentEnabledReader struct {
 func NewJSONCommentEnabledReader(
 	underlying io.Reader,
 	readerOptions *cli.TReaderOptions,
-	inputChannel chan<- *types.RecordAndContext,
+	readerChannel chan<- *list.List, // list of *types.RecordAndContext
 ) *JSONCommentEnabledReader {
 	return &JSONCommentEnabledReader{
 		lineScanner:   bufio.NewScanner(underlying),
 		readerOptions: readerOptions,
 		context:       types.NewNilContext(),
-		inputChannel:  inputChannel,
+		readerChannel: readerChannel,
 
 		lineBytes: nil,
 	}
@@ -234,7 +252,9 @@ func (bsr *JSONCommentEnabledReader) Read(p []byte) (n int, err error) {
 		if bsr.readerOptions.CommentHandling == cli.PassComments {
 			// Insert the string into the record-output stream, so that goroutine can
 			// print it, resulting in deterministic output-ordering.
-			bsr.inputChannel <- types.NewOutputString(line+"\n", bsr.context)
+			ell := list.New()
+			ell.PushBack(types.NewOutputString(line+"\n", bsr.context))
+			bsr.readerChannel <- ell
 		}
 	}
 }

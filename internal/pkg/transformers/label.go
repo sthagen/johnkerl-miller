@@ -1,7 +1,7 @@
 package transformers
 
 import (
-	"errors"
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -107,12 +107,7 @@ func NewTransformerLabel(
 	for _, newName := range newNames {
 		_, ok := uniquenessChecker[newName]
 		if ok {
-			return nil, errors.New(
-				fmt.Sprintf(
-					"mlr label: labels must be unique; got duplicate \"%s\"\n",
-					newName,
-				),
-			)
+			return nil, fmt.Errorf("mlr label: labels must be unique; got duplicate \"%s\"\n", newName)
 		}
 		uniquenessChecker[newName] = true
 	}
@@ -128,14 +123,14 @@ func NewTransformerLabel(
 
 func (tr *TransformerLabel) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		inrec.Label(tr.newNames)
 	}
-	outputChannel <- inrecAndContext // including end-of-stream marker
+	outputRecordsAndContexts.PushBack(inrecAndContext) // including end-of-stream marker
 }

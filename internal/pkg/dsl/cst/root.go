@@ -7,18 +7,17 @@ package cst
 
 import (
 	"container/list"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/dsl"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/output"
 	"github.com/johnkerl/miller/internal/pkg/parsing/lexer"
 	"github.com/johnkerl/miller/internal/pkg/parsing/parser"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
-	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 // NewEmptyRoot sets up an empty CST, before ingesting any DSL strings.  For
@@ -148,7 +147,7 @@ func (root *RootNode) IngestAST(
 	warningsAreFatal bool,
 ) error {
 	if ast.RootNode == nil {
-		return errors.New("Cannot build CST from nil AST root")
+		return fmt.Errorf("cannot build CST from nil AST root")
 	}
 
 	// Check for things that are syntax errors but not done in the AST for
@@ -283,9 +282,7 @@ func (root *RootNode) regexProtectPrePassAux(astNode *dsl.ASTNode) {
 func (root *RootNode) buildMainPass(ast *dsl.AST, isReplImmediate bool) error {
 
 	if ast.RootNode.Type != dsl.NodeTypeStatementBlock {
-		return errors.New(
-			"CST root build: non-statement-block AST root node unhandled",
-		)
+		return fmt.Errorf("at CST root build: non-statement-block AST root node unhandled")
 	}
 	astChildren := ast.RootNode.Children
 
@@ -411,9 +408,7 @@ func (root *RootNode) resolveSubroutineCallsites() error {
 			return err
 		}
 		if uds == nil {
-			return errors.New(
-				"mlr: subroutine name not found: " + subroutineName,
-			)
+			return fmt.Errorf("mlr: subroutine name not found: " + subroutineName)
 		}
 
 		unresolvedSubroutineCallsite.uds = uds
@@ -464,7 +459,7 @@ func (root *RootNode) ExecuteBeginBlocks(state *runtime.State) error {
 	return nil
 }
 
-func (root *RootNode) ExecuteMainBlock(state *runtime.State) (outrec *types.Mlrmap, err error) {
+func (root *RootNode) ExecuteMainBlock(state *runtime.State) (outrec *mlrval.Mlrmap, err error) {
 	_, err = root.mainBlock.Execute(state)
 	return state.Inrec, err
 }
@@ -488,7 +483,7 @@ func (root *RootNode) ExecuteEndBlocks(state *runtime.State) error {
 // executed once, and then discarded.
 
 // This is the 'execute once' part of that.
-func (root *RootNode) ExecuteREPLImmediate(state *runtime.State) (outrec *types.Mlrmap, err error) {
+func (root *RootNode) ExecuteREPLImmediate(state *runtime.State) (outrec *mlrval.Mlrmap, err error) {
 	_, err = root.replImmediateBlock.ExecuteFrameless(state)
 	return state.Inrec, err
 }

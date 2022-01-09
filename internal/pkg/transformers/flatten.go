@@ -1,6 +1,7 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -44,7 +45,7 @@ func transformerFlattenParseCLI(
 	pargi *int,
 	argc int,
 	args []string,
-	_ *cli.TOptions,
+	options *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
 ) IRecordTransformer {
 
@@ -87,6 +88,7 @@ func transformerFlattenParseCLI(
 
 	transformer, err := NewTransformerFlatten(
 		oFlatSep,
+		options,
 		fieldNames,
 	)
 	if err != nil {
@@ -101,6 +103,7 @@ func transformerFlattenParseCLI(
 type TransformerFlatten struct {
 	// input
 	oFlatSep     string
+	options      *cli.TOptions
 	fieldNameSet map[string]bool
 
 	// state
@@ -109,6 +112,7 @@ type TransformerFlatten struct {
 
 func NewTransformerFlatten(
 	oFlatSep string,
+	options *cli.TOptions,
 	fieldNames []string,
 ) (*TransformerFlatten, error) {
 	var fieldNameSet map[string]bool = nil
@@ -118,6 +122,7 @@ func NewTransformerFlatten(
 
 	retval := &TransformerFlatten{
 		oFlatSep:     oFlatSep,
+		options:      options,
 		fieldNameSet: fieldNameSet,
 	}
 
@@ -133,50 +138,50 @@ func NewTransformerFlatten(
 
 func (tr *TransformerFlatten) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerFlatten) flattenAll(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		oFlatSep := tr.oFlatSep
 		if oFlatSep == "" {
-			oFlatSep = inrecAndContext.Context.FLATSEP
+			oFlatSep = tr.options.WriterOptions.FLATSEP
 		}
 		inrec.Flatten(oFlatSep)
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerFlatten) flattenSome(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		oFlatSep := tr.oFlatSep
 		if oFlatSep == "" {
-			oFlatSep = inrecAndContext.Context.FLATSEP
+			oFlatSep = tr.options.WriterOptions.FLATSEP
 		}
 		inrec.FlattenFields(tr.fieldNameSet, oFlatSep)
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

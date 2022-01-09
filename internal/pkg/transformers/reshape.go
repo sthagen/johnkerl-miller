@@ -28,6 +28,7 @@ package transformers
 // 15 2009-01-05     Z  0.09719105
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -35,6 +36,7 @@ import (
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -283,24 +285,24 @@ func NewTransformerReshape(
 
 func (tr *TransformerReshape) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerReshape) wideToLongNoRegex(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		pairs := types.NewMlrmap()
+		pairs := mlrval.NewMlrmap()
 		for _, inputFieldName := range tr.inputFieldNames {
 			value := inrec.Get(inputFieldName)
 			if value != nil {
@@ -315,31 +317,31 @@ func (tr *TransformerReshape) wideToLongNoRegex(
 		}
 
 		if pairs.IsEmpty() {
-			outputChannel <- inrecAndContext
+			outputRecordsAndContexts.PushBack(inrecAndContext)
 		} else {
 			for pf := pairs.Head; pf != nil; pf = pf.Next {
 				outrec := inrec.Copy()
-				outrec.PutReference(tr.outputKeyFieldName, types.MlrvalFromString(pf.Key))
+				outrec.PutReference(tr.outputKeyFieldName, mlrval.FromString(pf.Key))
 				outrec.PutReference(tr.outputValueFieldName, pf.Value)
-				outputChannel <- types.NewRecordAndContext(outrec, &inrecAndContext.Context)
+				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
 	} else {
-		outputChannel <- inrecAndContext // emit end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerReshape) wideToLongRegex(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		pairs := types.NewMlrmap()
+		pairs := mlrval.NewMlrmap()
 
 		for pd := inrec.Head; pd != nil; pd = pd.Next {
 			for _, inputFieldRegex := range tr.inputFieldRegexes {
@@ -357,27 +359,27 @@ func (tr *TransformerReshape) wideToLongRegex(
 		}
 
 		if pairs.IsEmpty() {
-			outputChannel <- inrecAndContext
+			outputRecordsAndContexts.PushBack(inrecAndContext)
 		} else {
 			for pf := pairs.Head; pf != nil; pf = pf.Next {
 				outrec := inrec.Copy()
-				outrec.PutReference(tr.outputKeyFieldName, types.MlrvalFromString(pf.Key))
+				outrec.PutReference(tr.outputKeyFieldName, mlrval.FromString(pf.Key))
 				outrec.PutReference(tr.outputValueFieldName, pf.Value)
-				outputChannel <- types.NewRecordAndContext(outrec, &inrecAndContext.Context)
+				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
 	} else {
-		outputChannel <- inrecAndContext // emit end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerReshape) longToWide(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -385,7 +387,7 @@ func (tr *TransformerReshape) longToWide(
 		splitOutKeyFieldValue := inrec.Get(tr.splitOutKeyFieldName)
 		splitOutValueFieldValue := inrec.Get(tr.splitOutValueFieldName)
 		if splitOutKeyFieldValue == nil || splitOutValueFieldValue == nil {
-			outputChannel <- inrecAndContext
+			outputRecordsAndContexts.PushBack(inrecAndContext)
 			return
 		}
 
@@ -429,22 +431,22 @@ func (tr *TransformerReshape) longToWide(
 					outrec.PutReference(pg.Key, pg.Value)
 				}
 
-				outputChannel <- types.NewRecordAndContext(outrec, &inrecAndContext.Context)
+				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
-		outputChannel <- inrecAndContext // emit end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
 	}
 }
 
 type tReshapeBucket struct {
-	representative *types.Mlrmap
-	pairs          *types.Mlrmap
+	representative *mlrval.Mlrmap
+	pairs          *mlrval.Mlrmap
 }
 
-func newReshapeBucket(representative *types.Mlrmap) *tReshapeBucket {
+func newReshapeBucket(representative *mlrval.Mlrmap) *tReshapeBucket {
 	return &tReshapeBucket{
 		representative: representative,
-		pairs:          types.NewMlrmap(),
+		pairs:          mlrval.NewMlrmap(),
 	}
 }

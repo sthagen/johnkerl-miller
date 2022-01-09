@@ -26,6 +26,8 @@ const DEFAULT_GEN_START_AS_STRING = "1"
 const DEFAULT_GEN_STEP_AS_STRING = "1"
 const DEFAULT_GEN_STOP_AS_STRING = "100"
 
+const DEFAULT_RECORDS_PER_BATCH = 500
+
 type TGeneratorOptions struct {
 	FieldName     string
 	StartAsString string
@@ -34,25 +36,22 @@ type TGeneratorOptions struct {
 }
 
 type TReaderOptions struct {
-	InputFileFormat     string
-	IFS                 string
-	IPS                 string
-	IRS                 string
-	AllowRepeatIFS      bool
-	AllowRepeatIPS      bool
-	IFSRegex            *regexp.Regexp
-	IPSRegex            *regexp.Regexp
-	SuppressIFSRegexing bool // e.g. if they want to do '--ifs .' since '.' is a regex metacharacter
-	SuppressIPSRegexing bool // e.g. if they want to do '--ips .' since '.' is a regex metacharacter
+	InputFileFormat  string
+	IFS              string
+	IPS              string
+	IRS              string
+	AllowRepeatIFS   bool
+	IFSRegex         *regexp.Regexp
+	IPSRegex         *regexp.Regexp
+	DedupeFieldNames bool
 
 	// If unspecified on the command line, these take input-format-dependent
 	// defaults.  E.g. default FS is comma for DKVP but space for NIDX;
 	// default AllowRepeatIFS is false for CSV but true for PPRINT.
-	IFSWasSpecified            bool
-	IPSWasSpecified            bool
-	IRSWasSpecified            bool
-	AllowRepeatIFSWasSpecified bool
-	AllowRepeatIPSWasSpecified bool
+	ifsWasSpecified            bool
+	ipsWasSpecified            bool
+	irsWasSpecified            bool
+	allowRepeatIFSWasSpecified bool
 
 	UseImplicitCSVHeader bool
 	AllowRaggedCSVInput  bool
@@ -72,6 +71,9 @@ type TReaderOptions struct {
 	PrepipeIsRaw bool
 	// For in-process gunzip/bunzip2/zcat (distinct from prepipe)
 	FileInputEncoding lib.TFileInputEncoding
+
+	// TODO: comment
+	RecordsPerBatch int
 }
 
 // ----------------------------------------------------------------
@@ -82,25 +84,22 @@ type TWriterOptions struct {
 	OPS              string
 	FLATSEP          string
 
+	FlushOnEveryRecord             bool
+	flushOnEveryRecordWasSpecified bool
+
 	// If unspecified on the command line, these take input-format-dependent
 	// defaults.  E.g. default FS is comma for DKVP but space for NIDX.
-	OFSWasSpecified bool
-	OPSWasSpecified bool
-	ORSWasSpecified bool
+	ofsWasSpecified bool
+	opsWasSpecified bool
+	orsWasSpecified bool
 
 	HeaderlessCSVOutput      bool
 	BarredPprintOutput       bool
 	RightAlignedPPRINTOutput bool
 	RightAlignedXTABOutput   bool
 
-	//	right_justify_xtab_value bool;
-	//	right_align_pprint bool;
 	WrapJSONOutputInOuterList bool
 	JSONOutputMultiline       bool // Not using miller/types enum to avoid package cycle
-	//	json_quote_int_keys bool;
-	//	json_quote_non_string_values bool;
-	//
-	//	quoting_t oquoting;
 
 	// When we read things like
 	//
@@ -154,9 +153,11 @@ type TOptions struct {
 
 	HaveRandSeed bool
 	RandSeed     int
+
+	PrintElapsedTime bool // mlr --time
 }
 
-// ----------------------------------------------------------------
+// Not usable until FinalizeReaderOptions and FinalizeWriterOptions are called.
 func DefaultOptions() *TOptions {
 	return &TOptions{
 		ReaderOptions: DefaultReaderOptions(),
@@ -168,9 +169,11 @@ func DefaultOptions() *TOptions {
 	}
 }
 
+// Not usable until FinalizeReaderOptions is called on it.
 func DefaultReaderOptions() TReaderOptions {
 	return TReaderOptions{
-		InputFileFormat:   "dkvp", // xxx constify at top
+		InputFileFormat: "dkvp", // TODO: constify at top, or maybe formats.DKVP in package
+		// FinalizeReaderOptions will compute IFSRegex and IPSRegex.
 		IRS:               "\n",
 		IFS:               ",",
 		IPS:               "=",
@@ -182,16 +185,22 @@ func DefaultReaderOptions() TReaderOptions {
 			StepAsString:  DEFAULT_GEN_STEP_AS_STRING,
 			StopAsString:  DEFAULT_GEN_STOP_AS_STRING,
 		},
+		DedupeFieldNames: true,
+
+		// TODO: comment
+		RecordsPerBatch: DEFAULT_RECORDS_PER_BATCH,
 	}
 }
 
+// Not usable until FinalizeWriterOptions is called on it.
 func DefaultWriterOptions() TWriterOptions {
 	return TWriterOptions{
-		OutputFileFormat: "dkvp",
-		ORS:              "\n",
-		OFS:              ",",
-		OPS:              "=",
-		FLATSEP:          ".",
+		OutputFileFormat:   "dkvp",
+		ORS:                "\n",
+		OFS:                ",",
+		OPS:                "=",
+		FLATSEP:            ".",
+		FlushOnEveryRecord: true,
 
 		HeaderlessCSVOutput:       false,
 		WrapJSONOutputInOuterList: false,

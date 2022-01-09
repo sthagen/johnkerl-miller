@@ -2,7 +2,6 @@ package transformers
 
 import (
 	"container/list"
-	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -149,7 +148,7 @@ func NewTransformerRename(
 	doGsub bool,
 ) (*TransformerRename, error) {
 	if len(names)%2 != 0 {
-		return nil, errors.New("Rename: names string must have even length.")
+		return nil, fmt.Errorf("mlr rename: names string must have even length")
 	}
 
 	oldToNewNames := lib.NewOrderedMap()
@@ -191,20 +190,20 @@ func NewTransformerRename(
 
 func (tr *TransformerRename) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, inputDownstreamDoneChannel, outputDownstreamDoneChannel, outputChannel)
+	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerRename) transformWithoutRegexes(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -217,15 +216,15 @@ func (tr *TransformerRename) transformWithoutRegexes(
 
 		}
 	}
-	outputChannel <- inrecAndContext // including end-of-stream marker
+	outputRecordsAndContexts.PushBack(inrecAndContext) // including end-of-stream marker
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerRename) transformWithRegexes(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
@@ -252,8 +251,8 @@ func (tr *TransformerRename) transformWithRegexes(
 			}
 		}
 
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext // including end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // including end-of-stream marker
 	}
 }

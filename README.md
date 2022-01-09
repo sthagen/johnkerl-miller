@@ -1,5 +1,3 @@
-[**Take the 2021 Miller User Survey!**](https://docs.google.com/forms/d/e/1FAIpQLSfNgLS9WVRq9mu8dZlMbS7LbTyRH1diRDnT_dGiavSOh_A8xA/viewform?usp=sf_link)
-
 # What is Miller?
 
 **Miller is like awk, sed, cut, join, and sort for data formats such as CSV, TSV, tabular JSON and positionally-indexed.**
@@ -60,7 +58,7 @@ There's a good chance you can get Miller pre-built for your system:
 [![FreeBSD](https://img.shields.io/badge/distros-freebsd-8c0707.svg)](https://www.freshports.org/textproc/miller/)
 
 [![Anaconda](https://img.shields.io/badge/distros-anaconda-63ad41.svg)](https://anaconda.org/conda-forge/miller/)
-[![Homebrew/MacOSX](https://img.shields.io/badge/distros-macosxbrew-ba832b.svg)](https://github.com/Homebrew/homebrew-core/search?utf8=%E2%9C%93&q=miller)
+[![Homebrew/MacOSX](https://img.shields.io/badge/distros-homebrew-ba832b.svg)](https://formulae.brew.sh/formula/miller)
 [![MacPorts/MacOSX](https://img.shields.io/badge/distros-macports-1376ec.svg)](https://www.macports.org/ports.php?by=name&substr=miller)
 [![Chocolatey](https://img.shields.io/badge/distros-chocolatey-red.svg)](https://chocolatey.org/packages/miller)
 
@@ -78,9 +76,15 @@ See also [building from source](https://miller.readthedocs.io/en/latest/build.ht
 
 # Building from source
 
-* `make` and `make check`
-* The Miller executable is `./mlr` (or `.\mlr.exe` on Windows)
-* For more developer information please see [README-go-port.md](./README-go-port.md)
+* `make`: takes just a few seconds and produces the Miller executable, which is `./mlr` (or `.\mlr.exe` on Windows).
+  * Without `make`: `go build github.com/johnkerl/miller/cmd/mlr`
+* `make check` runs tests.
+  * Without `make`: `go test github.com/johnkerl/miller/internal/pkg/...` and `mlr regtest`
+* `make install` installs executable `/usr/local/bin/mlr` and manual page `/usr/local/share/man/man1/mlr.1` (so you can do `man mlr`).
+  * You can instead do `./configure --prefix=/some/install/path` followed by `make install` if you want to install somewhere other than `/usr/local`.
+  * Without make: `go install github.com/johnkerl/miller/cmd/mlr` will install to _GOPATH_`/bin/mlr`
+* See also the doc page on [building from source](https://miller.readthedocs.io/en/latest/build).
+* For more developer information please see [README-go-port.md](./README-go-port.md).
 
 # License
 
@@ -91,14 +95,9 @@ See also [building from source](https://miller.readthedocs.io/en/latest/build.ht
 * Discussion forum: https://github.com/johnkerl/miller/discussions
 * Feature requests / bug reports: https://github.com/johnkerl/miller/issues
 
-# Contributors
-
-Thanks to all the fine people who help make Miller better by contributing commits/PRs! (I wish there
-were an equally good way to honor all the fine people who contribute through issues and feature requests!)
-
-<a href="https://github.com/johnkerl/miller/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=johnkerl/miller" />
-</a>
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-40-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 # Features
 
@@ -145,9 +144,9 @@ system&rsquo;s available RAM, and you can use Miller in **tail -f** contexts.
 
 * Miller has high-throughput **performance** on par with the Unix toolkit.
 
-* Not unlike `jq` (http://stedolan.github.io/jq/) for JSON, Miller is written
-in portable, modern C, with **zero runtime dependencies**. You can download or
-compile a single binary, `scp` it to a faraway machine, and expect it to work.
+* Miller is written in portable, modern Go, with **zero runtime dependencies**.
+You can download or compile a single binary, `scp` it to a faraway machine,
+and expect it to work.
 
 # What people are saying about Miller
 
@@ -163,6 +162,79 @@ compile a single binary, `scp` it to a faraway machine, and expect it to work.
 
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">Miller: a *format-aware* data munging tool By <a href="https://twitter.com/__jo_ker__?ref_src=twsrc%5Etfw">@__jo_ker__</a> to overcome limitations with *line-aware* workshorses like awk, sed et al <a href="https://t.co/LCyPkhYvt9">https://t.co/LCyPkhYvt9</a><br><br>The project website is a fantastic example of good software documentation!!</p>&mdash; Donny Daniel (@dnnydnl) <a href="https://twitter.com/dnnydnl/status/1038883999391932416?ref_src=twsrc%5Etfw">September 9, 2018</a></blockquote>
 
-<blockquote class="twitter-tweet"><p lang="en" dir="ltr">Holy holly data swiss army knife batman! How did noone suggest Miller <a href="https://t.co/JGQpmRAZLv">https://t.co/JGQpmRAZLv</a> for solving database cleaning / ETL issues to me before <br><br>Congrats to <a href="https://twitter.com/__jo_ker__?ref_src=twsrc%5Etfw">@__jo_ker__</a> for amazingly intuitive tool for critical data management tasks!<a href="https://twitter.com/hashtag/DataScienceandLaw?src=hash&amp;ref_src=twsrc%5Etfw">#DataScienceandLaw</a> <a href="https://twitter.com/hashtag/ComputationalLaw?src=hash&amp;ref_src=twsrc%5Etfw">#ComputationalLaw</a></p>&mdash; James Miller (@japanlawprof) <a href="https://twitter.com/japanlawprof/status/1006547451409518597?ref_src=twsrc%5Etfw">June 12, 2018</a></blockquote>
+<blockquote class="twitter-tweet"><p lang="en" dir="ltr">Holy holly data swiss army knife batman! How did no one suggest Miller <a href="https://t.co/JGQpmRAZLv">https://t.co/JGQpmRAZLv</a> for solving database cleaning / ETL issues to me before <br><br>Congrats to <a href="https://twitter.com/__jo_ker__?ref_src=twsrc%5Etfw">@__jo_ker__</a> for amazingly intuitive tool for critical data management tasks!<a href="https://twitter.com/hashtag/DataScienceandLaw?src=hash&amp;ref_src=twsrc%5Etfw">#DataScienceandLaw</a> <a href="https://twitter.com/hashtag/ComputationalLaw?src=hash&amp;ref_src=twsrc%5Etfw">#ComputationalLaw</a></p>&mdash; James Miller (@japanlawprof) <a href="https://twitter.com/japanlawprof/status/1006547451409518597?ref_src=twsrc%5Etfw">June 12, 2018</a></blockquote>
 
 <blockquote class="twitter-tweet"><p lang="en" dir="ltr">🤯<a href="https://twitter.com/__jo_ker__?ref_src=twsrc%5Etfw">@__jo_ker__</a>&#39;s Miller easily reads, transforms, + writes all sorts of tabular data. It&#39;s standalone, fast, and built for streaming data (operating on one line at a time, so you can work on files larger than memory).<br><br>And the docs are dream. I&#39;ve been reading them all morning! <a href="https://t.co/Be2pGPZK6t">https://t.co/Be2pGPZK6t</a></p>&mdash; Benjamin Wolfe (he/him) (@BenjaminWolfe) <a href="https://twitter.com/BenjaminWolfe/status/1435966268499128324?ref_src=twsrc%5Etfw">September 9, 2021</a></blockquote>
+
+## Contributors ✨
+
+Thanks to all the fine people who help make Miller better ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/aborruso"><img src="https://avatars.githubusercontent.com/u/30607?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Andrea Borruso</b></sub></a><br /><a href="#ideas-aborruso" title="Ideas, Planning, & Feedback">🤔</a> <a href="#design-aborruso" title="Design">🎨</a></td>
+    <td align="center"><a href="https://sjackman.ca/"><img src="https://avatars.githubusercontent.com/u/291551?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Shaun Jackman</b></sub></a><br /><a href="#ideas-sjackman" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="http://www.fredtrotter.com/"><img src="https://avatars.githubusercontent.com/u/83133?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Fred Trotter</b></sub></a><br /><a href="#ideas-ftrotter" title="Ideas, Planning, & Feedback">🤔</a> <a href="#design-ftrotter" title="Design">🎨</a></td>
+    <td align="center"><a href="https://github.com/Komosa"><img src="https://avatars.githubusercontent.com/u/10688154?v=4?s=50" width="50px;" alt=""/><br /><sub><b>komosa</b></sub></a><br /><a href="#ideas-Komosa" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/jungle-boogie"><img src="https://avatars.githubusercontent.com/u/1111743?v=4?s=50" width="50px;" alt=""/><br /><sub><b>jungle-boogie</b></sub></a><br /><a href="#ideas-jungle-boogie" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/0-wiz-0"><img src="https://avatars.githubusercontent.com/u/2221844?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Thomas Klausner</b></sub></a><br /><a href="#infra-0-wiz-0" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a></td>
+    <td align="center"><a href="https://github.com/skitt"><img src="https://avatars.githubusercontent.com/u/2128935?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Stephen Kitt</b></sub></a><br /><a href="#platform-skitt" title="Packaging/porting to new platform">📦</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="http://leahneukirchen.org/"><img src="https://avatars.githubusercontent.com/u/139?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Leah Neukirchen</b></sub></a><br /><a href="#ideas-leahneukirchen" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/lgbaldoni"><img src="https://avatars.githubusercontent.com/u/1450716?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Luigi Baldoni</b></sub></a><br /><a href="#platform-lgbaldoni" title="Packaging/porting to new platform">📦</a></td>
+    <td align="center"><a href="https://yutani.rbind.io/"><img src="https://avatars.githubusercontent.com/u/1978793?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Hiroaki Yutani</b></sub></a><br /><a href="#ideas-yutannihilation" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://3e.org/"><img src="https://avatars.githubusercontent.com/u/41439?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Daniel M. Drucker</b></sub></a><br /><a href="#ideas-dmd" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/NikosAlexandris"><img src="https://avatars.githubusercontent.com/u/7046639?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Nikos Alexandris</b></sub></a><br /><a href="#ideas-NikosAlexandris" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/kundeng"><img src="https://avatars.githubusercontent.com/u/89032?v=4?s=50" width="50px;" alt=""/><br /><sub><b>kundeng</b></sub></a><br /><a href="#platform-kundeng" title="Packaging/porting to new platform">📦</a></td>
+    <td align="center"><a href="http://victorsergienko.com/"><img src="https://avatars.githubusercontent.com/u/151199?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Victor Sergienko</b></sub></a><br /><a href="#platform-singalen" title="Packaging/porting to new platform">📦</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/gromgit"><img src="https://avatars.githubusercontent.com/u/215702?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Adrian Ho</b></sub></a><br /><a href="#design-gromgit" title="Design">🎨</a></td>
+    <td align="center"><a href="https://github.com/Zachp"><img src="https://avatars.githubusercontent.com/u/1316442?v=4?s=50" width="50px;" alt=""/><br /><sub><b>zachp</b></sub></a><br /><a href="#platform-Zachp" title="Packaging/porting to new platform">📦</a></td>
+    <td align="center"><a href="https://dsel.net/"><img src="https://avatars.githubusercontent.com/u/921669?v=4?s=50" width="50px;" alt=""/><br /><sub><b>David Selassie</b></sub></a><br /><a href="#ideas-davidselassie" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="http://www.joelparkerhenderson.com/"><img src="https://avatars.githubusercontent.com/u/27145?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Joel Parker Henderson</b></sub></a><br /><a href="#ideas-joelparkerhenderson" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/divtiply"><img src="https://avatars.githubusercontent.com/u/5359679?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Michel Ace</b></sub></a><br /><a href="#ideas-divtiply" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="http://fuco1.github.io/sitemap.html"><img src="https://avatars.githubusercontent.com/u/2664959?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Matus Goljer</b></sub></a><br /><a href="#ideas-Fuco1" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/terorie"><img src="https://avatars.githubusercontent.com/u/21371810?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Richard Patel</b></sub></a><br /><a href="#platform-terorie" title="Packaging/porting to new platform">📦</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://blog.kub1x.org/"><img src="https://avatars.githubusercontent.com/u/1833840?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Jakub Podlaha</b></sub></a><br /><a href="#design-kub1x" title="Design">🎨</a></td>
+    <td align="center"><a href="https://goo.gl/ZGZynx"><img src="https://avatars.githubusercontent.com/u/85767?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Miodrag Milić</b></sub></a><br /><a href="#platform-majkinetor" title="Packaging/porting to new platform">📦</a></td>
+    <td align="center"><a href="https://github.com/derekmahar"><img src="https://avatars.githubusercontent.com/u/6047?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Derek Mahar</b></sub></a><br /><a href="#ideas-derekmahar" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/spmundi"><img src="https://avatars.githubusercontent.com/u/38196185?v=4?s=50" width="50px;" alt=""/><br /><sub><b>spmundi</b></sub></a><br /><a href="#ideas-spmundi" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/koernepr"><img src="https://avatars.githubusercontent.com/u/24551942?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Peter Körner</b></sub></a><br /><a href="#security-koernepr" title="Security">🛡️</a></td>
+    <td align="center"><a href="https://github.com/rubyFeedback"><img src="https://avatars.githubusercontent.com/u/46686565?v=4?s=50" width="50px;" alt=""/><br /><sub><b>rubyFeedback</b></sub></a><br /><a href="#ideas-rubyFeedback" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/rbolsius"><img src="https://avatars.githubusercontent.com/u/2106964?v=4?s=50" width="50px;" alt=""/><br /><sub><b>rbolsius</b></sub></a><br /><a href="#platform-rbolsius" title="Packaging/porting to new platform">📦</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/awildturtok"><img src="https://avatars.githubusercontent.com/u/1553491?v=4?s=50" width="50px;" alt=""/><br /><sub><b>awildturtok</b></sub></a><br /><a href="#ideas-awildturtok" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/agguser"><img src="https://avatars.githubusercontent.com/u/1206106?v=4?s=50" width="50px;" alt=""/><br /><sub><b>agguser</b></sub></a><br /><a href="#ideas-agguser" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/jganong"><img src="https://avatars.githubusercontent.com/u/2783890?v=4?s=50" width="50px;" alt=""/><br /><sub><b>jganong</b></sub></a><br /><a href="#ideas-jganong" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://www.linkedin.com/in/fulvio-scapin"><img src="https://avatars.githubusercontent.com/u/69568?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Fulvio Scapin</b></sub></a><br /><a href="#ideas-trantor" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/torbiak"><img src="https://avatars.githubusercontent.com/u/109347?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Jordan Torbiak</b></sub></a><br /><a href="#ideas-torbiak" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/Andy1978"><img src="https://avatars.githubusercontent.com/u/240064?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Andreas Weber</b></sub></a><br /><a href="#ideas-Andy1978" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/vapniks"><img src="https://avatars.githubusercontent.com/u/174330?v=4?s=50" width="50px;" alt=""/><br /><sub><b>vapniks</b></sub></a><br /><a href="#platform-vapniks" title="Packaging/porting to new platform">📦</a></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://github.com/89z"><img src="https://avatars.githubusercontent.com/u/73562167?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Zombo</b></sub></a><br /><a href="#platform-89z" title="Packaging/porting to new platform">📦</a></td>
+    <td align="center"><a href="https://github.com/BEFH"><img src="https://avatars.githubusercontent.com/u/3386600?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Brian Fulton-Howard</b></sub></a><br /><a href="#platform-BEFH" title="Packaging/porting to new platform">📦</a></td>
+    <td align="center"><a href="https://github.com/ChCyrill"><img src="https://avatars.githubusercontent.com/u/2165604?v=4?s=50" width="50px;" alt=""/><br /><sub><b>ChCyrill</b></sub></a><br /><a href="#ideas-ChCyrill" title="Ideas, Planning, & Feedback">🤔</a></td>
+    <td align="center"><a href="https://github.com/jauderho"><img src="https://avatars.githubusercontent.com/u/13562?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Jauder Ho</b></sub></a><br /><a href="https://github.com/johnkerl/miller/commits?author=jauderho" title="Code">💻</a></td>
+    <td align="center"><a href="https://github.com/psacawa"><img src="https://avatars.githubusercontent.com/u/21274063?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Paweł Sacawa</b></sub></a><br /><a href="https://github.com/johnkerl/miller/issues?q=author%3Apsacawa" title="Bug reports">🐛</a></td>
+  </tr>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+<a href="https://github.com/johnkerl/miller/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=johnkerl/miller" />
+</a>
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome!

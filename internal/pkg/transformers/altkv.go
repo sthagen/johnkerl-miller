@@ -1,12 +1,14 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -91,14 +93,14 @@ func NewTransformerAltkv() (*TransformerAltkv, error) {
 
 func (tr *TransformerAltkv) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		newrec := types.NewMlrmapAsRecord()
+		newrec := mlrval.NewMlrmapAsRecord()
 		outputFieldNumber := 1
 
 		for pe := inrec.Head; pe != nil; /* increment in loop body */ {
@@ -122,9 +124,9 @@ func (tr *TransformerAltkv) Transform(
 			pe = pe.Next
 		}
 
-		outputChannel <- types.NewRecordAndContext(newrec, &inrecAndContext.Context)
+		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &inrecAndContext.Context))
 
 	} else { // end of record stream
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }

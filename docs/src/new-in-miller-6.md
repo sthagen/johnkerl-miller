@@ -16,9 +16,16 @@ Quick links:
 </div>
 # What's new in Miller 6
 
-See also the [list of issues tagged with go-port](https://github.com/johnkerl/miller/issues?q=label%3Ago-port).
-
 ## User experience
+
+Features are driven largely by great feedback in the [2021 Miller User Survey results](https://github.com/johnkerl/miller/discussions/670) and [GitHub Issues](https://github.com/johnkerl/miller/issues?q=is%3Aissue).
+
+### Performance
+
+Performance is on par with Miller 5 for simple processing, and is far better than Miller 5 for
+complex processing chains -- the latter due to improved multicore utilization. CSV I/O is notably
+improved.  See the [Performance benchmarks](#performance-benchmarks) section at the bottom of this
+page for details.
 
 ### Documentation improvements
 
@@ -38,6 +45,12 @@ and
 more complex/niche material has been pushed farther down. The long reference
 pages have been split up into separate pages. (See also
 [Structure of these documents](structure-of-these-documents.md).)
+
+One of the main feedback themes from the 2021 Miller User Survey was that some
+things should be easier to find. Namely, on each doc page there's now a banner
+across the top with things that should be one click away from the landing page
+(or any page): command-line flags, verbs, functions, glossary/acronyms, and a
+finder for docs by release.
 
 Since CSV is overwhelmingly the most popular data format for Miller, it is
 now discussed first, and more examples use CSV.
@@ -72,9 +85,16 @@ mlr: cannot parse DSL expression.
 Parse error on token ">" at line 63 columnn 7.
 </pre>
 
+### Scripting
+
+Scripting is now easier -- support for `#!` with `sh`, as always, along with now support for `#!` with `mlr -s`. For
+Windows, `mlr -s` can also be used.  These help reduce backslash-clutter and let you do more while typing less.
+See the [scripting page](scripting.md).
+
 ### REPL
 
-Miller now has a read-evaluate-print-loop ([REPL](repl.md)) where you can single-step through your data-file record, express arbitrary statements to converse with the data, etc.
+Miller now has a read-evaluate-print-loop ([REPL](repl.md)) where you can single-step through your data-file record,
+express arbitrary statements to converse with the data, etc.
 
 <pre class="pre-highlight-in-pair">
 <b>mlr repl</b>
@@ -233,10 +253,9 @@ absent-empty-coalesce operator [`???`](reference-dsl-builtin-functions.md#absent
 
 * Unsigned right-shift [`>>>`](reference-dsl-builtin-functions.md#ursh) along with `>>>=`.
 
-## Developer-specific aspects
+## See also
 
-* Miller has been ported from C to Go. Developer notes: [https://github.com/johnkerl/miller/blob/main/README-go-port.md](https://github.com/johnkerl/miller/blob/main/README-go-port.md).
-* Regression testing has been completely reworked, including regression-testing now running fully on Windows (alongside Linux and Mac) [on each GitHub commit](https://github.com/johnkerl/miller/actions).
+See also the [list of issues tagged with go-port](https://github.com/johnkerl/miller/issues?q=label%3Ago-port).
 
 ## Changes from Miller 5
 
@@ -251,7 +270,112 @@ The following differences are rather technical. If they don't sound familiar to 
     * See also `mlr help legacy-flags` or the [legacy-flags reference](reference-main-flag-list.md#legacy-flags).
 * Type-inference:
     * The `-S` and `-F` flags to `mlr put` and `mlr filter` are ignored, since type-inference is no longer done in `mlr put` and `mlr filter`, but rather, when records are first read. You can use `mlr -S` and `mlr -A`, respectively, instead to control type-inference within the record-readers.
-    * Similarly, use `mlr -O` to force octal-looking strings to remain strings like `"0123"`, not ints like `0123` which is 83 in decimal.
+    * Octal numbers like `0123` and `07` are type-inferred as string. Use `mlr -O` to infer them as octal integers. Note that `08` and `09` will then infer as deicmal integers.
+    * Any numbers prefix with `0o`, e.g. `0o377`, are already treated as octal regardless of `mlr -O` -- `mlr -O` only affects how leading-zero integers are handled.
     * See also the [miscellaneous-flags reference](reference-main-flag-list.md#miscellaneous-flags).
 * Emitting a map-valued expression now requires either a temporary variable or the new `emit1` keyword. Please see the
 [page on emit statements](reference-dsl-output-statements.md#emit1-and-emitemitpemitf) for more information.
+* By default, field names are deduped for all file formats except JSON. So if you have an input record with `x=8,x=9` then the second field's key is renamed to `x_2` and so on -- the record scans as `x=8,x_2=9`. Use `mlr --no-dedupe-field-names` to suppress this, and have the record be scanned as `x=9`. For JSON, the last duplicated key in an input record is always retained, regardless of `mlr --no-dedupe-field-names`: `{"x":8,"x":9}` scans as if it were `{"x":9}`.
+
+**Please drop an issue at [https://github.com/johnkerl/miller/issues](https://github.com/johnkerl/miller/issues) with any/all backward-compatibility concerns between Miller 5 and Miller 6.**
+
+## Developer-specific aspects
+
+* Miller has been ported from C to Go. Developer notes: [https://github.com/johnkerl/miller/blob/main/README-go-port.md](https://github.com/johnkerl/miller/blob/main/README-go-port.md).
+* Regression testing has been completely reworked, including regression-testing now running fully on Windows (alongside Linux and Mac) [on each GitHub commit](https://github.com/johnkerl/miller/actions).
+
+## Performance benchmarks
+
+For performance testing, the [example.csv](https://github.com/johnkerl/miller/blob/main/docs/src/example.csv) file
+[was expanded](https://github.com/johnkerl/miller/blob/main/scripts/make-big-files) into a million-line CSV file,
+then converted to DKVP, JSON, etc.
+
+Notes:
+
+* These benchmarks were run on two laptops: a commodity Mac laptop with four CPUs, on MacOS Monterey, using `go1.16.5 darwin/amd64`, and a commodity Linux Lenovo with eight CPUs, on Ubuntu 21.10, using `go1.17.5 linux/amd64`.
+* Interestingly, I noted a significant slowdown -- for this particular Linux laptop on low battery -- for the Go version but not the C version. Perhaps multicore interacts with power-saving mode.
+* As of late 2021, Miller has been benchmarked using Go compiler versions 1.15.15, 1.16.12, 1.17.5, and 1.18beta1, with no significant performance changes attributable to compiler versions.
+
+For the [first benchmark](https://github.com/johnkerl/miller/blob/main/scripts/chain-cmps.sh), the format is CSV and the operations are varied:
+
+**Mac**
+
+| Operation | Miller 5 | Miller 6 | Speedup |
+| --- | --- | --- | --- |
+| CSV check | 1.541 | 1.216 | 1.27x |
+| CSV cat | 2.403 | 1.430 | 1.68x |
+| CSV tail | 1.526 | 1.222 | 1.25x |
+| CSV tac | 2.785 | 3.122 | 0.89x |
+| CSV sort -f shape | 2.996 | 3.139 | 0.95x |
+| CSV sort -n quantity | 4.895 | 5.200 | 0.94x |
+| CSV stats1 | 2.955 | 1.865 | 1.58x |
+| CSV put expressions | 5.642 | 2.577 | 2.19x |
+
+**Linux**
+
+| Operation | Miller 5 | Miller 6 | Speedup |
+| --- | --- | --- | --- |
+| CSV check | 0.680 | 1.104 | 0.62x |
+| CSV cat | 1.066 | 1.231 | 0.87x |
+| CSV tail | 0.691 | 1.130 | 0.61x |
+| CSV tac | 1.648 | 2.620 | 0.63x |
+| CSV sort -f shape | 2.087 | 2.953 | 0.71x |
+| CSV sort -n quantity | 5.588 | 5.337 | 1.05x |
+| CSV stats1 | 2.376 | 1.751 | 1.36x |
+| CSV put expressions | 4.520 | 2.091 | 2.16x |
+
+For the [second benchmark](https://github.com/johnkerl/miller/blob/main/scripts/time-big-files), we have `mlr cat` of those files, varying file types, with processing times shown. Catting out files as-is isn't a particularly useful operation in itself, but it gives an idea of how processing time depends on file format:
+
+**Mac**
+
+| Format   | Miller 5 | Miller 6 | Speedup |
+| ---      | ---      | ---      | ---     |
+| CSV      | 2.393    | 1.493    | 1.60x   |
+| CSV-lite | 1.644    | 1.351    | 1.22x   |
+| DKVP     | 2.418    | 1.920    | 1.26x   |
+| NIDX     | 1.053    | 0.958    | 1.10x   |
+| XTAB     | 4.978    | 2.003    | 2.49x   |
+| JSON     | 10.966   | 10.569   | 1.04x   |
+
+**Linux**
+
+| Format   | Miller 5 | Miller 6 | Speedup |
+| ---      | ---      | ---      | ---     |
+| CSV      | 1.069    | 1.157    | 0.92x   |
+| CSV-lite | 0.640    | 1.187    | 0.54x   |
+| DKVP     | 1.017    | 1.853    | 0.55x   |
+| NIDX     | 0.623    | 1.398    | 0.45x   |
+| XTAB     | 2.159    | 1.893    | 1.14x   |
+| JSON     | 5.077    | 10.445   | 0.49x   |
+
+For the [third benchmark](https://github.com/johnkerl/miller/blob/main/scripts/chain-lengths.sh), we have longer and longer then-chains: `mlr put ...`, then `mlr put ... then put ...`, etc. -- deepening the then-chain from one to six:
+
+**Mac**
+
+| Chain length | Miller 5 | Miller 6 | Speedup |
+| --- | --- | --- | --- |
+| 1 | 5.709 | 2.567 | 2.22x |
+| 2 | 8.926 | 3.110 | 2.87x |
+| 3 | 11.915 | 3.712 | 3.21x |
+| 4 | 15.093 | 4.391 | 3.44x |
+| 5 | 18.209 | 5.090 | 3.58x |
+| 6 | 21.109 | 6.032 | 3.50x |
+
+**Linux**
+
+| Chain length | Miller 5 | Miller 6 | Speedup |
+| --- | --- | --- | --- |
+| 1 | 4.732 | 2.106 | 2.25x |
+| 2 | 8.103 | 2.992 | 2.71x |
+| 3 | 11.42 | 3.4743 | 3.29x |
+| 4 | 14.904 | 3.859 | 3.86x |
+| 5 | 18.128 | 4.1563 | 4.36x |
+| 6 | 21.827 | 4.512 | 4.84x |
+
+Notes:
+
+* CSV processing is particularly improved in Miller 6.
+* Record I/O is improved across the board, except that JSON continues to be a CPU-intensive format. Miller 6 JSON throughput is the same on Mac and Linux; Miller 5 did better on Miller 5 but only on Linux, not Mac.
+* Miller 6's `sort` merits more performance analysis.
+* Even single-verb processing with `put` and `stats1` is significantly faster on both platforms.
+* Longer then-chains benefit even more from Miller 6's [multicore approach](cpu.md).

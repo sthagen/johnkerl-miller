@@ -50,6 +50,7 @@ import (
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -109,7 +110,7 @@ func transformerSortParseCLI(
 	argi++
 
 	groupByFieldNames := make([]string, 0)
-	comparatorFuncs := make([]types.ComparatorFunc, 0)
+	comparatorFuncs := make([]mlrval.CmpFuncInt, 0)
 
 	for argi < argc /* variable increment: 1 or 2 depending on flag */ {
 		opt := args[argi]
@@ -128,7 +129,7 @@ func transformerSortParseCLI(
 			subList := cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 			for _, item := range subList {
 				groupByFieldNames = append(groupByFieldNames, item)
-				comparatorFuncs = append(comparatorFuncs, types.LexicalAscendingComparator)
+				comparatorFuncs = append(comparatorFuncs, mlrval.LexicalAscendingComparator)
 			}
 
 		} else if opt == "-c" {
@@ -139,14 +140,14 @@ func transformerSortParseCLI(
 				subList := cli.VerbGetStringArrayArgOrDie(verb, "-nr", args, &argi, argc)
 				for _, item := range subList {
 					groupByFieldNames = append(groupByFieldNames, item)
-					comparatorFuncs = append(comparatorFuncs, types.CaseFoldDescendingComparator)
+					comparatorFuncs = append(comparatorFuncs, mlrval.CaseFoldDescendingComparator)
 				}
 			} else {
 
 				subList := cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 				for _, item := range subList {
 					groupByFieldNames = append(groupByFieldNames, item)
-					comparatorFuncs = append(comparatorFuncs, types.CaseFoldAscendingComparator)
+					comparatorFuncs = append(comparatorFuncs, mlrval.CaseFoldAscendingComparator)
 				}
 			}
 
@@ -154,7 +155,7 @@ func transformerSortParseCLI(
 			subList := cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 			for _, item := range subList {
 				groupByFieldNames = append(groupByFieldNames, item)
-				comparatorFuncs = append(comparatorFuncs, types.LexicalDescendingComparator)
+				comparatorFuncs = append(comparatorFuncs, mlrval.LexicalDescendingComparator)
 			}
 
 		} else if opt == "-n" {
@@ -187,7 +188,7 @@ func transformerSortParseCLI(
 				subList := cli.VerbGetStringArrayArgOrDie(verb, "-nf", args, &argi, argc)
 				for _, item := range subList {
 					groupByFieldNames = append(groupByFieldNames, item)
-					comparatorFuncs = append(comparatorFuncs, types.NumericAscendingComparator)
+					comparatorFuncs = append(comparatorFuncs, mlrval.NumericAscendingComparator)
 				}
 
 			} else if args[argi] == "-r" {
@@ -196,7 +197,7 @@ func transformerSortParseCLI(
 				subList := cli.VerbGetStringArrayArgOrDie(verb, "-nr", args, &argi, argc)
 				for _, item := range subList {
 					groupByFieldNames = append(groupByFieldNames, item)
-					comparatorFuncs = append(comparatorFuncs, types.NumericDescendingComparator)
+					comparatorFuncs = append(comparatorFuncs, mlrval.NumericDescendingComparator)
 				}
 
 			} else {
@@ -204,7 +205,7 @@ func transformerSortParseCLI(
 				subList := cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 				for _, item := range subList {
 					groupByFieldNames = append(groupByFieldNames, item)
-					comparatorFuncs = append(comparatorFuncs, types.NumericAscendingComparator)
+					comparatorFuncs = append(comparatorFuncs, mlrval.NumericAscendingComparator)
 				}
 			}
 
@@ -212,14 +213,14 @@ func transformerSortParseCLI(
 			subList := cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 			for _, item := range subList {
 				groupByFieldNames = append(groupByFieldNames, item)
-				comparatorFuncs = append(comparatorFuncs, types.NumericAscendingComparator)
+				comparatorFuncs = append(comparatorFuncs, mlrval.NumericAscendingComparator)
 			}
 
 		} else if opt == "-nr" {
 			subList := cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
 			for _, item := range subList {
 				groupByFieldNames = append(groupByFieldNames, item)
-				comparatorFuncs = append(comparatorFuncs, types.NumericDescendingComparator)
+				comparatorFuncs = append(comparatorFuncs, mlrval.NumericDescendingComparator)
 			}
 
 		} else {
@@ -268,7 +269,7 @@ func transformerSortParseCLI(
 type TransformerSort struct {
 	// -- Input
 	groupByFieldNames []string
-	comparatorFuncs   []types.ComparatorFunc
+	comparatorFuncs   []mlrval.CmpFuncInt
 
 	// -- State
 	// Map from string to *list.List:
@@ -280,7 +281,7 @@ type TransformerSort struct {
 
 func NewTransformerSort(
 	groupByFieldNames []string,
-	comparatorFuncs []types.ComparatorFunc,
+	comparatorFuncs []mlrval.CmpFuncInt,
 ) (*TransformerSort, error) {
 
 	tr := &TransformerSort{
@@ -298,14 +299,14 @@ func NewTransformerSort(
 // ----------------------------------------------------------------
 type GroupingKeysAndMlrvals struct {
 	groupingKey string
-	mlrvals     []*types.Mlrval
+	mlrvals     []*mlrval.Mlrval
 }
 
 func (tr *TransformerSort) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
@@ -367,15 +368,15 @@ func (tr *TransformerSort) Transform(
 			iRecordsInGroup := tr.recordListsByGroup.Get(groupingKeyAndMlrvals.groupingKey)
 			recordsInGroup := iRecordsInGroup.(*list.List)
 			for iRecord := recordsInGroup.Front(); iRecord != nil; iRecord = iRecord.Next() {
-				outputChannel <- iRecord.Value.(*types.RecordAndContext)
+				outputRecordsAndContexts.PushBack(iRecord.Value.(*types.RecordAndContext))
 			}
 		}
 
 		for iRecord := tr.spillGroup.Front(); iRecord != nil; iRecord = iRecord.Next() {
-			outputChannel <- iRecord.Value.(*types.RecordAndContext)
+			outputRecordsAndContexts.PushBack(iRecord.Value.(*types.RecordAndContext))
 		}
 
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
@@ -386,7 +387,7 @@ func groupHeadsToArray(groupHeads *lib.OrderedMap) []GroupingKeysAndMlrvals {
 	for entry := groupHeads.Head; entry != nil; entry = entry.Next {
 		retval[i] = GroupingKeysAndMlrvals{
 			groupingKey: entry.Key,
-			mlrvals:     entry.Value.([]*types.Mlrval),
+			mlrvals:     entry.Value.([]*mlrval.Mlrval),
 		}
 		i++
 	}

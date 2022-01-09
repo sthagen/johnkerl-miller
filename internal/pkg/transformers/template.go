@@ -1,12 +1,14 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -118,7 +120,7 @@ func transformerTemplateParseCLI(
 type TransformerTemplate struct {
 	fieldNameList []string
 	fieldNameSet  map[string]bool
-	fillWith      *types.Mlrval
+	fillWith      *mlrval.Mlrval
 }
 
 func NewTransformerTemplate(
@@ -128,7 +130,7 @@ func NewTransformerTemplate(
 	return &TransformerTemplate{
 		fieldNameList: fieldNames,
 		fieldNameSet:  lib.StringListToSet(fieldNames),
-		fillWith:      types.MlrvalFromString(fillWith),
+		fillWith:      mlrval.FromString(fillWith),
 	}, nil
 }
 
@@ -136,14 +138,14 @@ func NewTransformerTemplate(
 
 func (tr *TransformerTemplate) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
-		outrec := types.NewMlrmap()
+		outrec := mlrval.NewMlrmap()
 		for _, fieldName := range tr.fieldNameList {
 			value := inrec.Get(fieldName)
 			if value != nil {
@@ -153,8 +155,8 @@ func (tr *TransformerTemplate) Transform(
 			}
 		}
 		outrecAndContext := types.NewRecordAndContext(outrec, &inrecAndContext.Context)
-		outputChannel <- outrecAndContext
+		outputRecordsAndContexts.PushBack(outrecAndContext)
 	} else {
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 	}
 }

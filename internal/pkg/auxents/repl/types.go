@@ -5,6 +5,8 @@
 package repl
 
 import (
+	"bufio"
+	"container/list"
 	"os"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
@@ -12,7 +14,6 @@ import (
 	"github.com/johnkerl/miller/internal/pkg/input"
 	"github.com/johnkerl/miller/internal/pkg/output"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
-	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 // ================================================================
@@ -45,12 +46,20 @@ type Repl struct {
 
 	options *cli.TOptions
 
-	inputChannel          chan *types.RecordAndContext
+	readerChannel         chan *list.List // list of *types.RecordAndContext
 	errorChannel          chan error
 	downstreamDoneChannel chan bool
 	recordReader          input.IRecordReader
 	recordWriter          output.IRecordWriter
-	outputStream          *os.File
+
+	// These are for record-writer output, nominally to os.Stdout, but perhaps
+	// with a redirect. We need to keep all three -- the *bufio.Writer to write
+	// to, the *os.File for Close() when it's not os.Stdout, since bufio.Writer
+	// doesn't implement Close(), and the file name to print errors on Close()
+	// (e.g. permissions, or disk-full).
+	recordOutputFileName       string
+	recordOutputStream         *os.File
+	bufferedRecordOutputStream *bufio.Writer
 
 	runtimeState *runtime.State
 

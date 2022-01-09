@@ -1,12 +1,14 @@
 package transformers
 
 import (
-	"errors"
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/johnkerl/miller/internal/pkg/bifs"
 	"github.com/johnkerl/miller/internal/pkg/cli"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -116,11 +118,11 @@ func transformerSeqgenParseCLI(
 // ----------------------------------------------------------------
 type TransformerSeqgen struct {
 	fieldName      string
-	start          *types.Mlrval
-	stop           *types.Mlrval
-	step           *types.Mlrval
-	doneComparator types.BinaryFunc
-	mdone          *types.Mlrval
+	start          *mlrval.Mlrval
+	stop           *mlrval.Mlrval
+	step           *mlrval.Mlrval
+	doneComparator bifs.BinaryFunc
+	mdone          *mlrval.Mlrval
 }
 
 // ----------------------------------------------------------------
@@ -130,52 +132,35 @@ func NewTransformerSeqgen(
 	stopString string,
 	stepString string,
 ) (*TransformerSeqgen, error) {
-	start := types.MlrvalFromInferredType(startString)
-	stop := types.MlrvalFromInferredType(stopString)
-	step := types.MlrvalFromInferredType(stepString)
-	var doneComparator types.BinaryFunc = nil
+	start := mlrval.FromInferredType(startString)
+	stop := mlrval.FromInferredType(stopString)
+	step := mlrval.FromInferredType(stepString)
+	var doneComparator bifs.BinaryFunc = nil
 
 	fstart, startIsNumeric := start.GetNumericToFloatValue()
 	if !startIsNumeric {
-		return nil, errors.New(
-			fmt.Sprintf(
-				"mlr seqgen: start value should be number; got \"%s\"",
-				startString,
-			),
-		)
+		return nil, fmt.Errorf("mlr seqgen: start value should be number; got \"%s\"", startString)
 	}
 
 	fstop, stopIsNumeric := stop.GetNumericToFloatValue()
 	if !stopIsNumeric {
-		return nil, errors.New(
-			fmt.Sprintf(
-				"mlr seqgen: stop value should be number; got \"%s\"",
-				stopString,
-			),
-		)
+		return nil, fmt.Errorf("mlr seqgen: stop value should be number; got \"%s\"", stopString)
 	}
 
 	fstep, stepIsNumeric := step.GetNumericToFloatValue()
 	if !stepIsNumeric {
-		return nil, errors.New(
-			fmt.Sprintf(
-				"mlr seqgen: step value should be number; got \"%s\"",
-				stepString,
-			),
-		)
+		return nil, fmt.Errorf("mlr seqgen: step value should be number; got \"%s\"", stepString)
 	}
 
 	if fstep > 0 {
-		doneComparator = types.BIF_greater_than
+		doneComparator = bifs.BIF_greater_than
 	} else if fstep < 0 {
-		doneComparator = types.BIF_less_than
+		doneComparator = bifs.BIF_less_than
 	} else {
 		if fstart == fstop {
-			doneComparator = types.BIF_equals
+			doneComparator = bifs.BIF_equals
 		} else {
-			return nil, errors.New(
-				"mlr seqgen: step must not be zero unless start == stop.",
-			)
+			return nil, fmt.Errorf("mlr seqgen: step must not be zero unless start == stop.")
 		}
 	}
 
@@ -185,17 +170,15 @@ func NewTransformerSeqgen(
 		stop:           stop,
 		step:           step,
 		doneComparator: doneComparator,
-		mdone:          types.MLRVAL_FALSE,
+		mdone:          mlrval.FALSE,
 	}, nil
 }
 
-// ----------------------------------------------------------------
-
 func (tr *TransformerSeqgen) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	counter := tr.start
 	context := types.NewNilContext()
@@ -227,16 +210,16 @@ func (tr *TransformerSeqgen) Transform(
 			break
 		}
 
-		outrec := types.NewMlrmapAsRecord()
+		outrec := mlrval.NewMlrmapAsRecord()
 		outrec.PutCopy(tr.fieldName, counter)
 
 		context.UpdateForInputRecord()
 
 		outrecAndContext := types.NewRecordAndContext(outrec, context)
-		outputChannel <- outrecAndContext
+		outputRecordsAndContexts.PushBack(outrecAndContext)
 
-		counter = types.BIF_plus_binary(counter, tr.step)
+		counter = bifs.BIF_plus_binary(counter, tr.step)
 	}
 
-	outputChannel <- types.NewEndOfStreamMarker(context)
+	outputRecordsAndContexts.PushBack(types.NewEndOfStreamMarker(context))
 }

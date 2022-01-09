@@ -1,7 +1,7 @@
 package transformers
 
 import (
-	"errors"
+	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +10,7 @@ import (
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/dsl/cst"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/parsing/lexer"
 	"github.com/johnkerl/miller/internal/pkg/parsing/parser"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
@@ -435,7 +436,7 @@ func NewTransformerPut(
 		return nil, err
 	}
 
-	runtimeState := runtime.NewEmptyState()
+	runtimeState := runtime.NewEmptyState(options)
 
 	// E.g.
 	//   mlr put -s sum=0
@@ -445,16 +446,11 @@ func NewTransformerPut(
 		for _, preset := range presets {
 			pair := strings.SplitN(preset, "=", 2)
 			if len(pair) != 2 {
-				return nil, errors.New(
-					fmt.Sprintf(
-						"mlr: missing \"=\" in preset expression \"%s\".",
-						preset,
-					),
-				)
+				return nil, fmt.Errorf("missing \"=\" in preset expression \"%s\".", preset)
 			}
 			key := pair[0]
 			svalue := pair[1]
-			mvalue := types.MlrvalFromInferredType(svalue)
+			mvalue := mlrval.FromInferredType(svalue)
 			runtimeState.Oosvars.PutCopy(key, mvalue)
 		}
 	}
@@ -506,12 +502,12 @@ func BuildASTFromString(dslString string) (*dsl.AST, error) {
 
 func (tr *TransformerPut) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.runtimeState.OutputChannel = outputChannel
+	tr.runtimeState.OutputRecordsAndContexts = outputRecordsAndContexts
 
 	inrec := inrecAndContext.Record
 	context := inrecAndContext.Context
@@ -545,10 +541,7 @@ func (tr *TransformerPut) Transform(
 			}
 			wantToEmit := lib.BooleanXOR(filterBool, tr.invertFilter)
 			if wantToEmit {
-				outputChannel <- types.NewRecordAndContext(
-					outrec,
-					&context,
-				)
+				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &context))
 			}
 		}
 
@@ -576,6 +569,6 @@ func (tr *TransformerPut) Transform(
 		// indicator.
 		tr.cstRootNode.ProcessEndOfStream()
 
-		outputChannel <- types.NewEndOfStreamMarker(&context)
+		outputRecordsAndContexts.PushBack(types.NewEndOfStreamMarker(&context))
 	}
 }

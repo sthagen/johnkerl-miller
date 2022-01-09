@@ -2,13 +2,13 @@ package transformers
 
 import (
 	"container/list"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/transformers/utils"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
@@ -209,12 +209,7 @@ func NewTransformerStats2(
 ) (*TransformerStats2, error) {
 	for _, name := range accumulatorNameList {
 		if !utils.ValidateStats2AccumulatorName(name) {
-			return nil, errors.New(
-				fmt.Sprintf(
-					"%s stats2: accumulator \"%s\" not found.\n",
-					"mlr", name,
-				),
-			)
+			return nil, fmt.Errorf("mlr stats2: accumulator \"%s\" not found.", name)
 		}
 	}
 
@@ -272,9 +267,9 @@ func NewTransformerStats2(
 
 func (tr *TransformerStats2) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
@@ -283,19 +278,19 @@ func (tr *TransformerStats2) Transform(
 
 		if tr.doIterativeStats {
 			// The input record is modified in this case, with new fields appended
-			outputChannel <- inrecAndContext
+			outputRecordsAndContexts.PushBack(inrecAndContext)
 		}
 		// if tr.doHoldAndFit, the input record is held by the ingestor
 
 	} else { // end of record stream
 		if !tr.doIterativeStats { // in the iterative case, already emitted per-record
 			if tr.doHoldAndFit {
-				tr.fit(outputChannel)
+				tr.fit(outputRecordsAndContexts)
 			} else {
-				tr.emit(outputChannel, &inrecAndContext.Context)
+				tr.emit(outputRecordsAndContexts, &inrecAndContext.Context)
 			}
 		}
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }
 
@@ -389,15 +384,15 @@ func (tr *TransformerStats2) ingest(
 
 // ----------------------------------------------------------------
 func (tr *TransformerStats2) emit(
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	context *types.Context,
 ) {
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-		outrec := types.NewMlrmapAsRecord()
+		outrec := mlrval.NewMlrmapAsRecord()
 
 		// Add in a=s,b=t fields:
 		groupingKey := pa.Key
-		groupByFieldValues := tr.groupingKeysToGroupByFieldValues.Get(groupingKey).([]*types.Mlrval)
+		groupByFieldValues := tr.groupingKeysToGroupByFieldValues.Get(groupingKey).([]*mlrval.Mlrval)
 		for i, groupByFieldName := range tr.groupByFieldNameList {
 			outrec.PutReference(groupByFieldName, groupByFieldValues[i].Copy())
 		}
@@ -422,12 +417,12 @@ func (tr *TransformerStats2) emit(
 			}
 		}
 
-		outputChannel <- types.NewRecordAndContext(outrec, context)
+		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, context))
 	}
 }
 
 func (tr *TransformerStats2) populateRecord(
-	outrec *types.Mlrmap,
+	outrec *mlrval.Mlrmap,
 	valueFieldName1 string,
 	valueFieldName2 string,
 	valueFieldsToAccumulator *lib.OrderedMap,
@@ -440,7 +435,7 @@ func (tr *TransformerStats2) populateRecord(
 }
 
 func (tr *TransformerStats2) fit(
-	outputChannel chan<- *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 ) {
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
 		groupingKey := pa.Key
@@ -475,7 +470,7 @@ func (tr *TransformerStats2) fit(
 				}
 			}
 
-			outputChannel <- recordAndContext
+			outputRecordsAndContexts.PushBack(recordAndContext)
 		}
 	}
 }

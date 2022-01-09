@@ -5,11 +5,11 @@
 package cst
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
@@ -106,7 +106,7 @@ func (site *UDSCallsite) Execute(state *runtime.State) (*BlockExitPayload, error
 	// we push a new frameset and DefineTypedAtScope using the callee's frameset.
 
 	// Evaluate the arguments
-	arguments := make([]*types.Mlrval, len(site.uds.signature.typeGatedParameterNames))
+	arguments := make([]*mlrval.Mlrval, len(site.uds.signature.typeGatedParameterNames))
 
 	for i, typeGatedParameterName := range site.uds.signature.typeGatedParameterNames {
 		arguments[i] = site.argumentNodes[i].Evaluate(state)
@@ -173,14 +173,12 @@ func (manager *UDSManager) LookUp(subroutineName string, callsiteArity int) (*UD
 		return nil, nil
 	}
 	if uds.signature.arity != callsiteArity {
-		return nil, errors.New(
-			fmt.Sprintf(
-				"mlr: subroutine %s invoked with %d argument%s; expected %d",
-				subroutineName,
-				callsiteArity,
-				lib.Plural(callsiteArity),
-				uds.signature.arity,
-			),
+		return nil, fmt.Errorf(
+			"mlr: subroutine %s invoked with %d argument%s; expected %d",
+			subroutineName,
+			callsiteArity,
+			lib.Plural(callsiteArity),
+			uds.signature.arity,
 		)
 	}
 	return uds, nil
@@ -243,11 +241,9 @@ func (root *RootNode) BuildAndInstallUDS(astNode *dsl.ASTNode) error {
 
 	if !root.allowUDFUDSRedefinitions {
 		if root.udsManager.ExistsByName(subroutineName) {
-			return errors.New(
-				fmt.Sprintf(
-					"mlr: subroutine named \"%s\" has already been defined.",
-					subroutineName,
-				),
+			return fmt.Errorf(
+				"mlr: subroutine named \"%s\" has already been defined.",
+				subroutineName,
 			)
 		}
 	}

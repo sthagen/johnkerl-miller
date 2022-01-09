@@ -1,9 +1,11 @@
 package transformers
 
 import (
+	"container/list"
 	"fmt"
 	"os"
 
+	"github.com/johnkerl/miller/internal/pkg/bifs"
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/lib"
 	"github.com/johnkerl/miller/internal/pkg/types"
@@ -107,9 +109,9 @@ func NewTransformerSec2GMTDate(
 
 func (tr *TransformerSec2GMTDate) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
@@ -117,12 +119,12 @@ func (tr *TransformerSec2GMTDate) Transform(
 		for _, fieldName := range tr.fieldNameList {
 			value := inrec.Get(fieldName)
 			if value != nil {
-				inrec.PutReference(fieldName, types.BIF_sec2gmtdate(value))
+				inrec.PutReference(fieldName, bifs.BIF_sec2gmtdate(value))
 			}
 		}
-		outputChannel <- inrecAndContext
+		outputRecordsAndContexts.PushBack(inrecAndContext)
 
 	} else { // End of record stream
-		outputChannel <- inrecAndContext // end-of-stream marker
+		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
 	}
 }

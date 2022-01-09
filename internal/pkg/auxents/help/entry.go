@@ -10,11 +10,12 @@ import (
 
 	"github.com/mattn/go-isatty"
 
+	"github.com/johnkerl/miller/internal/pkg/bifs"
 	"github.com/johnkerl/miller/internal/pkg/cli"
 	"github.com/johnkerl/miller/internal/pkg/dsl/cst"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/transformers"
-	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 // ================================================================
@@ -72,6 +73,7 @@ func init() {
 				handlerInfos: []tHandlerInfo{
 					{name: "flags", zaryHandlerFunc: showFlagHelp},
 					{name: "list-separator-aliases", zaryHandlerFunc: listSeparatorAliases},
+					{name: "list-separator-regex-aliases", zaryHandlerFunc: listSeparatorRegexAliases},
 					// Per-section entries will be computed and installed below
 				},
 			},
@@ -314,6 +316,10 @@ func listSeparatorAliases() {
 	cli.ListSeparatorAliasesForOnlineHelp()
 }
 
+func listSeparatorRegexAliases() {
+	cli.ListSeparatorRegexAliasesForOnlineHelp()
+}
+
 // ----------------------------------------------------------------
 func helpAuxents() {
 	fmt.Print(`Miller has a few otherwise-standalone executables packaged within it.
@@ -434,7 +440,8 @@ How to specify location of .mlrrc:
   o If $HOME/.mlrrc exists, it's then processed as above.
   o If ./.mlrrc exists, it's then also processed as above.
   (I.e. current-directory .mlrrc defaults are stacked over home-directory .mlrrc defaults.)
-
+* The command-line flag "--norc" can be used to suppress loading the .mlrrc file even when other
+  conditions are met.
 See also:
 https://miller.readthedocs.io/en/latest/customization.html
 `)
@@ -447,11 +454,11 @@ func helpOutputColorization() {
 
 // ----------------------------------------------------------------
 func helpTypeArithmeticInfo() {
-	mlrvals := []*types.Mlrval{
-		types.MlrvalFromInt(1),
-		types.MlrvalFromFloat64(2.5),
-		types.MLRVAL_ABSENT,
-		types.MLRVAL_ERROR,
+	mlrvals := []*mlrval.Mlrval{
+		mlrval.FromInt(1),
+		mlrval.FromFloat(2.5),
+		mlrval.ABSENT,
+		mlrval.ERROR,
 	}
 
 	n := len(mlrvals)
@@ -470,7 +477,7 @@ func helpTypeArithmeticInfo() {
 			} else if i == -1 {
 				fmt.Printf(" %-10s", "------")
 			} else {
-				sum := types.BIF_plus_binary(mlrvals[i], mlrvals[j])
+				sum := bifs.BIF_plus_binary(mlrvals[i], mlrvals[j])
 				fmt.Printf(" %-10s", sum.String())
 			}
 		}

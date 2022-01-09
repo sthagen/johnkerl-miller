@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
@@ -97,9 +98,9 @@ func NewTransformerRemoveEmptyColumns() (*TransformerRemoveEmptyColumns, error) 
 
 func (tr *TransformerRemoveEmptyColumns) Transform(
 	inrecAndContext *types.RecordAndContext,
+	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-	outputChannel chan<- *types.RecordAndContext,
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
@@ -107,7 +108,7 @@ func (tr *TransformerRemoveEmptyColumns) Transform(
 		tr.recordsAndContexts.PushBack(inrecAndContext)
 
 		for pe := inrec.Head; pe != nil; pe = pe.Next {
-			if !pe.Value.IsEmpty() {
+			if !pe.Value.IsVoid() {
 				tr.namesWithNonEmptyValues[pe.Key] = true
 			}
 		}
@@ -118,7 +119,7 @@ func (tr *TransformerRemoveEmptyColumns) Transform(
 			outrecAndContext := e.Value.(*types.RecordAndContext)
 			outrec := outrecAndContext.Record
 
-			newrec := types.NewMlrmapAsRecord()
+			newrec := mlrval.NewMlrmapAsRecord()
 
 			for pe := outrec.Head; pe != nil; pe = pe.Next {
 				_, ok := tr.namesWithNonEmptyValues[pe.Key]
@@ -128,9 +129,9 @@ func (tr *TransformerRemoveEmptyColumns) Transform(
 				}
 			}
 
-			outputChannel <- types.NewRecordAndContext(newrec, &outrecAndContext.Context)
+			outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &outrecAndContext.Context))
 		}
 
-		outputChannel <- inrecAndContext // Emit the stream-terminating null record
+		outputRecordsAndContexts.PushBack(inrecAndContext) // Emit the stream-terminating null record
 	}
 }

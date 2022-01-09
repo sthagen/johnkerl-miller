@@ -11,9 +11,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/mattn/go-isatty"
+
 	"github.com/johnkerl/miller/internal/pkg/colorizer"
 	"github.com/johnkerl/miller/internal/pkg/lib"
-	"github.com/johnkerl/miller/internal/pkg/types"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 )
 
 // FinalizeReaderOptions does a few things.
@@ -30,45 +32,28 @@ func FinalizeReaderOptions(readerOptions *TReaderOptions) {
 	readerOptions.IFS = lib.UnhexStringLiteral(readerOptions.IFS)
 	readerOptions.IPS = lib.UnhexStringLiteral(readerOptions.IPS)
 
-	if !readerOptions.IFSWasSpecified {
+	if !readerOptions.ifsWasSpecified {
 		readerOptions.IFS = defaultFSes[readerOptions.InputFileFormat]
 	}
-	if !readerOptions.IPSWasSpecified {
+	if !readerOptions.ipsWasSpecified {
 		readerOptions.IPS = defaultPSes[readerOptions.InputFileFormat]
 	}
-	if !readerOptions.IRSWasSpecified {
+	if !readerOptions.irsWasSpecified {
 		readerOptions.IRS = defaultRSes[readerOptions.InputFileFormat]
 	}
-	if !readerOptions.AllowRepeatIFSWasSpecified {
+	if !readerOptions.allowRepeatIFSWasSpecified {
 		// Special case for Miller 6 upgrade -- now that we have regexing for mixes of tabs
 		// and spaces, that should now be the default for NIDX. But *only* for NIDX format,
 		// and if IFS wasn't specified.
-		if readerOptions.InputFileFormat == "nidx" && !readerOptions.IFSWasSpecified {
-			readerOptions.IFS = WHITESPACE
+		if readerOptions.InputFileFormat == "nidx" && !readerOptions.ifsWasSpecified {
+			readerOptions.IFSRegex = lib.CompileMillerRegexOrDie(WHITESPACE_REGEX)
 		} else {
 			readerOptions.AllowRepeatIFS = defaultAllowRepeatIFSes[readerOptions.InputFileFormat]
 		}
 	}
-	if !readerOptions.AllowRepeatIPSWasSpecified {
-		readerOptions.AllowRepeatIPS = defaultAllowRepeatIPSes[readerOptions.InputFileFormat]
-	}
 
-	if readerOptions.SuppressIFSRegexing {
-		readerOptions.IFSRegex = nil
-	} else if readerOptions.AllowRepeatIFS {
-		readerOptions.IFSRegex = lib.CompileMillerRegexOrDie("(" + readerOptions.IFS + ")+")
-	} else {
-		readerOptions.IFSRegex = lib.CompileMillerRegexOrDie(readerOptions.IFS)
-	}
-
-	if readerOptions.SuppressIPSRegexing {
-		readerOptions.IPSRegex = nil
-	} else if readerOptions.AllowRepeatIPS {
-		readerOptions.IPSRegex = lib.CompileMillerRegexOrDie("(" + readerOptions.IPS + ")+")
-	} else {
-		readerOptions.IPSRegex = lib.CompileMillerRegexOrDie(readerOptions.IPS)
-	}
-
+	readerOptions.IFS = lib.UnbackslashStringLiteral(readerOptions.IFS)
+	readerOptions.IPS = lib.UnbackslashStringLiteral(readerOptions.IPS)
 	readerOptions.IRS = lib.UnbackslashStringLiteral(readerOptions.IRS)
 }
 
@@ -76,14 +61,22 @@ func FinalizeReaderOptions(readerOptions *TReaderOptions) {
 // because the '\n' at the command line which is Go "\\n" (a backslash and an
 // n) needs to become the single newline character., and likewise for "\t", etc.
 func FinalizeWriterOptions(writerOptions *TWriterOptions) {
-	if !writerOptions.OFSWasSpecified {
+	if !writerOptions.ofsWasSpecified {
 		writerOptions.OFS = defaultFSes[writerOptions.OutputFileFormat]
 	}
-	if !writerOptions.OPSWasSpecified {
+	if !writerOptions.opsWasSpecified {
 		writerOptions.OPS = defaultPSes[writerOptions.OutputFileFormat]
 	}
-	if !writerOptions.ORSWasSpecified {
+	if !writerOptions.orsWasSpecified {
 		writerOptions.ORS = defaultRSes[writerOptions.OutputFileFormat]
+	}
+
+	// If output is a terminal, fflush on every record. Otherwise, use default
+	// buffering (flush every some number of KB or on EOF). This is a
+	// significant performance improvement for large files, as we invoke
+	// syscall.write (with its invocation overhead) far less frequently.
+	if !writerOptions.flushOnEveryRecordWasSpecified {
+		writerOptions.FlushOnEveryRecord = isatty.IsTerminal(os.Stdout.Fd())
 	}
 
 	writerOptions.OFS = lib.UnbackslashStringLiteral(writerOptions.OFS)
@@ -105,6 +98,7 @@ var FLAG_TABLE = FlagTable{
 		&CommentsInDataFlagSection,
 		&OutputColorizationFlagSection,
 		&FlattenUnflattenFlagSection,
+		&ProfilingFlagSection,
 		&MiscFlagSection,
 	},
 }
@@ -174,6 +168,14 @@ Notes about all other separators:
 	}
 	fmt.Println()
 
+	fmt.Println("  - Similarly, you can use the following for `--ifs-regex` and `--ips-regex`:")
+	fmt.Println()
+	aliases = lib.GetArrayKeysSorted(SEPARATOR_REGEX_NAMES_TO_VALUES)
+	for _, alias := range aliases {
+		fmt.Printf("          %-10s = \"%s\"\n", alias, SEPARATOR_REGEX_NAMES_TO_VALUES[alias])
+	}
+	fmt.Println()
+
 	fmt.Println("* Default separators by format:")
 	fmt.Println()
 
@@ -208,6 +210,16 @@ func ListSeparatorAliasesForOnlineHelp() {
 	}
 }
 
+func ListSeparatorRegexAliasesForOnlineHelp() {
+	// Go doesn't preserve insertion order in its arrays so here we are inlining a sort.
+	aliases := lib.GetArrayKeysSorted(SEPARATOR_REGEX_NAMES_TO_VALUES)
+	for _, alias := range aliases {
+		// Really absurd level of indent needed to get fixed-with font in mkdocs here,
+		// I don't know why. Usually it only takes 4, not 10.
+		fmt.Printf("%-10s = \"%s\"\n", alias, SEPARATOR_REGEX_NAMES_TO_VALUES[alias])
+	}
+}
+
 func init() { SeparatorFlagSection.Sort() }
 
 var SeparatorFlagSection = FlagSection{
@@ -226,7 +238,24 @@ var SeparatorFlagSection = FlagSection{
 				// we needn't do anything ourselves.
 				if args[*pargi+1] != "auto" {
 					options.ReaderOptions.IFS = SeparatorFromArg(args[*pargi+1])
-					options.ReaderOptions.IFSWasSpecified = true
+					options.ReaderOptions.ifsWasSpecified = true
+				}
+				*pargi += 2
+			},
+		},
+
+		{
+			name: "--ifs-regex",
+			arg:  "{string}",
+			help: "Specify FS for input as a regular expression.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				CheckArgCount(args, *pargi, argc, 2)
+				// Backward compatibility with Miller <= 5. Auto-inference of
+				// LF vs CR/LF line endings is handled within Go libraries so
+				// we needn't do anything ourselves.
+				if args[*pargi+1] != "auto" {
+					options.ReaderOptions.IFSRegex = lib.CompileMillerRegexOrDie(SeparatorRegexFromArg(args[*pargi+1]))
+					options.ReaderOptions.ifsWasSpecified = true
 				}
 				*pargi += 2
 			},
@@ -239,7 +268,19 @@ var SeparatorFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
 				options.ReaderOptions.IPS = SeparatorFromArg(args[*pargi+1])
-				options.ReaderOptions.IPSWasSpecified = true
+				options.ReaderOptions.ipsWasSpecified = true
+				*pargi += 2
+			},
+		},
+
+		{
+			name: "--ips-regex",
+			arg:  "{string}",
+			help: "Specify PS for input as a regular expression.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				CheckArgCount(args, *pargi, argc, 2)
+				options.ReaderOptions.IPSRegex = lib.CompileMillerRegexOrDie(SeparatorRegexFromArg(args[*pargi+1]))
+				options.ReaderOptions.ipsWasSpecified = true
 				*pargi += 2
 			},
 		},
@@ -255,7 +296,7 @@ var SeparatorFlagSection = FlagSection{
 				// we needn't do anything ourselves.
 				if args[*pargi+1] != "auto" {
 					options.ReaderOptions.IRS = SeparatorFromArg(args[*pargi+1])
-					options.ReaderOptions.IRSWasSpecified = true
+					options.ReaderOptions.irsWasSpecified = true
 				}
 				*pargi += 2
 			},
@@ -266,7 +307,7 @@ var SeparatorFlagSection = FlagSection{
 			help: "Let IFS be repeated: e.g. for splitting on multiple spaces.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.AllowRepeatIFS = true
-				options.ReaderOptions.AllowRepeatIFSWasSpecified = true
+				options.ReaderOptions.allowRepeatIFSWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -282,7 +323,7 @@ var SeparatorFlagSection = FlagSection{
 				// we needn't do anything ourselves.
 				if args[*pargi+1] != "auto" {
 					options.WriterOptions.ORS = SeparatorFromArg(args[*pargi+1])
-					options.WriterOptions.ORSWasSpecified = true
+					options.WriterOptions.orsWasSpecified = true
 				}
 				*pargi += 2
 			},
@@ -295,7 +336,7 @@ var SeparatorFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
 				options.WriterOptions.OFS = SeparatorFromArg(args[*pargi+1])
-				options.WriterOptions.OFSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 2
 			},
 		},
@@ -307,7 +348,7 @@ var SeparatorFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
 				options.WriterOptions.OPS = SeparatorFromArg(args[*pargi+1])
-				options.WriterOptions.OPSWasSpecified = true
+				options.WriterOptions.opsWasSpecified = true
 				*pargi += 2
 			},
 		},
@@ -324,8 +365,8 @@ var SeparatorFlagSection = FlagSection{
 				if args[*pargi+1] != "auto" {
 					options.ReaderOptions.IRS = SeparatorFromArg(args[*pargi+1])
 					options.WriterOptions.ORS = SeparatorFromArg(args[*pargi+1])
-					options.ReaderOptions.IRSWasSpecified = true
-					options.WriterOptions.ORSWasSpecified = true
+					options.ReaderOptions.irsWasSpecified = true
+					options.WriterOptions.orsWasSpecified = true
 				}
 				*pargi += 2
 			},
@@ -343,8 +384,8 @@ var SeparatorFlagSection = FlagSection{
 				if args[*pargi+1] != "auto" {
 					options.ReaderOptions.IFS = SeparatorFromArg(args[*pargi+1])
 					options.WriterOptions.OFS = SeparatorFromArg(args[*pargi+1])
-					options.ReaderOptions.IFSWasSpecified = true
-					options.WriterOptions.OFSWasSpecified = true
+					options.ReaderOptions.ifsWasSpecified = true
+					options.WriterOptions.ofsWasSpecified = true
 				}
 				*pargi += 2
 			},
@@ -358,27 +399,9 @@ var SeparatorFlagSection = FlagSection{
 				CheckArgCount(args, *pargi, argc, 2)
 				options.ReaderOptions.IPS = SeparatorFromArg(args[*pargi+1])
 				options.WriterOptions.OPS = SeparatorFromArg(args[*pargi+1])
-				options.ReaderOptions.IPSWasSpecified = true
-				options.WriterOptions.OPSWasSpecified = true
+				options.ReaderOptions.ipsWasSpecified = true
+				options.WriterOptions.opsWasSpecified = true
 				*pargi += 2
-			},
-		},
-
-		{
-			name: "--no-ifs-regex",
-			help: `Don't treat IFS value as a regular expression. Useful if your IFS is ".".`,
-			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				options.ReaderOptions.SuppressIFSRegexing = true
-				*pargi += 1
-			},
-		},
-
-		{
-			name: "--no-ips-regex",
-			help: `Don't treat IPS value as a regular expression. Useful if your IPS is ".".`,
-			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				options.ReaderOptions.SuppressIPSRegexing = true
-				*pargi += 1
 			},
 		},
 	},
@@ -486,12 +509,6 @@ var LegacyFlagSection = FlagSection{
 		{
 			name:   "--no-mmap",
 			help:   "Miller no longer uses memory-mapping to access data files.",
-			parser: NoOpParse1,
-		},
-
-		{
-			name:   "--no-fflush",
-			help:   "The current implementation of Miller does not use buffered output, so there is no longer anything to suppress here.",
 			parser: NoOpParse1,
 		},
 
@@ -622,7 +639,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -632,7 +649,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csvlite"
 				options.ReaderOptions.IFS = "\t"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -645,8 +662,8 @@ var FileFormatFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csvlite"
 				options.ReaderOptions.IFS = ASV_FS
 				options.ReaderOptions.IRS = ASV_RS
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -659,8 +676,8 @@ var FileFormatFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csvlite"
 				options.ReaderOptions.IFS = USV_FS
 				options.ReaderOptions.IRS = USV_RS
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -707,7 +724,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -808,7 +825,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.WriterOptions.OFSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -819,7 +836,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.OutputFileFormat = "csvlite"
 				options.WriterOptions.OFS = "\t"
-				options.WriterOptions.OFSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -832,8 +849,8 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "csvlite"
 				options.WriterOptions.OFS = ASV_FS
 				options.WriterOptions.ORS = ASV_RS
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -846,8 +863,8 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "csvlite"
 				options.WriterOptions.OFS = USV_FS
 				options.WriterOptions.ORS = USV_RS
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -885,7 +902,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.WriterOptions.OFS = " "
-				options.WriterOptions.OFSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -954,8 +971,8 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OFS = "\t"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -969,8 +986,8 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "csvlite"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OFS = "\t"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -986,11 +1003,11 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OFS = ASV_FS
 				options.ReaderOptions.IRS = ASV_RS
 				options.WriterOptions.ORS = ASV_RS
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 
-				options.ReaderOptions.IRSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1006,10 +1023,10 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OFS = USV_FS
 				options.ReaderOptions.IRS = USV_RS
 				options.WriterOptions.ORS = USV_RS
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1044,8 +1061,8 @@ var FileFormatFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OFS = " "
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1066,7 +1083,7 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				options.WriterOptions.OutputFileFormat = "pprint"
 				*pargi += 1
 			},
@@ -1110,10 +1127,10 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OFS = " "
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				options.ReaderOptions.AllowRepeatIFS = true
-				options.ReaderOptions.AllowRepeatIFSWasSpecified = true
+				options.ReaderOptions.allowRepeatIFSWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1126,8 +1143,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OFS = "\t"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1142,9 +1159,9 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.ReaderOptions.IRSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1157,7 +1174,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "dkvp"
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1171,8 +1188,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.WriterOptions.OFS = " "
-				options.ReaderOptions.IRSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1185,7 +1202,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "json"
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1198,7 +1215,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "pprint"
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1212,7 +1229,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "pprint"
 				options.WriterOptions.BarredPprintOutput = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1225,7 +1242,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "xtab"
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1238,7 +1255,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.WriterOptions.OutputFileFormat = "markdown"
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1253,9 +1270,9 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "csv"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1269,8 +1286,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "dkvp"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1285,9 +1302,9 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.WriterOptions.OFS = " "
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1301,8 +1318,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "json"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1316,8 +1333,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "pprint"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1332,8 +1349,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "pprint"
 				options.WriterOptions.BarredPprintOutput = true
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1347,8 +1364,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "xtab"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1362,8 +1379,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "csv"
 				options.ReaderOptions.IFS = "\t"
 				options.WriterOptions.OutputFileFormat = "markdown"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.ReaderOptions.IRSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.ReaderOptions.irsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1390,8 +1407,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "dkvp"
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1405,7 +1422,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "dkvp"
 				options.WriterOptions.OutputFileFormat = "nidx"
 				options.WriterOptions.OFS = " "
-				options.WriterOptions.OFSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1480,7 +1497,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "nidx"
 				options.WriterOptions.OutputFileFormat = "csv"
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1494,8 +1511,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "nidx"
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1582,7 +1599,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "json"
 				options.WriterOptions.OutputFileFormat = "csv"
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1596,8 +1613,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "json"
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1685,8 +1702,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "csv"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1701,9 +1718,9 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.ReaderOptions.IFSWasSpecified = true
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1717,7 +1734,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "dkvp"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1731,7 +1748,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "nidx"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1745,7 +1762,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "json"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1759,7 +1776,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "xtab"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1773,7 +1790,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "pprint"
 				options.ReaderOptions.IFS = " "
 				options.WriterOptions.OutputFileFormat = "markdown"
-				options.ReaderOptions.IFSWasSpecified = true
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1787,7 +1804,7 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "xtab"
 				options.WriterOptions.OutputFileFormat = "csv"
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -1801,8 +1818,8 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 				options.ReaderOptions.InputFileFormat = "xtab"
 				options.WriterOptions.OutputFileFormat = "csv"
 				options.WriterOptions.OFS = "\t"
-				options.WriterOptions.OFSWasSpecified = true
-				options.WriterOptions.ORSWasSpecified = true
+				options.WriterOptions.ofsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
 				*pargi += 1
 			},
 		},
@@ -2341,7 +2358,7 @@ var OutputColorizationFlagSection = FlagSection{
 // FLATTEN/UNFLATTEN FLAGS
 
 func FlattenUnflattenPrintInfo() {
-	fmt.Println("These flags control how Miller converts record values which are maps or arrays, when input is JSON and ouput is non-JSON (flattening) or input is non-JSON and output is JSON (unflattening).")
+	fmt.Println("These flags control how Miller converts record values which are maps or arrays, when input is JSON and output is non-JSON (flattening) or input is non-JSON and output is JSON (unflattening).")
 	fmt.Println()
 	fmt.Println("See the Flatten/unflatten doc page for more information.")
 }
@@ -2388,6 +2405,51 @@ var FlattenUnflattenFlagSection = FlagSection{
 			help: "When input non-JSON and output is JSON, suppress the default auto-unflatten behavior. Default: if the input has `y.1=7,y.2=8,y.3=9` then this unflattens to `$y=[7,8,9]`.  flattens to `y.1=7,y.2=8,y.3=9. With `--no-auto-flatten`, instead we get `${y.1}=7,${y.2}=8,${y.3}=9`.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.AutoUnflatten = false
+				*pargi += 1
+			},
+		},
+	},
+}
+
+// ================================================================
+// PROFILING FLAGS
+
+func ProfilingPrintInfo() {
+	fmt.Print("These are flags for profiling Miller performance.")
+}
+
+func init() { ProfilingFlagSection.Sort() }
+
+var ProfilingFlagSection = FlagSection{
+	name:        "Profiling flags",
+	infoPrinter: ProfilingPrintInfo,
+	flags: []Flag{
+		{
+			name: "--cpuprofile",
+			arg:  "{CPU-profile file name}",
+			help: `Create a CPU-profile file for performance analysis. Instructions will be printed to stderr.
+This flag must be the very first thing after 'mlr' on the command line.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				// Already handled in main(). Nothing to do here except to accept this as valid syntax.
+				*pargi += 2
+			},
+		},
+
+		{
+			name: "--traceprofile",
+			help: `Create a trace-profile file for performance analysis. Instructions will be printed to stderr.
+This flag must be the very first thing after 'mlr' on the command line.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				// Already handled in main(). Nothing to do here except to accept this as valid syntax.
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--time",
+			help: "Print elapsed execution time in seconds to stderr at the end of the execution of the program.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.PrintElapsedTime = true
 				*pargi += 1
 			},
 		},
@@ -2457,7 +2519,7 @@ var MiscFlagSection = FlagSection{
 		{
 			name: "--ofmt",
 			arg:  "{format}",
-			help: "E.g. `%.18f`, `%.0f`, `%9.6e`. Please use sprintf-style codes for floating-point nummbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.",
+			help: "E.g. `%.18f`, `%.0f`, `%9.6e`. Please use sprintf-style codes for floating-point numbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
 				options.WriterOptions.FPOFMT = args[*pargi+1]
@@ -2514,7 +2576,6 @@ var MiscFlagSection = FlagSection{
 				if !ok || nrProgressMod <= 0 {
 					fmt.Fprintf(os.Stderr,
 						"%s: --nr-progress-mod argument must be a positive integer; got \"%s\".\n",
-
 						"mlr", args[*pargi+1])
 					os.Exit(1)
 				}
@@ -2546,11 +2607,64 @@ var MiscFlagSection = FlagSection{
 		},
 
 		{
+			name: "--no-dedupe-field-names",
+			help: `By default, if an input record has a field named ` + "`x`" + ` and
+another also named ` + "`x`" + `, the second will be renamed ` + "`x_2`" + `, and so on.  With this flag provided, the
+second ` + "`x`" + `'s value will replace the first ` + "`x`" + `'s value when the record is read.  This flag has no effect
+on JSON input records, where duplicate keys always result in the last one's value being retained.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.DedupeFieldNames = false
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--records-per-batch",
+			arg:  "{n}",
+			help: `This is an internal parameter for maximum number of records in a batch size. Normally
+this does not need to be modified.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				CheckArgCount(args, *pargi, argc, 2)
+				recordsPerBatch, ok := lib.TryIntFromString(args[*pargi+1])
+				if !ok || recordsPerBatch <= 0 {
+					fmt.Fprintf(os.Stderr,
+						"%s: --nr-progress-mod argument must be a positive integer; got \"%s\".\n",
+						"mlr", args[*pargi+1])
+					os.Exit(1)
+				}
+				options.ReaderOptions.RecordsPerBatch = recordsPerBatch
+				*pargi += 2
+			},
+		},
+
+		{
+			name: "--hash-records",
+			help: `This is an internal parameter which normally does not need to be modified.
+It controls the mechanism by which Miller accesses fields within records.
+In general --no-hash-records is faster, and is the default. For specific use-cases involving
+data having many fields, and many of them being processed during a given processing run,
+--hash-records might offer a slight performance benefit.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				mlrval.HashRecords(true)
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--no-hash-records",
+			help: `See --hash-records.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				mlrval.HashRecords(false)
+				*pargi += 1
+			},
+		},
+
+		{
 			name:     "--infer-none",
 			altNames: []string{"-S"},
 			help:     `Don't treat values like 123 or 456.7 in data files as int/float; leave them as strings.`,
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				types.SetInferrerStringOnly()
+				mlrval.SetInferrerStringOnly()
 				*pargi += 1
 			},
 		},
@@ -2560,17 +2674,47 @@ var MiscFlagSection = FlagSection{
 			altNames: []string{"-A"},
 			help:     `Cast all integers in data files to floats.`,
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				types.SetInferrerIntAsFloat()
+				mlrval.SetInferrerIntAsFloat()
 				*pargi += 1
 			},
 		},
 
 		{
-			name:     "--infer-no-octal",
+			name:     "--infer-octal",
 			altNames: []string{"-O"},
-			help:     `Treat numbers like 0123 in data files as string "0123", not octal for decimal 83 etc.`,
+			help: `Treat numbers like 0123 in data files as numeric; default is string.
+Note that 00--07 etc scan as int; 08-09 scan as float.`,
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				types.SetInferrerNoOctal()
+				mlrval.SetInferrerOctalAsInt()
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--fflush",
+			help: `Force buffered output to be written after every output record.
+The default is flush output after every record if the output is to the terminal, or less often if
+the output is to a file or a pipe. The default is a significant performance optimization for large
+files.  Use this flag to force frequent updates even when output is to a pipe or file, at a
+performance cost.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.WriterOptions.FlushOnEveryRecord = true
+				options.WriterOptions.flushOnEveryRecordWasSpecified = true
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--no-fflush",
+			help: `Let buffered output not be written after every output record.
+The default is flush output after every record if the output is to the terminal, or less often if
+the output is to a file or a pipe. The default is a significant performance optimization for large
+files.  Use this flag to allow less-frequent updates when output is to the terminal. This is
+unlikely to be a noticeable performance improvement, since direct-to-screen output for large files
+has its own overhead.`,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.WriterOptions.FlushOnEveryRecord = false
+				options.WriterOptions.flushOnEveryRecordWasSpecified = true
 				*pargi += 1
 			},
 		},

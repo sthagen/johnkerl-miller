@@ -1,20 +1,19 @@
 package output
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/johnkerl/miller/internal/pkg/cli"
-	"github.com/johnkerl/miller/internal/pkg/types"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 )
 
 // ----------------------------------------------------------------
 type RecordWriterJSON struct {
 	// Parameters:
 	writerOptions  *cli.TWriterOptions
-	jsonFormatting types.TJSONFormatting
+	jsonFormatting mlrval.TJSONFormatting
 
 	// State:
 	onFirst bool
@@ -22,9 +21,9 @@ type RecordWriterJSON struct {
 
 // ----------------------------------------------------------------
 func NewRecordWriterJSON(writerOptions *cli.TWriterOptions) (*RecordWriterJSON, error) {
-	var jsonFormatting types.TJSONFormatting = types.JSON_SINGLE_LINE
+	var jsonFormatting mlrval.TJSONFormatting = mlrval.JSON_SINGLE_LINE
 	if writerOptions.JSONOutputMultiline {
-		jsonFormatting = types.JSON_MULTILINE
+		jsonFormatting = mlrval.JSON_MULTILINE
 	}
 	return &RecordWriterJSON{
 		writerOptions:  writerOptions,
@@ -35,28 +34,26 @@ func NewRecordWriterJSON(writerOptions *cli.TWriterOptions) (*RecordWriterJSON, 
 
 // ----------------------------------------------------------------
 func (writer *RecordWriterJSON) Write(
-	outrec *types.Mlrmap,
-	ostream io.WriteCloser,
+	outrec *mlrval.Mlrmap,
+	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
 	if writer.writerOptions.WrapJSONOutputInOuterList {
-		writer.writeWithListWrap(outrec, ostream, outputIsStdout)
+		writer.writeWithListWrap(outrec, bufferedOutputStream, outputIsStdout)
 	} else {
-		writer.writeWithoutListWrap(outrec, ostream, outputIsStdout)
+		writer.writeWithoutListWrap(outrec, bufferedOutputStream, outputIsStdout)
 	}
 }
 
 // ----------------------------------------------------------------
 func (writer *RecordWriterJSON) writeWithListWrap(
-	outrec *types.Mlrmap,
-	ostream io.WriteCloser,
+	outrec *mlrval.Mlrmap,
+	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
-	var buffer bytes.Buffer // stdio is non-buffered in Go, so buffer for ~5x speed increase
-
 	if outrec != nil { // Not end of record stream
 		if writer.onFirst {
-			buffer.WriteString("[\n")
+			bufferedOutputStream.WriteString("[\n")
 		}
 
 		// The Mlrmap MarshalJSON doesn't include the final newline, so that we
@@ -68,26 +65,25 @@ func (writer *RecordWriterJSON) writeWithListWrap(
 		}
 
 		if !writer.onFirst {
-			buffer.WriteString(",\n")
+			bufferedOutputStream.WriteString(",\n")
 		}
 
-		buffer.WriteString(s)
+		bufferedOutputStream.WriteString(s)
 
 		writer.onFirst = false
 
 	} else { // End of record stream
 		if writer.onFirst { // zero records in the entire output stream
-			buffer.Write([]byte("["))
+			bufferedOutputStream.WriteString("[")
 		}
-		buffer.Write([]byte("\n]\n"))
+		bufferedOutputStream.WriteString("\n]\n")
 	}
-	ostream.Write(buffer.Bytes())
 }
 
 // ----------------------------------------------------------------
 func (writer *RecordWriterJSON) writeWithoutListWrap(
-	outrec *types.Mlrmap,
-	ostream io.WriteCloser,
+	outrec *mlrval.Mlrmap,
+	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
 	if outrec == nil {
@@ -103,6 +99,6 @@ func (writer *RecordWriterJSON) writeWithoutListWrap(
 		os.Exit(1)
 	}
 
-	ostream.Write([]byte(s))
-	ostream.Write([]byte("\n"))
+	bufferedOutputStream.WriteString(s)
+	bufferedOutputStream.WriteString("\n")
 }

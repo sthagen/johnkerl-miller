@@ -5,12 +5,12 @@
 package cst
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/johnkerl/miller/internal/pkg/dsl"
 	"github.com/johnkerl/miller/internal/pkg/lib"
+	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
-	"github.com/johnkerl/miller/internal/pkg/types"
 )
 
 // ----------------------------------------------------------------
@@ -126,7 +126,7 @@ func (node *ForLoopOneVariableNode) Execute(state *runtime.State) (*BlockExitPay
 		state.Stack.PushStackFrame()
 		defer state.Stack.PopStackFrame()
 		for pe := mapval.Head; pe != nil; pe = pe.Next {
-			mapkey := types.MlrvalFromString(pe.Key)
+			mapkey := mlrval.FromString(pe.Key)
 
 			err := state.Stack.SetAtScope(node.indexVariable, mapkey)
 			if err != nil {
@@ -195,11 +195,9 @@ func (node *ForLoopOneVariableNode) Execute(state *runtime.State) (*BlockExitPay
 	// silent zero-pass. But maybe we should surface it as an error. Maybe
 	// with a "mlr put --errors" flag or something.
 	//	} else {
-	//		return nil, errors.New(
-	//			fmt.Sprintf(
-	//				"mlr: looped-over item is not a map or array; got %s",
-	//				indexMlrval.GetTypeName(),
-	//			),
+	//		return nil, fmt.Errorf(
+	//			"mlr: looped-over item is not a map or array; got %s",
+	//			indexMlrval.GetTypeName(),
 	//		)
 
 	return nil, nil
@@ -311,7 +309,7 @@ func (node *ForLoopTwoVariableNode) Execute(state *runtime.State) (*BlockExitPay
 		state.Stack.PushStackFrame()
 		defer state.Stack.PopStackFrame()
 		for pe := mapval.Head; pe != nil; pe = pe.Next {
-			mapkey := types.MlrvalFromString(pe.Key)
+			mapkey := mlrval.FromString(pe.Key)
 
 			err := state.Stack.SetAtScope(node.keyIndexVariable, mapkey)
 			if err != nil {
@@ -352,7 +350,7 @@ func (node *ForLoopTwoVariableNode) Execute(state *runtime.State) (*BlockExitPay
 		state.Stack.PushStackFrame()
 		defer state.Stack.PopStackFrame()
 		for zindex, element := range arrayval {
-			mindex := types.MlrvalFromInt(int(zindex + 1))
+			mindex := mlrval.FromInt(int(zindex + 1))
 
 			err := state.Stack.SetAtScope(node.keyIndexVariable, mindex)
 			if err != nil {
@@ -390,11 +388,9 @@ func (node *ForLoopTwoVariableNode) Execute(state *runtime.State) (*BlockExitPay
 	// silent zero-pass. But maybe we should surface it as an error. Maybe
 	// with a "mlr put --errors" flag or something.
 	//	} else {
-	//		return nil, errors.New(
-	//			fmt.Sprintf(
-	//				"mlr: looped-over item is not a map or array; got %s",
-	//				indexMlrval.GetTypeName(),
-	//			),
+	//		return nil, fmt.Errorf(
+	//			"mlr: looped-over item is not a map or array; got %s",
+	//			indexMlrval.GetTypeName(),
 	//		)
 
 	return nil, nil
@@ -524,20 +520,20 @@ func (node *ForLoopMultivariableNode) Execute(state *runtime.State) (*BlockExitP
 
 // ----------------------------------------------------------------
 func (node *ForLoopMultivariableNode) executeOuter(
-	mlrval *types.Mlrval,
+	mv *mlrval.Mlrval,
 	keyIndexVariables []*runtime.StackVariable,
 	state *runtime.State,
 ) (*BlockExitPayload, error) {
 	if len(keyIndexVariables) == 1 {
-		return node.executeInner(mlrval, keyIndexVariables[0], state)
+		return node.executeInner(mv, keyIndexVariables[0], state)
 	}
 	// else, recurse
 
-	if mlrval.IsMap() {
-		mapval := mlrval.GetMap()
+	if mv.IsMap() {
+		mapval := mv.GetMap()
 
 		for pe := mapval.Head; pe != nil; pe = pe.Next {
-			mapkey := types.MlrvalFromString(pe.Key)
+			mapkey := mlrval.FromString(pe.Key)
 
 			err := state.Stack.SetAtScope(keyIndexVariables[0], mapkey)
 			if err != nil {
@@ -563,14 +559,14 @@ func (node *ForLoopMultivariableNode) executeOuter(
 			}
 		}
 
-	} else if mlrval.IsArray() {
-		arrayval := mlrval.GetArray()
+	} else if mv.IsArray() {
+		arrayval := mv.GetArray()
 
 		// Note: Miller user-space array indices ("mindex") are 1-up. Internal
 		// Go storage ("zindex") is 0-up.
 
 		for zindex, element := range arrayval {
-			mindex := types.MlrvalFromInt(int(zindex + 1))
+			mindex := mlrval.FromInt(int(zindex + 1))
 
 			err := state.Stack.SetAtScope(keyIndexVariables[0], mindex)
 			if err != nil {
@@ -597,7 +593,7 @@ func (node *ForLoopMultivariableNode) executeOuter(
 			}
 		}
 
-	} else if mlrval.IsAbsent() {
+	} else if mv.IsAbsent() {
 		// Data-heterogeneity no-op
 	}
 
@@ -605,11 +601,9 @@ func (node *ForLoopMultivariableNode) executeOuter(
 	// silent zero-pass. But maybe we should surface it as an error. Maybe
 	// with a "mlr put --errors" flag or something.
 	//	} else {
-	//		return nil, errors.New(
-	//			fmt.Sprintf(
-	//				"mlr: looped-over item is not a map or array; got %s",
-	//				mlrval.GetTypeName(),
-	//			),
+	//		return nil, fmt.Errorf(
+	//			"mlr: looped-over item is not a map or array; got %s",
+	//			mv.GetTypeName(),
 	//		)
 
 	return nil, nil
@@ -617,15 +611,15 @@ func (node *ForLoopMultivariableNode) executeOuter(
 
 // ----------------------------------------------------------------
 func (node *ForLoopMultivariableNode) executeInner(
-	mlrval *types.Mlrval,
+	mv *mlrval.Mlrval,
 	keyIndexVariable *runtime.StackVariable,
 	state *runtime.State,
 ) (*BlockExitPayload, error) {
-	if mlrval.IsMap() {
-		mapval := mlrval.GetMap()
+	if mv.IsMap() {
+		mapval := mv.GetMap()
 
 		for pe := mapval.Head; pe != nil; pe = pe.Next {
-			mapkey := types.MlrvalFromString(pe.Key)
+			mapkey := mlrval.FromString(pe.Key)
 
 			err := state.Stack.SetAtScope(keyIndexVariable, mapkey)
 			if err != nil {
@@ -656,14 +650,14 @@ func (node *ForLoopMultivariableNode) executeInner(
 			}
 		}
 
-	} else if mlrval.IsArray() {
-		arrayval := mlrval.GetArray()
+	} else if mv.IsArray() {
+		arrayval := mv.GetArray()
 
 		// Note: Miller user-space array indices ("mindex") are 1-up. Internal
 		// Go storage ("zindex") is 0-up.
 
 		for zindex, element := range arrayval {
-			mindex := types.MlrvalFromInt(int(zindex + 1))
+			mindex := mlrval.FromInt(int(zindex + 1))
 
 			err := state.Stack.SetAtScope(keyIndexVariable, mindex)
 			if err != nil {
@@ -694,7 +688,7 @@ func (node *ForLoopMultivariableNode) executeInner(
 			}
 		}
 
-	} else if mlrval.IsAbsent() {
+	} else if mv.IsAbsent() {
 		// Data-heterogeneity no-op
 	}
 
@@ -702,11 +696,9 @@ func (node *ForLoopMultivariableNode) executeInner(
 	// silent zero-pass. But maybe we should surface it as an error. Maybe
 	// with a "mlr put --errors" flag or something.
 	//	} else {
-	//		return nil, errors.New(
-	//			fmt.Sprintf(
-	//				"mlr: looped-over item is not a map or array; got %s",
-	//				mlrval.GetTypeName(),
-	//			),
+	//		return nil, fmt.Errorf(
+	//			"mlr: looped-over item is not a map or array; got %s",
+	//			mv.GetTypeName(),
 	//		)
 
 	return nil, nil
@@ -808,7 +800,7 @@ func (root *RootNode) BuildTripleForLoopNode(astNode *dsl.ASTNode) (*TripleForLo
 			precontinuationAssignments = make([]IExecutable, n-1)
 			for i := 0; i < n-1; i++ {
 				if continuationExpressionASTNode.Children[i].Type != dsl.NodeTypeAssignment {
-					return nil, errors.New(
+					return nil, fmt.Errorf(
 						"mlr: the non-final triple-for continutation statements must be assignments.",
 					)
 				}
@@ -825,11 +817,11 @@ func (root *RootNode) BuildTripleForLoopNode(astNode *dsl.ASTNode) (*TripleForLo
 		bareBooleanASTNode := continuationExpressionASTNode.Children[n-1]
 		if bareBooleanASTNode.Type != dsl.NodeTypeBareBoolean {
 			if n == 1 {
-				return nil, errors.New(
+				return nil, fmt.Errorf(
 					"mlr: the triple-for continutation statement must be a bare boolean.",
 				)
 			} else {
-				return nil, errors.New(
+				return nil, fmt.Errorf(
 					"mlr: the final triple-for continutation statement must be a bare boolean.",
 				)
 			}
@@ -902,7 +894,7 @@ func (node *TripleForLoopNode) Execute(state *runtime.State) (*BlockExitPayload,
 			boolValue, isBool := continuationValue.GetBoolValue()
 			if !isBool {
 				// TODO: propagate line-number context
-				return nil, errors.New("mlr: for-loop continuation did not evaluate to boolean.")
+				return nil, fmt.Errorf("mlr: for-loop continuation did not evaluate to boolean.")
 			}
 			if boolValue == false {
 				break
