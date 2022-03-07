@@ -632,7 +632,7 @@ func usageFunctionsByClass() {
 
 func helpForFunction(args []string) {
 	for _, arg := range args {
-		cst.BuiltinFunctionManagerInstance.TryListBuiltinFunctionUsage(arg)
+		cst.BuiltinFunctionManagerInstance.ListBuiltinFunctionUsage(arg)
 	}
 }
 
@@ -712,8 +712,7 @@ func helpByApproximateSearchOne(thing string) bool {
 	}
 
 	if !found {
-		fmt.Printf("No help found for \"%s\". Please try 'mlr help find %s' for approximate match.\n", thing, thing)
-		fmt.Printf("See also 'mlr help topics'.\n")
+		fmt.Printf("No help found for \"%s\". See also 'mlr help topics'.\n", thing)
 	}
 	return found
 }

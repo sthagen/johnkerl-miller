@@ -16,7 +16,11 @@ Quick links:
 </div>
 # Output colorization
 
-As of version 6.0.0, Miller supports output-colorization. Here are examples using side-by-side black-background and white-background terminals:
+As of version 6.0.0, Miller supports output colorization. This includes colors
+per se, as well as bold, underline, and/or reverse. As of version 6.1.0, the
+default is bold+underline for keys -- this works well as a default regardless
+of your terminal's color settings -- with further customization options as
+described below:
 
 ![pix/colorization.png](pix/colorization.png)
 
@@ -36,8 +40,6 @@ As of version 6.0.0, Miller supports output-colorization. Here are examples usin
     * Example: no color: `mlr --csv cat foo.csv | less`
 
 * NIDX output format (plain text, Unix-style, with implicitly positionally indexed fields) is not colored. This is because in other formats, keys are one color and values are another. For NIDX, all output is values.
-
-* The default colors were chosen since they look OK with white or black terminal background, and are differentiable with common varieties of human color vision.
 
 ## Mechanisms for colorization
 
@@ -65,6 +67,9 @@ If environment-variable settings and command-line flags are both provided, the l
 
 ## How to see available color codes
 
-You can use `mlr --list-color-codes` to see the available color codes (like `170`), and `mlr --list-color-names` to see available names (like `orchid`).
+Use `mlr --list-color-names` to see available names, like `orchid`. Colors can also be specified
+using numbers in the range 0..255, like 170: please see `mlr --list-color-codes`.  You can also use
+`bold`, `underline`, and/or `reverse`.  Additionally, combinations of all of these can be joined
+with a `-`, like `red-bold`, `bold-170`, `bold-underline`, etc.
 
 ![pix/colorization2.png](pix/colorization2.png)

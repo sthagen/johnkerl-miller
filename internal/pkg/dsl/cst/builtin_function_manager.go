@@ -28,16 +28,16 @@ type TFunctionClass string
 
 const (
 	FUNC_CLASS_ARITHMETIC  TFunctionClass = "arithmetic"
-	FUNC_CLASS_MATH                       = "math"
-	FUNC_CLASS_BOOLEAN                    = "boolean"
-	FUNC_CLASS_STRING                     = "string"
-	FUNC_CLASS_HASHING                    = "hashing"
-	FUNC_CLASS_CONVERSION                 = "conversion"
-	FUNC_CLASS_TYPING                     = "typing"
-	FUNC_CLASS_COLLECTIONS                = "collections"
-	FUNC_CLASS_HOFS                       = "higher-order-functions"
-	FUNC_CLASS_SYSTEM                     = "system"
-	FUNC_CLASS_TIME                       = "time"
+	FUNC_CLASS_MATH        TFunctionClass = "math"
+	FUNC_CLASS_BOOLEAN     TFunctionClass = "boolean"
+	FUNC_CLASS_STRING      TFunctionClass = "string"
+	FUNC_CLASS_HASHING     TFunctionClass = "hashing"
+	FUNC_CLASS_CONVERSION  TFunctionClass = "conversion"
+	FUNC_CLASS_TYPING      TFunctionClass = "typing"
+	FUNC_CLASS_COLLECTIONS TFunctionClass = "collections"
+	FUNC_CLASS_HOFS        TFunctionClass = "higher-order-functions"
+	FUNC_CLASS_SYSTEM      TFunctionClass = "system"
+	FUNC_CLASS_TIME        TFunctionClass = "time"
 )
 
 // ================================================================
@@ -112,7 +112,7 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		{
 			name:       "/",
 			class:      FUNC_CLASS_ARITHMETIC,
-			help:       `Division. Integer / integer is floating-point.`,
+			help:       `Division. Integer / integer is integer when exact, else floating-point: e.g. 6/3 is 2 but 6/4 is 1.5.`,
 			binaryFunc: bifs.BIF_divide,
 		},
 
@@ -161,7 +161,7 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		{
 			name:       "./",
 			class:      FUNC_CLASS_ARITHMETIC,
-			help:       `Integer division; not pythonic.`,
+			help:       `Integer division, rounding toward zero.`,
 			binaryFunc: bifs.BIF_dot_divide,
 		},
 
@@ -317,9 +317,16 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		},
 
 		{
-			name:                   "=~",
-			class:                  FUNC_CLASS_BOOLEAN,
-			help:                   `String (left-hand side) matches regex (right-hand side), e.g. '$name =~ "^a.*b$"'.`,
+			name:  "=~",
+			class: FUNC_CLASS_BOOLEAN,
+			help: `String (left-hand side) matches regex (right-hand side), e.g.
+'$name =~ "^a.*b$"'.
+Capture groups \1 through \9 are matched from (...) in the right-hand side, and can be
+used within subsequent DSL statements. See also "Regular expressions" at ` + lib.DOC_URL + `.`,
+			examples: []string{
+				`With if-statement: if ($url =~ "http.*com") { ... }`,
+				`Without if-statement: given $line = "index ab09 file", and $line =~ "([a-z][a-z])([0-9][0-9])", then $label = "[\1:\2]", $label is "[ab:09]"`,
+			},
 			regexCaptureBinaryFunc: bifs.BIF_string_matches_regexp,
 		},
 
@@ -361,7 +368,7 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		{
 			name:       "???",
 			class:      FUNC_CLASS_BOOLEAN,
-			help:       `Absent-coalesce operator. $a ?? 1 evaluates to 1 if $a isn't defined in the current record, or has empty value.`,
+			help:       `Absent/empty-coalesce operator. $a ??? 1 evaluates to 1 if $a isn't defined in the current record, or has empty value.`,
 			binaryFunc: BinaryShortCircuitPlaceholder,
 		},
 
@@ -378,7 +385,7 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		{
 			name:       ".",
 			class:      FUNC_CLASS_STRING,
-			help:       `String concatenation.`,
+			help:       `String concatenation. Non-strings are coerced, so you can do '"ax".98' etc.`,
 			binaryFunc: bifs.BIF_dot,
 		},
 
@@ -404,13 +411,6 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		},
 
 		{
-			name:        "gsub",
-			class:       FUNC_CLASS_STRING,
-			help:        `'$name=gsub($name, "old", "new")' (replace all).`,
-			ternaryFunc: bifs.BIF_gsub,
-		},
-
-		{
 			name:      "lstrip",
 			class:     FUNC_CLASS_STRING,
 			help:      "Strip leading whitespace from string.",
@@ -418,17 +418,27 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 		},
 
 		{
-			name:       "regextract",
-			class:      FUNC_CLASS_STRING,
-			help:       `'$name=regextract($name, "[A-Z]{3}[0-9]{2}")'`,
+			name:  "regextract",
+			class: FUNC_CLASS_STRING,
+			help: `Extracts a substring (the first, if there are multiple matches), matching a
+regular expression, from the input.  Does not use capture groups; see also the =~ operator which does.`,
 			binaryFunc: bifs.BIF_regextract,
+			examples: []string{
+				`regextract("index ab09 file", "[a-z][a-z][0-9][0-9]") gives "ab09"`,
+				`regextract("index a999 file", "[a-z][a-z][0-9][0-9]") gives (absent), which will result in an assignment not happening.`,
+			},
 		},
 
 		{
-			name:        "regextract_or_else",
-			class:       FUNC_CLASS_STRING,
-			help:        `'$name=regextract_or_else($name, "[A-Z]{3}[0-9]{2}", "default")'`,
+			name:  "regextract_or_else",
+			class: FUNC_CLASS_STRING,
+			help: `Like regextract but the third argument is the return value in case the input string (first
+argument) doesn't match the pattern (second argument).`,
 			ternaryFunc: bifs.BIF_regextract_or_else,
+			examples: []string{
+				`regextract_or_else("index ab09 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "ab09"`,
+				`regextract_or_else("index a999 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "nonesuch"`,
+			},
 		},
 
 		{
@@ -457,13 +467,43 @@ func makeBuiltinFunctionLookupTable() []BuiltinFunctionInfo {
 			class:       FUNC_CLASS_STRING,
 			help:        `Like sub but does no regexing. No characters are special.`,
 			ternaryFunc: bifs.BIF_ssub,
+			examples: []string{
+				`ssub("abc.def", ".", "X") gives "abcXdef"`,
+			},
 		},
 
 		{
-			name:        "sub",
-			class:       FUNC_CLASS_STRING,
-			help:        `'$name=sub($name, "old", "new")' (replace once).`,
+			name:  "sub",
+			class: FUNC_CLASS_STRING,
+			help: `'$name = sub($name, "old", "new")': replace once (first match, if there are multiple matches),
+with support for regular expressions.  Capture groups \1 through \9 in the new part are matched from (...) in
+the old part, and must be used within the same call to sub -- they don't persist for subsequent DSL
+statements.  See also =~ and regextract. See also "Regular expressions" at ` + lib.DOC_URL + `.`,
 			ternaryFunc: bifs.BIF_sub,
+			examples: []string{
+				`sub("ababab", "ab", "XY") gives "XYabab"`,
+				`sub("abc.def", ".", "X") gives "Xbc.def"`,
+				`sub("abc.def", "\.", "X") gives "abcXdef"`,
+				`sub("abcdefg", "[ce]", "X") gives "abXdefg"`,
+				`sub("prefix4529:suffix8567", "suffix([0-9]+)", "name\1") gives "prefix4529:name8567"`,
+			},
+		},
+
+		{
+			name:  "gsub",
+			class: FUNC_CLASS_STRING,
+			help: `'$name = gsub($name, "old", "new")': replace all, with support for regular expressions.
+Capture groups \1 through \9 in the new part are matched from (...) in the old part, and must be
+used within the same call to gsub -- they don't persist for subsequent DSL statements.  See also
+=~ and regextract. See also "Regular expressions" at ` + lib.DOC_URL + `.`,
+			ternaryFunc: bifs.BIF_gsub,
+			examples: []string{
+				`gsub("ababab", "ab", "XY") gives "XYXYXY"`,
+				`gsub("abc.def", ".", "X") gives "XXXXXXX"`,
+				`gsub("abc.def", "\.", "X") gives "abcXdef"`,
+				`gsub("abcdefg", "[ce]", "X") gives "abXdXfg"`,
+				`gsub("prefix4529:suffix8567", "(....ix)([0-9]+)", "[\1 : \2]") gives "[prefix : 4529]:[suffix : 8567]"`,
+			},
 		},
 
 		{
@@ -508,6 +548,44 @@ Arrays are new in Miller 6; the substr function is older.`,
 			class:      FUNC_CLASS_STRING,
 			help:       `Truncates string first argument to max length of int second argument.`,
 			binaryFunc: bifs.BIF_truncate,
+		},
+
+		{
+			name:  "format",
+			class: FUNC_CLASS_STRING,
+			help: `Using first argument as format string, interpolate remaining arguments in place of
+each "{}" in the format string. Too-few arguments are treated as the empty string; too-many arguments are discarded.`,
+			examples: []string{
+				`format("{}:{}:{}", 1,2)     gives "1:2:".`,
+				`format("{}:{}:{}", 1,2,3)   gives "1:2:3".`,
+				`format("{}:{}:{}", 1,2,3,4) gives "1:2:3".`,
+			},
+			variadicFunc: bifs.BIF_format,
+		},
+
+		{
+			name:  "unformat",
+			class: FUNC_CLASS_STRING,
+			help: `Using first argument as format string, unpacks second argument into an array of matches,
+with type-inference. On non-match, returns error -- use is_error() to check.`,
+			examples: []string{
+				`unformat("{}:{}:{}",  "1:2:3") gives [1, 2, 3].`,
+				`unformat("{}h{}m{}s", "3h47m22s") gives [3, 47, 22].`,
+				`is_error(unformat("{}h{}m{}s", "3:47:22")) gives true.`,
+			},
+			binaryFunc: bifs.BIF_unformat,
+		},
+
+		{
+			name:  "unformatx",
+			class: FUNC_CLASS_STRING,
+			help:  `Same as unformat, but without type-inference.`,
+			examples: []string{
+				`unformatx("{}:{}:{}",  "1:2:3") gives ["1", "2", "3"].`,
+				`unformatx("{}h{}m{}s", "3h47m22s") gives ["3", "47", "22"].`,
+				`is_error(unformatx("{}h{}m{}s", "3:47:22")) gives true.`,
+			},
+			binaryFunc: bifs.BIF_unformatx,
 		},
 
 		// ----------------------------------------------------------------
@@ -928,10 +1006,11 @@ is supplied.`,
 		{
 			name:  "strftime",
 			class: FUNC_CLASS_TIME,
-			help: `Formats seconds since the epoch as timestamp. Format strings are as in the C library
-(please see "man strftime" on your system), with the Miller-specific addition of "%1S" through "%9S" which
-format the seconds with 1 through 9 decimal places, respectively. ("%S" uses no decimal places.) See also
-strftime_local.`,
+			help: `Formats seconds since the epoch as timestamp. Format strings are as at
+https://pkg.go.dev/github.com/lestrrat-go/strftime, with the Miller-specific addition of "%1S"
+through "%9S" which format the seconds with 1 through 9 decimal places, respectively. ("%S" uses no
+decimal places.) See also ` + lib.DOC_URL + `/en/latest/reference-dsl-time/ for more information on the differences from the C library ("man strftime" on your system).
+See also strftime_local.`,
 			examples: []string{
 				`strftime(1440768801.7,"%Y-%m-%dT%H:%M:%SZ")  = "2015-08-28T13:33:21Z"`,
 				`strftime(1440768801.7,"%Y-%m-%dT%H:%M:%3SZ") = "2015-08-28T13:33:21.700Z"`,
@@ -970,7 +1049,7 @@ strftime_local.`,
 		{
 			name:  "strptime_local",
 			class: FUNC_CLASS_TIME,
-			help:  `Like stpftime but consults the $TZ environment variable to get local time zone.`,
+			help:  `Like strftime but consults the $TZ environment variable to get local time zone.`,
 			examples: []string{
 				`strptime_local("2015-08-28T13:33:21Z",    "%Y-%m-%dT%H:%M:%SZ") = 1440758001     with TZ="Asia/Istanbul"`,
 				`strptime_local("2015-08-28T13:33:21.345Z","%Y-%m-%dT%H:%M:%SZ") = 1440758001.345 with TZ="Asia/Istanbul"`,
@@ -1043,21 +1122,21 @@ strftime_local.`,
 		{
 			name:     "systime",
 			class:    FUNC_CLASS_TIME,
-			help:     "help string will go here",
+			help:     "Returns the system time in floating-point seconds since the epoch.",
 			zaryFunc: bifs.BIF_systime,
 		},
 
 		{
 			name:     "systimeint",
 			class:    FUNC_CLASS_TIME,
-			help:     "help string will go here",
+			help:     "Returns the system time in integer seconds since the epoch.",
 			zaryFunc: bifs.BIF_systimeint,
 		},
 
 		{
 			name:     "uptime",
 			class:    FUNC_CLASS_TIME,
-			help:     "help string will go here",
+			help:     "Returns the time in floating-point seconds since the current Miller program was started.",
 			zaryFunc: bifs.BIF_uptime,
 		},
 
@@ -1144,7 +1223,7 @@ strftime_local.`,
 		{
 			name:      "is_not_empty",
 			class:     FUNC_CLASS_TYPING,
-			help:      "False if field is present in input with empty value, true otherwise",
+			help:      "True if field is present in input with non-empty value, false otherwise",
 			unaryFunc: bifs.BIF_is_notempty,
 		},
 
@@ -1165,14 +1244,14 @@ strftime_local.`,
 		{
 			name:      "is_not_null",
 			class:     FUNC_CLASS_TYPING,
-			help:      "False if argument is null (empty or absent), true otherwise.",
+			help:      "False if argument is null (empty, absent, or JSON null), true otherwise.",
 			unaryFunc: bifs.BIF_is_notnull,
 		},
 
 		{
 			name:      "is_null",
 			class:     FUNC_CLASS_TYPING,
-			help:      "True if argument is null (empty or absent), false otherwise.",
+			help:      "True if argument is null (empty, absent, or JSON null), false otherwise.",
 			unaryFunc: bifs.BIF_is_null,
 		},
 
@@ -1195,6 +1274,14 @@ strftime_local.`,
 			class:     FUNC_CLASS_TYPING,
 			help:      "True if field is present with string (including empty-string) value",
 			unaryFunc: bifs.BIF_is_string,
+		},
+
+		{
+			name:  "is_nan",
+			class: FUNC_CLASS_TYPING,
+			help: `True if the argument is the NaN (not-a-number) floating-point value.
+Note that NaN has the property that NaN != NaN, so you need 'is_nan(x)' rather than 'x == NaN'.`,
+			unaryFunc: bifs.BIF_is_nan,
 		},
 
 		{
@@ -1357,9 +1444,24 @@ strftime_local.`,
 		{
 			name:  "fmtnum",
 			class: FUNC_CLASS_CONVERSION,
-			help: `Convert int/float/bool to string using printf-style format string, e.g.
-'$s = fmtnum($n, "%08d")' or '$t = fmtnum($n, "%.6e")'.`,
+			help: `Convert int/float/bool to string using printf-style format string (https://pkg.go.dev/fmt), e.g.
+'$s = fmtnum($n, "%08d")' or '$t = fmtnum($n, "%.6e")'. This function recurses on array and map values.`,
 			binaryFunc: bifs.BIF_fmtnum,
+			examples: []string{
+				`$x = fmtnum($x, "%.6f")`,
+			},
+		},
+
+		{
+			name:       "fmtifnum",
+			class:      FUNC_CLASS_CONVERSION,
+			help:       `Identical to fmtnum, except returns the first argument as-is if the output would be an error.`,
+			binaryFunc: bifs.BIF_fmtifnum,
+			examples: []string{
+				`fmtifnum(3.4, "%.6f") gives 3.400000"`,
+				`fmtifnum("abc", "%.6f") gives abc"`,
+				`$* = fmtifnum($*, "%.6f") formats numeric fields in the current record, leaving non-numeric ones alone`,
+			},
 		},
 
 		{
@@ -1379,7 +1481,7 @@ strftime_local.`,
 		{
 			name:  "joink",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Makes string from map/array keys.`,
+			help:  `Makes string from map/array keys. First argument is map/array; second is separator string.`,
 			examples: []string{
 				`joink({"a":3,"b":4,"c":5}, ",") = "a,b,c".`,
 				`joink([1,2,3], ",") = "1,2,3".`,
@@ -1390,7 +1492,7 @@ strftime_local.`,
 		{
 			name:  "joinv",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Makes string from map/array values.`,
+			help:  `Makes string from map/array values. First argument is map/array; second is separator string.`,
 			examples: []string{
 				`joinv([3,4,5], ",") = "3,4,5"`,
 				`joinv({"a":3,"b":4,"c":5}, ",") = "3,4,5"`,
@@ -1401,10 +1503,11 @@ strftime_local.`,
 		{
 			name:  "joinkv",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Makes string from map/array key-value pairs.`,
+			help: `Makes string from map/array key-value pairs. First argument is map/array;
+second is pair-separator string; third is field-separator string. Mnemonic: the "=" comes before the "," in the output and in the arguments to joinkv.`,
 			examples: []string{
 				`joinkv([3,4,5], "=", ",") = "1=3,2=4,3=5"`,
-				`joinkv({"a":3,"b":4,"c":5}, "=", ",") = "a=3,b=4,c=5"`,
+				`joinkv({"a":3,"b":4,"c":5}, ":", ";") = "a:3;b:4;c:5"`,
 			},
 			ternaryFunc: bifs.BIF_joinkv,
 		},
@@ -1412,7 +1515,8 @@ strftime_local.`,
 		{
 			name:  "splita",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Splits string into array with type inference.`,
+			help: `Splits string into array with type inference. First argument is string to split;
+second is the separator to split on.`,
 			examples: []string{
 				`splita("3,4,5", ",") = [3,4,5]`,
 			},
@@ -1422,9 +1526,10 @@ strftime_local.`,
 		{
 			name:  "splitax",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Splits string into array without type inference.`,
+			help: `Splits string into array without type inference. First argument is string to split;
+second is the separator to split on.`,
 			examples: []string{
-				`splita("3,4,5", ",") = ["3","4","5"]`,
+				`splitax("3,4,5", ",") = ["3","4","5"]`,
 			},
 			binaryFunc: bifs.BIF_splitax,
 		},
@@ -1432,7 +1537,8 @@ strftime_local.`,
 		{
 			name:  "splitkv",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Splits string by separators into map with type inference.`,
+			help: `Splits string by separators into map with type inference. First argument is string to split;
+second argument is pair separator; third argument is field separator.`,
 			examples: []string{
 				`splitkv("a=3,b=4,c=5", "=", ",") = {"a":3,"b":4,"c":5}`,
 			},
@@ -1442,7 +1548,9 @@ strftime_local.`,
 		{
 			name:  "splitkvx",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Splits string by separators into map without type inference (keys and values are strings).`,
+			help: `Splits string by separators into map without type inference
+(keys and values are strings). First argument is string to split; second
+argument is pair separator; third argument is field separator.`,
 			examples: []string{
 				`splitkvx("a=3,b=4,c=5", "=", ",") = {"a":"3","b":"4","c":"5"}`,
 			},
@@ -1452,7 +1560,8 @@ strftime_local.`,
 		{
 			name:  "splitnv",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Splits string by separator into integer-indexed map with type inference.`,
+			help: `Splits string by separator into integer-indexed map with type inference. First argument is
+string to split; second argument is separator to split on.`,
 			examples: []string{
 				`splitnv("a,b,c", ",") = {"1":"a","2":"b","3":"c"}`,
 			},
@@ -1462,7 +1571,9 @@ strftime_local.`,
 		{
 			name:  "splitnvx",
 			class: FUNC_CLASS_CONVERSION,
-			help:  `Splits string by separator into integer-indexed map without type inference (values are strings).`,
+			help: `Splits string by separator into integer-indexed map without
+type inference (values are strings). First argument is string to split; second
+argument is separator to split on.`,
 			examples: []string{
 				`splitnvx("3,4,5", ",") = {"1":"3","2":"4","3":"5"}`,
 			},
@@ -1495,6 +1606,19 @@ strftime_local.`,
 		},
 
 		{
+			name:  "concat",
+			class: FUNC_CLASS_COLLECTIONS,
+			help: `Returns the array concatenation of the arguments. Non-array arguments are treated as
+single-element arrays.`,
+			examples: []string{
+				`concat(1,2,3) is [1,2,3]`,
+				`concat([1,2],3) is [1,2,3]`,
+				`concat([1,2],[3]) is [1,2,3]`,
+			},
+			variadicFunc: bifs.BIF_concat,
+		},
+
+		{
 			name:      "depth",
 			class:     FUNC_CLASS_COLLECTIONS,
 			help:      "Prints maximum depth of map/array. Scalars have depth 0.",
@@ -1505,15 +1629,32 @@ strftime_local.`,
 			name:  "flatten",
 			class: FUNC_CLASS_COLLECTIONS,
 			help: `Flattens multi-level maps to single-level ones. Useful for nested JSON-like structures
-for non-JSON file formats like CSV.`,
+for non-JSON file formats like CSV. With two arguments, the first argument is a map (maybe $*) and
+the second argument is the flatten separator. With three arguments, the first argument is prefix,
+the second is the flatten separator, and the third argument is a map; flatten($*, ".") is the
+same as flatten("", ".", $*).  See "Flatten/unflatten: converting between JSON and tabular formats"
+at ` + lib.DOC_URL + ` for more information.`,
 			examples: []string{
+				`flatten({"a":[1,2],"b":3}, ".") is {"a.1": 1, "a.2": 2, "b": 3}.`,
 				`flatten("a", ".", {"b": { "c": 4 }}) is {"a.b.c" : 4}.`,
 				`flatten("", ".", {"a": { "b": 3 }}) is {"a.b" : 3}.`,
-				`Two-argument version: flatten($*, ".") is the same as flatten("", ".", $*).`,
 			},
 			binaryFunc:         bifs.BIF_flatten_binary,
 			ternaryFunc:        bifs.BIF_flatten,
 			hasMultipleArities: true,
+		},
+
+		{
+			name:  "unflatten",
+			class: FUNC_CLASS_COLLECTIONS,
+			help: `Reverses flatten. Useful for nested JSON-like structures for non-JSON file formats like CSV.
+The first argument is a map, and the second argument is the flatten separator.  See also arrayify.
+See "Flatten/unflatten: converting between JSON and tabular formats" at ` + lib.DOC_URL + ` for more
+information.`,
+			examples: []string{
+				`unflatten({"a.b.c" : 4}, ".") is {"a": "b": { "c": 4 }}.`,
+			},
+			binaryFunc: bifs.BIF_unflatten,
 		},
 
 		{
@@ -1526,7 +1667,7 @@ for non-JSON file formats like CSV.`,
 		{
 			name:      "get_values",
 			class:     FUNC_CLASS_COLLECTIONS,
-			help:      "Returns array of keys of map or array -- in the latter case, returns a copy of the array",
+			help:      "Returns array of values of map or array -- in the latter case, returns a copy of the array",
 			unaryFunc: bifs.BIF_get_values,
 		},
 
@@ -1605,17 +1746,6 @@ from all arguments. Rightmost collisions win, e.g.  'mapsum({1:2,3:4},{1:5})' is
 			variadicFunc: bifs.BIF_mapsum,
 		},
 
-		{
-			name:  "unflatten",
-			class: FUNC_CLASS_COLLECTIONS,
-			help: `Reverses flatten. Useful for nested JSON-like structures for non-JSON file formats like CSV.
-See also arrayify.`,
-			examples: []string{
-				`unflatten({"a.b.c" : 4}, ".") is {"a": "b": { "c": 4 }}.`,
-			},
-			binaryFunc: bifs.BIF_unflatten,
-		},
-
 		// ----------------------------------------------------------------
 		// FUNC_CLASS_HOFS
 
@@ -1684,15 +1814,23 @@ key and value, and map-element key and value; it should return the updated accum
 			name:  "sort",
 			class: FUNC_CLASS_HOFS,
 			help: `Given a map or array as first argument and string flags or function as optional second argument,
-returns a sorted copy of the input. With one argument, sorts array elements naturally, and maps naturally by
-map keys.  If the second argument is a string, it can contain any of "f" for lexical (default "n" for
-natural/numeric), "), "c" for case-folded lexical, and "r" for reversed/descending sort. If the second
-argument is a function, then for arrays it should take two arguments a and b, returning < 0, 0, or > 0 as a <
-b, a == b, or a > b respectively; for maps the function should take four arguments ak, av, bk, and bv, again
-returning < 0, 0, or > 0, using a and b's keys and values.`,
+returns a sorted copy of the input. With one argument, sorts array elements with numbers first numerically and
+then strings lexically, and map elements likewise by map keys.  If the second argument is a string, it can
+contain any of "f" for lexical ("n" is for the above default), "c" for case-folded lexical, or "t" for natural
+sort order. An additional "r" in that string is for reverse.  If the second argument is a function, then for
+arrays it should take two arguments a and b, returning < 0, 0, or > 0 as a < b, a == b, or a > b respectively;
+for maps the function should take four arguments ak, av, bk, and bv, again returning < 0, 0, or
+> 0, using a and b's keys and values.`,
 			examples: []string{
-				`Array example: sort([5,2,3,1,4], func(a,b) {return b <=> a}) returns [5,4,3,2,1].`,
-				`Map example: sort({"c":2,"a":3,"b":1}, func(ak,av,bk,bv) {return bv <=> av}) returns {"a":3,"c":2,"b":1}.`,
+				`Default sorting: sort([3,"A",1,"B",22]) returns [1, 3, 20, "A", "B"].`,
+				`  Note that this is numbers before strings.`,
+				`Default sorting: sort(["E","a","c","B","d"]) returns ["B", "E", "a", "c", "d"].`,
+				`  Note that this is uppercase before lowercase.`,
+				`Case-folded ascending: sort(["E","a","c","B","d"], "c") returns ["a", "B", "c", "d", "E"].`,
+				`Case-folded descending: sort(["E","a","c","B","d"], "cr") returns ["E", "d", "c", "B", "a"].`,
+				`Natural sorting: sort(["a1","a10","a100","a2","a20","a200"], "t") returns ["a1", "a2", "a10", "a20", "a100", "a200"].`,
+				`Array with function: sort([5,2,3,1,4], func(a,b) {return b <=> a}) returns [5,4,3,2,1].`,
+				`Map with function: sort({"c":2,"a":3,"b":1}, func(ak,av,bk,bv) {return bv <=> av}) returns {"a":3,"c":2,"b":1}.`,
 			},
 			variadicFuncWithState: SortHOF,
 			minimumVariadicArity:  1,

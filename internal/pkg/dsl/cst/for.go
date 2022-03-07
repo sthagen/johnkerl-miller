@@ -163,7 +163,7 @@ func (node *ForLoopOneVariableNode) Execute(state *runtime.State) (*BlockExitPay
 		state.Stack.PushStackFrame()
 		defer state.Stack.PopStackFrame()
 		for _, element := range arrayval {
-			err := state.Stack.SetAtScope(node.indexVariable, &element)
+			err := state.Stack.SetAtScope(node.indexVariable, element)
 			if err != nil {
 				return nil, err
 			}
@@ -350,13 +350,13 @@ func (node *ForLoopTwoVariableNode) Execute(state *runtime.State) (*BlockExitPay
 		state.Stack.PushStackFrame()
 		defer state.Stack.PopStackFrame()
 		for zindex, element := range arrayval {
-			mindex := mlrval.FromInt(int(zindex + 1))
+			mindex := mlrval.FromInt(int64(zindex + 1))
 
 			err := state.Stack.SetAtScope(node.keyIndexVariable, mindex)
 			if err != nil {
 				return nil, err
 			}
-			err = state.Stack.SetAtScope(node.valueIndexVariable, &element)
+			err = state.Stack.SetAtScope(node.valueIndexVariable, element)
 			if err != nil {
 				return nil, err
 			}
@@ -566,21 +566,20 @@ func (node *ForLoopMultivariableNode) executeOuter(
 		// Go storage ("zindex") is 0-up.
 
 		for zindex, element := range arrayval {
-			mindex := mlrval.FromInt(int(zindex + 1))
+			mindex := mlrval.FromInt(int64(zindex + 1))
 
 			err := state.Stack.SetAtScope(keyIndexVariables[0], mindex)
 			if err != nil {
 				return nil, err
 			}
 
-			blockExitPayload, err := node.executeOuter(&element, keyIndexVariables[1:], state)
+			blockExitPayload, err := node.executeOuter(element, keyIndexVariables[1:], state)
 			if err != nil {
 				return nil, err
 			}
 			if blockExitPayload != nil {
 				if blockExitPayload.blockExitStatus == BLOCK_EXIT_BREAK {
 					return blockExitPayload, nil
-					break
 				}
 				// If BLOCK_EXIT_CONTINUE, keep going -- this means the body was exited
 				// early but we keep going at this level
@@ -657,13 +656,13 @@ func (node *ForLoopMultivariableNode) executeInner(
 		// Go storage ("zindex") is 0-up.
 
 		for zindex, element := range arrayval {
-			mindex := mlrval.FromInt(int(zindex + 1))
+			mindex := mlrval.FromInt(int64(zindex + 1))
 
 			err := state.Stack.SetAtScope(keyIndexVariable, mindex)
 			if err != nil {
 				return nil, err
 			}
-			err = state.Stack.SetAtScope(node.valueIndexVariable, &element)
+			err = state.Stack.SetAtScope(node.valueIndexVariable, element)
 			if err != nil {
 				return nil, err
 			}

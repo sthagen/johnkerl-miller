@@ -17,7 +17,7 @@ const barDefaultOOBString = "#"
 const barDefaultBlankString = "."
 const barDefaultLo = 0.0
 const barDefaultHi = 100.0
-const barDefaultWidth = 40
+const barDefaultWidth = int64(40)
 
 // ----------------------------------------------------------------
 const verbNameBar = "bar"
@@ -130,7 +130,7 @@ func transformerBarParseCLI(
 		fieldNames,
 		lo,
 		hi,
-		width,
+		int(width),
 		doAuto,
 		fillString,
 		oobString,
@@ -216,14 +216,6 @@ func (tr *TransformerBar) Transform(
 ) {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-}
-
-// ----------------------------------------------------------------
-func (tr *TransformerBar) simpleBar(
-	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
-) {
-	outputRecordsAndContexts.PushBack(inrecAndContext)
 }
 
 // ----------------------------------------------------------------

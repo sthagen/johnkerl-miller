@@ -18,6 +18,10 @@ import (
 )
 
 type CmpFuncBool func(input1, input2 *Mlrval) bool
+
+// The Go sort API is just a bool a<b, not triple a<b, a==b, a>b. Miller does the latter since when
+// we sort primarily on field 1, then secondarily on field 2, etc., we need to be able to detect
+// ties on field 1 so we can know whether to compare on field 2 or not.
 type CmpFuncInt func(input1, input2 *Mlrval) int // -1, 0, 1 for <=>
 
 // ----------------------------------------------------------------
@@ -64,7 +68,7 @@ func _more(input1, input2 *Mlrval) int {
 }
 
 // int_cmp implements the spaceship operator for ints.
-func int_cmp(a, b int) int {
+func int_cmp(a, b int64) int {
 	if a < b {
 		return -1
 	}
@@ -102,12 +106,6 @@ func string_cmp(a, b string) int {
 func cmp_b_ss(input1, input2 *Mlrval) int {
 	return string_cmp(input1.printrep, input2.printrep)
 }
-func cmp_b_xs(input1, input2 *Mlrval) int {
-	return string_cmp(input1.String(), input2.printrep)
-}
-func cmp_b_sx(input1, input2 *Mlrval) int {
-	return string_cmp(input1.printrep, input2.String())
-}
 func cmp_b_ii(input1, input2 *Mlrval) int {
 	return int_cmp(input1.intval, input2.intval)
 }
@@ -121,7 +119,7 @@ func cmp_b_ff(input1, input2 *Mlrval) int {
 	return float_cmp(input1.floatval, input2.floatval)
 }
 func cmp_b_bb(input1, input2 *Mlrval) int {
-	return int_cmp(lib.BoolToInt(input1.boolval), lib.BoolToInt(input2.boolval))
+	return int_cmp(int64(lib.BoolToInt(input1.boolval)), int64(lib.BoolToInt(input2.boolval)))
 }
 
 // TODO: cmp on array & map

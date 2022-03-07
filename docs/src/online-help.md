@@ -53,7 +53,7 @@ Flags:
   mlr help list-separator-regex-aliases
   mlr help comments-in-data-flags
   mlr help compressed-data-flags
-  mlr help csv-only-flags
+  mlr help csv/tsv-only-flags
   mlr help file-format-flags
   mlr help flatten-unflatten-flags
   mlr help format-conversion-keystroke-saver-flags
@@ -212,6 +212,8 @@ Options:
 -n  {comma-separated field names}  Numerical ascending; nulls sort last
 -nf {comma-separated field names}  Same as -n
 -nr {comma-separated field names}  Numerical descending; nulls sort first
+-t  {comma-separated field names}  Natural ascending
+-tr {comma-separated field names}  Natural descending
 -h|--help Show this message.
 
 Example:
@@ -234,15 +236,18 @@ Given the name of a DSL function (from `mlr -f`) you can use `mlr help function`
 append  (class=collections #args=2) Appends second argument to end of first argument, which must be an array.
 </pre>
 
-<pre class="pre-highlight-non-pair">
+<pre class="pre-highlight-in-pair">
 <b>mlr help function split</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Function "split" not found.
 </pre>
 
 <pre class="pre-highlight-in-pair">
 <b>mlr help function splita</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-splita  (class=conversion #args=2) Splits string into array with type inference.
+splita  (class=conversion #args=2) Splits string into array with type inference. First argument is string to split; second is the separator to split on.
 Example:
 splita("3,4,5", ",") = [3,4,5]
 </pre>

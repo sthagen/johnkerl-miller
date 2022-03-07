@@ -430,6 +430,9 @@ Options:
                defaults to -j values if omitted.
   -r {a,b,c}   Comma-separated join-field names for right input file(s);
                defaults to -j values if omitted.
+  --lk|--left-keep-field-names {a,b,c} If supplied, this means keep only the specified field
+               names from the left file. Automatically includes the join-field name(s). Helpful
+               for when you only want a limited subset of information from the left file.
   --lp {text}  Additional prefix for non-join output field names from
                the left file
   --rp {text}  Additional prefix for non-join output field names from
@@ -456,7 +459,9 @@ the main "mlr --help" for more information on syntax for these arguments:
   --ips {pair-separator character}
   --repifs
   --implicit-csv-header
+  --implicit-tsv-header
   --no-implicit-csv-header
+  --no-implicit-tsv-header
 For example, if you have 'mlr --csv ... join -l foo ... ' then the left-file format will
 be specified CSV as well unless you override with 'mlr --csv ... join --ijson -l foo' etc.
 Likewise, if you have 'mlr --csv --implicit-csv-header ...' then the join-in file will be
@@ -914,6 +919,8 @@ Options:
 -n  {comma-separated field names}  Numerical ascending; nulls sort last
 -nf {comma-separated field names}  Same as -n
 -nr {comma-separated field names}  Numerical descending; nulls sort first
+-t  {comma-separated field names}  Natural ascending
+-tr {comma-separated field names}  Natural descending
 -h|--help Show this message.
 
 Example:
@@ -928,6 +935,47 @@ Outputs records sorted lexically ascending by keys.
 Options:
 -r        Recursively sort subobjects/submaps, e.g. for JSON input.
 -h|--help Show this message.
+
+================================================================
+split
+Usage: mlr split [options] {filename}
+Options:
+-n {n}:      Cap file sizes at N records.
+-m {m}:      Produce M files, round-robining records among them.
+-g {a,b,c}:  Write separate files with records having distinct values for fields named a,b,c.
+Exactly one  of -m, -n, or -g must be supplied.
+--prefix {p} Specify filename prefix; default "split".
+--suffix {s} Specify filename suffix; default is from mlr output format, e.g. "csv".
+-a           Append to existing file(s), if any, rather than overwriting.
+-v           Send records along to downstream verbs as well as splitting to files.
+-h|--help    Show this message.
+Any of the output-format command-line flags (see mlr -h). For example, using
+  mlr --icsv --from myfile.csv split --ojson -n 1000
+the input is CSV, but the output files are JSON.
+
+Examples: Suppose myfile.csv has 1,000,000 records.
+
+100 output files, 10,000 records each. First 10,000 records in split_1.csv, next in split_2.csv, etc.
+  mlr --csv --from myfile.csv split -n 10000
+
+10 output files, 100,000 records each. Records 1,11,21,etc in split_1.csv, records 2,12,22, etc in split_2.csv, etc.
+  mlr --csv --from myfile.csv split -m 10
+Same, but with JSON output.
+  mlr --csv --from myfile.csv split -m 10 -o json
+
+Same but instead of split_1.csv, split_2.csv, etc. there are test_1.dat, test_2.dat, etc.
+  mlr --csv --from myfile.csv split -m 10 --prefix test --suffix dat
+Same, but written to the /tmp/ directory.
+  mlr --csv --from myfile.csv split -m 10 --prefix /tmp/test --suffix dat
+
+If the shape field has values triangle and square, then there will be split_triangle.csv and split_square.csv.
+  mlr --csv --from myfile.csv split -g shape
+
+If the color field has values yellow and green, and the shape field has values triangle and square,
+then there will be split_yellow_triangle.csv, split_yellow_square.csv, etc.
+  mlr --csv --from myfile.csv split -g color,shape
+
+See also the "tee" DSL function which lets you do more ad-hoc customization.
 
 ================================================================
 stats1
@@ -1021,31 +1069,34 @@ Example: mlr stats2 -a corr -f x,y
 ================================================================
 step
 Usage: mlr step [options]
-Computes values dependent on the previous record, optionally grouped by category.
+Computes values dependent on earlier/later records, optionally grouped by category.
 Options:
--a {delta,rsum,...}   Names of steppers: comma-separated, one or more of:
-  delta    Compute differences in field(s) between successive records
-  shift    Include value(s) in field(s) from previous record, if any
+-a {delta,rsum,...} Names of steppers: comma-separated, one or more of:
+  counter    Count instances of field(s) between successive records
+  delta      Compute differences in field(s) between successive records
+  ewma       Exponentially weighted moving average over successive records
   from-first Compute differences in field(s) from first record
-  ratio    Compute ratios in field(s) between successive records
-  rsum     Compute running sums of field(s) between successive records
-  counter  Count instances of field(s) between successive records
-  ewma     Exponentially weighted moving average over successive records
+  ratio      Compute ratios in field(s) between successive records
+  rsum       Compute running sums of field(s) between successive records
+  shift      Alias for shift_lag
+  shift_lag  Include value(s) in field(s) from the previous record, if any
+  shift_lead Include value(s) in field(s) from the next record, if any
+  slwin      Sliding-window averages over m records back and n forward. E.g. slwin_7_2 for 7 back and 2 forward.
 
--f {a,b,c} Value-field names on which to compute statistics
--g {d,e,f} Optional group-by-field names
--F         Computes integerable things (e.g. counter) in floating point.
-           As of Miller 6 this happens automatically, but the flag is accepted
-           as a no-op for backward compatibility with Miller 5 and below.
--d {x,y,z} Weights for ewma. 1 means current sample gets all weight (no
-           smoothing), near under under 1 is light smoothing, near over 0 is
-           heavy smoothing. Multiple weights may be specified, e.g.
-           "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
-           is "-d 0.5".
--o {a,b,c} Custom suffixes for EWMA output fields. If omitted, these default to
-           the -d values. If supplied, the number of -o values must be the same
-           as the number of -d values.
--h|--help Show this message.
+-f {a,b,c}   Value-field names on which to compute statistics
+-g {d,e,f}   Optional group-by-field names
+-F           Computes integerable things (e.g. counter) in floating point.
+             As of Miller 6 this happens automatically, but the flag is accepted
+             as a no-op for backward compatibility with Miller 5 and below.
+-d {x,y,z}   Weights for EWMA. 1 means current sample gets all weight (no
+             smoothing), near under under 1 is light smoothing, near over 0 is
+             heavy smoothing. Multiple weights may be specified, e.g.
+             "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
+             is "-d 0.5".
+-o {a,b,c}   Custom suffixes for EWMA output fields. If omitted, these default to
+             the -d values. If supplied, the number of -o values must be the same
+             as the number of -d values.
+-h|--help   Show this message.
 
 Examples:
   mlr step -a rsum -f request_size
@@ -1053,6 +1104,7 @@ Examples:
   mlr step -a ewma -d 0.1,0.9 -f x,y
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y -g group_name
+  mlr step -a slwin_9_0,slwin_0_9 -f x
 
 Please see https://miller.readthedocs.io/en/latest/reference-verbs.html#filter or
 https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
@@ -1115,8 +1167,12 @@ Usage: mlr top [options]
 --min         Print top smallest values; default is top largest values.
 -F            Keep top values as floats even if they look like integers.
 -o {name}     Field name for output indices. Default "top_idx".
+              This is ignored if -a is used.
 Prints the n records with smallest/largest values at specified fields,
-optionally by category.
+optionally by category. If -a is given, then the top records are emitted
+with the same fields as they appeared in the input. Without -a, only fields
+from -f, fields from -g, and the top-index field are emitted. For more information
+please see https://miller.readthedocs.io/en/latest/reference-verbs#top
 
 ================================================================
 unflatten

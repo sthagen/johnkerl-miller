@@ -18,18 +18,19 @@ import (
 // ----------------------------------------------------------------
 type RecordReaderCSV struct {
 	readerOptions   *cli.TReaderOptions
-	recordsPerBatch int  // distinct from readerOptions.RecordsPerBatch for join/repl
-	ifs0            byte // Go's CSV library only lets its 'Comma' be a single character
+	recordsPerBatch int64 // distinct from readerOptions.RecordsPerBatch for join/repl
+	ifs0            byte  // Go's CSV library only lets its 'Comma' be a single character
+	csvLazyQuotes   bool  // Maps directly to Go's CSV library's LazyQuotes
 
 	filename   string
-	rowNumber  int
+	rowNumber  int64
 	needHeader bool
 	header     []string
 }
 
 func NewRecordReaderCSV(
 	readerOptions *cli.TReaderOptions,
-	recordsPerBatch int,
+	recordsPerBatch int64,
 ) (*RecordReaderCSV, error) {
 	if readerOptions.IRS != "\n" && readerOptions.IRS != "\r\n" {
 		return nil, fmt.Errorf("for CSV, IRS cannot be altered; LF vs CR/LF is autodetected")
@@ -41,6 +42,7 @@ func NewRecordReaderCSV(
 		readerOptions:   readerOptions,
 		ifs0:            readerOptions.IFS[0],
 		recordsPerBatch: recordsPerBatch,
+		csvLazyQuotes:   readerOptions.CSVLazyQuotes,
 	}, nil
 }
 
@@ -101,6 +103,7 @@ func (reader *RecordReaderCSV) processHandle(
 
 	csvReader := csv.NewReader(NewBOMStrippingReader(handle))
 	csvReader.Comma = rune(reader.ifs0)
+	csvReader.LazyQuotes = reader.csvLazyQuotes
 	csvRecordsChannel := make(chan *list.List, recordsPerBatch)
 	go channelizedCSVRecordScanner(csvReader, csvRecordsChannel, downstreamDoneChannel, errorChannel,
 		recordsPerBatch)
@@ -122,9 +125,9 @@ func channelizedCSVRecordScanner(
 	csvRecordsChannel chan<- *list.List,
 	downstreamDoneChannel <-chan bool, // for mlr head
 	errorChannel chan error,
-	recordsPerBatch int,
+	recordsPerBatch int64,
 ) {
-	i := 0
+	i := int64(0)
 	done := false
 
 	csvRecords := list.New()
@@ -219,11 +222,11 @@ func (reader *RecordReaderCSV) getRecordBatch(
 
 		record := mlrval.NewMlrmapAsRecord()
 
-		nh := len(reader.header)
-		nd := len(csvRecord)
+		nh := int64(len(reader.header))
+		nd := int64(len(csvRecord))
 
 		if nh == nd {
-			for i := 0; i < nh; i++ {
+			for i := int64(0); i < nh; i++ {
 				key := reader.header[i]
 				value := mlrval.FromDeferredType(csvRecord[i])
 				_, err := record.PutReferenceMaybeDedupe(key, value, dedupeFieldNames)
@@ -243,7 +246,7 @@ func (reader *RecordReaderCSV) getRecordBatch(
 				errorChannel <- err
 				return
 			} else {
-				i := 0
+				i := int64(0)
 				n := lib.IntMin2(nh, nd)
 				for i = 0; i < n; i++ {
 					key := reader.header[i]
@@ -256,7 +259,7 @@ func (reader *RecordReaderCSV) getRecordBatch(
 				}
 				if nh < nd {
 					// if header shorter than data: use 1-up itoa keys
-					key := strconv.Itoa(i + 1)
+					key := strconv.FormatInt(i+1, 10)
 					value := mlrval.FromDeferredType(csvRecord[i])
 					_, err := record.PutReferenceMaybeDedupe(key, value, dedupeFieldNames)
 					if err != nil {

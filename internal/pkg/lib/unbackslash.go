@@ -6,6 +6,7 @@ package lib
 
 import (
 	"bytes"
+	"strconv"
 )
 
 var unbackslashReplacements = map[byte]string{
@@ -37,6 +38,22 @@ var unbackslashReplacements = map[byte]string{
 // Note "\0" .. "\9" are used for regex captures within the DSL CST builder
 // and are not touched here. (See also lib/regex.go.)
 func UnbackslashStringLiteral(input string) string {
+
+	// We could just do this. However, if someone has a valid "\t" in one part of the string,
+	// and something else strconv.Unquote doesn't handle in another part of the string,
+	// we'd fail to unbackslash the former ...
+	//
+	//	output, err := strconv.Unquote(`"` + input + `"`)
+	//	if err == nil {
+	//		return output
+	//	} else {
+	//		return input
+	//	}
+	//
+	// ... and, given that desire, we don't a priori know how many digits in Unicode
+	// escape sequences -- so we *require* that people use four hex digits after \u
+	// and eight hex digits after \U.
+
 	var buffer bytes.Buffer
 
 	n := len(input)
@@ -65,6 +82,12 @@ func UnbackslashStringLiteral(input string) string {
 		} else if ok, code := isBackslashHex(input[i:]); ok {
 			buffer.WriteByte(byte(code))
 			i += 4
+		} else if ok, s := isUnicode4(input[i:]); ok {
+			buffer.WriteString(s)
+			i += 6
+		} else if ok, s := isUnicode8(input[i:]); ok {
+			buffer.WriteString(s)
+			i += 10
 		} else {
 			buffer.WriteByte('\\')
 			buffer.WriteByte(next)
@@ -178,6 +201,7 @@ func isBackslashHex(input string) (bool, int) {
 	return true, code
 }
 
+// isHexDigit tries to parse e.g. "\x41"
 func isHexDigit(b byte) (bool, byte) {
 	if '0' <= b && b <= '9' {
 		return true, b - '0'
@@ -189,4 +213,34 @@ func isHexDigit(b byte) (bool, byte) {
 		return true, b - 'A' + 10
 	}
 	return false, 0
+}
+
+// isUnicode4 tries to parse e.g. "\u2766"
+func isUnicode4(input string) (bool, string) {
+	if len(input) < 6 {
+		return false, ""
+	}
+	if input[0:2] != `\u` {
+		return false, ""
+	}
+	s, err := strconv.Unquote(`"` + input[0:6] + `"`)
+	if err == nil {
+		return true, s
+	}
+	return false, ""
+}
+
+// isUnicode8 tries to parse e.g. "\U00010877"
+func isUnicode8(input string) (bool, string) {
+	if len(input) < 10 {
+		return false, ""
+	}
+	if input[0:2] != `\U` {
+		return false, ""
+	}
+	s, err := strconv.Unquote(`"` + input[0:10] + `"`)
+	if err == nil {
+		return true, s
+	}
+	return false, ""
 }

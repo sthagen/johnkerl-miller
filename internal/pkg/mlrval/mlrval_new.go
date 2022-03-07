@@ -79,7 +79,7 @@ func (mv *Mlrval) SetFromVoid() *Mlrval {
 	return mv
 }
 
-func FromInt(input int) *Mlrval {
+func FromInt(input int64) *Mlrval {
 	return &Mlrval{
 		mvtype:        MT_INT,
 		printrepValid: false,
@@ -109,7 +109,7 @@ func TryFromIntString(input string) *Mlrval {
 }
 
 // TODO: comment
-func (mv *Mlrval) SetFromPrevalidatedIntString(input string, intval int) *Mlrval {
+func (mv *Mlrval) SetFromPrevalidatedIntString(input string, intval int64) *Mlrval {
 	mv.printrep = input
 	mv.printrepValid = true
 	mv.intval = intval
@@ -118,7 +118,7 @@ func (mv *Mlrval) SetFromPrevalidatedIntString(input string, intval int) *Mlrval
 }
 
 // TODO: comment
-func FromPrevalidatedIntString(input string, intval int) *Mlrval {
+func FromPrevalidatedIntString(input string, intval int64) *Mlrval {
 	mv := &Mlrval{}
 	mv.SetFromPrevalidatedIntString(input, intval)
 	return mv
@@ -213,7 +213,7 @@ func FromFunction(funcval interface{}, name string) *Mlrval {
 	}
 }
 
-func FromArray(arrayval []Mlrval) *Mlrval {
+func FromArray(arrayval []*Mlrval) *Mlrval {
 	return &Mlrval{
 		mvtype:        MT_ARRAY,
 		printrep:      "(bug-if-you-see-this:case-4)", // INVALID_PRINTREP,
@@ -223,7 +223,7 @@ func FromArray(arrayval []Mlrval) *Mlrval {
 }
 
 func FromEmptyArray() *Mlrval {
-	return FromArray(make([]Mlrval, 0))
+	return FromArray(make([]*Mlrval, 0))
 }
 
 func FromMap(mapval *Mlrmap) *Mlrval {

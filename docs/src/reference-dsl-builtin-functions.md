@@ -69,15 +69,15 @@ is 2. Unary operators such as `!` and `~` show argument-count of 1; the ternary
 
 * [**Arithmetic functions**](#arithmetic-functions):  [bitcount](#bitcount),  [madd](#madd),  [mexp](#mexp),  [mmul](#mmul),  [msub](#msub),  [pow](#pow),  [%](#percent),  [&](#bitwise-and),  [\*](#times),  [\**](#exponentiation),  [\+](#plus),  [\-](#minus),  [\.\*](#dot-times),  [\.\+](#dot-plus),  [\.\-](#dot-minus),  [\./](#dot-slash),  [/](#slash),  [//](#slash-slash),  [<<](#lsh),  [>>](#srsh),  [>>>](#ursh),  [^](#bitwise-xor),  [\|](#bitwise-or),  [~](#bitwise-not).
 * [**Boolean functions**](#boolean-functions):  [\!](#exclamation-point),  [\!=](#exclamation-point-equals),  [!=~](#regnotmatch),  [&&](#logical-and),  [<](#less-than),  [<=](#less-than-or-equals),  [<=>](#<=>),  [==](#double-equals),  [=~](#regmatch),  [>](#greater-than),  [>=](#greater-than-or-equals),  [?:](#question-mark-colon),  [??](#absent-coalesce),  [???](#absent-empty-coalesce),  [^^](#logical-xor),  [\|\|](#logical-or).
-* [**Collections functions**](#collections-functions):  [append](#append),  [arrayify](#arrayify),  [depth](#depth),  [flatten](#flatten),  [get_keys](#get_keys),  [get_values](#get_values),  [haskey](#haskey),  [json_parse](#json_parse),  [json_stringify](#json_stringify),  [leafcount](#leafcount),  [length](#length),  [mapdiff](#mapdiff),  [mapexcept](#mapexcept),  [mapselect](#mapselect),  [mapsum](#mapsum),  [unflatten](#unflatten).
-* [**Conversion functions**](#conversion-functions):  [boolean](#boolean),  [float](#float),  [fmtnum](#fmtnum),  [hexfmt](#hexfmt),  [int](#int),  [joink](#joink),  [joinkv](#joinkv),  [joinv](#joinv),  [splita](#splita),  [splitax](#splitax),  [splitkv](#splitkv),  [splitkvx](#splitkvx),  [splitnv](#splitnv),  [splitnvx](#splitnvx),  [string](#string).
+* [**Collections functions**](#collections-functions):  [append](#append),  [arrayify](#arrayify),  [concat](#concat),  [depth](#depth),  [flatten](#flatten),  [get_keys](#get_keys),  [get_values](#get_values),  [haskey](#haskey),  [json_parse](#json_parse),  [json_stringify](#json_stringify),  [leafcount](#leafcount),  [length](#length),  [mapdiff](#mapdiff),  [mapexcept](#mapexcept),  [mapselect](#mapselect),  [mapsum](#mapsum),  [unflatten](#unflatten).
+* [**Conversion functions**](#conversion-functions):  [boolean](#boolean),  [float](#float),  [fmtifnum](#fmtifnum),  [fmtnum](#fmtnum),  [hexfmt](#hexfmt),  [int](#int),  [joink](#joink),  [joinkv](#joinkv),  [joinv](#joinv),  [splita](#splita),  [splitax](#splitax),  [splitkv](#splitkv),  [splitkvx](#splitkvx),  [splitnv](#splitnv),  [splitnvx](#splitnvx),  [string](#string).
 * [**Hashing functions**](#hashing-functions):  [md5](#md5),  [sha1](#sha1),  [sha256](#sha256),  [sha512](#sha512).
 * [**Higher-order-functions functions**](#higher-order-functions-functions):  [any](#any),  [apply](#apply),  [every](#every),  [fold](#fold),  [reduce](#reduce),  [select](#select),  [sort](#sort).
 * [**Math functions**](#math-functions):  [abs](#abs),  [acos](#acos),  [acosh](#acosh),  [asin](#asin),  [asinh](#asinh),  [atan](#atan),  [atan2](#atan2),  [atanh](#atanh),  [cbrt](#cbrt),  [ceil](#ceil),  [cos](#cos),  [cosh](#cosh),  [erf](#erf),  [erfc](#erfc),  [exp](#exp),  [expm1](#expm1),  [floor](#floor),  [invqnorm](#invqnorm),  [log](#log),  [log10](#log10),  [log1p](#log1p),  [logifit](#logifit),  [max](#max),  [min](#min),  [qnorm](#qnorm),  [round](#round),  [roundm](#roundm),  [sgn](#sgn),  [sin](#sin),  [sinh](#sinh),  [sqrt](#sqrt),  [tan](#tan),  [tanh](#tanh),  [urand](#urand),  [urand32](#urand32),  [urandelement](#urandelement),  [urandint](#urandint),  [urandrange](#urandrange).
-* [**String functions**](#string-functions):  [capitalize](#capitalize),  [clean_whitespace](#clean_whitespace),  [collapse_whitespace](#collapse_whitespace),  [gsub](#gsub),  [lstrip](#lstrip),  [regextract](#regextract),  [regextract_or_else](#regextract_or_else),  [rstrip](#rstrip),  [ssub](#ssub),  [strip](#strip),  [strlen](#strlen),  [sub](#sub),  [substr](#substr),  [substr0](#substr0),  [substr1](#substr1),  [tolower](#tolower),  [toupper](#toupper),  [truncate](#truncate),  [\.](#dot).
+* [**String functions**](#string-functions):  [capitalize](#capitalize),  [clean_whitespace](#clean_whitespace),  [collapse_whitespace](#collapse_whitespace),  [format](#format),  [gsub](#gsub),  [lstrip](#lstrip),  [regextract](#regextract),  [regextract_or_else](#regextract_or_else),  [rstrip](#rstrip),  [ssub](#ssub),  [strip](#strip),  [strlen](#strlen),  [sub](#sub),  [substr](#substr),  [substr0](#substr0),  [substr1](#substr1),  [tolower](#tolower),  [toupper](#toupper),  [truncate](#truncate),  [unformat](#unformat),  [unformatx](#unformatx),  [\.](#dot).
 * [**System functions**](#system-functions):  [hostname](#hostname),  [os](#os),  [system](#system),  [version](#version).
 * [**Time functions**](#time-functions):  [dhms2fsec](#dhms2fsec),  [dhms2sec](#dhms2sec),  [fsec2dhms](#fsec2dhms),  [fsec2hms](#fsec2hms),  [gmt2localtime](#gmt2localtime),  [gmt2sec](#gmt2sec),  [hms2fsec](#hms2fsec),  [hms2sec](#hms2sec),  [localtime2gmt](#localtime2gmt),  [localtime2sec](#localtime2sec),  [sec2dhms](#sec2dhms),  [sec2gmt](#sec2gmt),  [sec2gmtdate](#sec2gmtdate),  [sec2hms](#sec2hms),  [sec2localdate](#sec2localdate),  [sec2localtime](#sec2localtime),  [strftime](#strftime),  [strftime_local](#strftime_local),  [strptime](#strptime),  [strptime_local](#strptime_local),  [systime](#systime),  [systimeint](#systimeint),  [uptime](#uptime).
-* [**Typing functions**](#typing-functions):  [asserting_absent](#asserting_absent),  [asserting_array](#asserting_array),  [asserting_bool](#asserting_bool),  [asserting_boolean](#asserting_boolean),  [asserting_empty](#asserting_empty),  [asserting_empty_map](#asserting_empty_map),  [asserting_error](#asserting_error),  [asserting_float](#asserting_float),  [asserting_int](#asserting_int),  [asserting_map](#asserting_map),  [asserting_nonempty_map](#asserting_nonempty_map),  [asserting_not_array](#asserting_not_array),  [asserting_not_empty](#asserting_not_empty),  [asserting_not_map](#asserting_not_map),  [asserting_not_null](#asserting_not_null),  [asserting_null](#asserting_null),  [asserting_numeric](#asserting_numeric),  [asserting_present](#asserting_present),  [asserting_string](#asserting_string),  [is_absent](#is_absent),  [is_array](#is_array),  [is_bool](#is_bool),  [is_boolean](#is_boolean),  [is_empty](#is_empty),  [is_empty_map](#is_empty_map),  [is_error](#is_error),  [is_float](#is_float),  [is_int](#is_int),  [is_map](#is_map),  [is_nonempty_map](#is_nonempty_map),  [is_not_array](#is_not_array),  [is_not_empty](#is_not_empty),  [is_not_map](#is_not_map),  [is_not_null](#is_not_null),  [is_null](#is_null),  [is_numeric](#is_numeric),  [is_present](#is_present),  [is_string](#is_string),  [typeof](#typeof).
+* [**Typing functions**](#typing-functions):  [asserting_absent](#asserting_absent),  [asserting_array](#asserting_array),  [asserting_bool](#asserting_bool),  [asserting_boolean](#asserting_boolean),  [asserting_empty](#asserting_empty),  [asserting_empty_map](#asserting_empty_map),  [asserting_error](#asserting_error),  [asserting_float](#asserting_float),  [asserting_int](#asserting_int),  [asserting_map](#asserting_map),  [asserting_nonempty_map](#asserting_nonempty_map),  [asserting_not_array](#asserting_not_array),  [asserting_not_empty](#asserting_not_empty),  [asserting_not_map](#asserting_not_map),  [asserting_not_null](#asserting_not_null),  [asserting_null](#asserting_null),  [asserting_numeric](#asserting_numeric),  [asserting_present](#asserting_present),  [asserting_string](#asserting_string),  [is_absent](#is_absent),  [is_array](#is_array),  [is_bool](#is_bool),  [is_boolean](#is_boolean),  [is_empty](#is_empty),  [is_empty_map](#is_empty_map),  [is_error](#is_error),  [is_float](#is_float),  [is_int](#is_int),  [is_map](#is_map),  [is_nan](#is_nan),  [is_nonempty_map](#is_nonempty_map),  [is_not_array](#is_not_array),  [is_not_empty](#is_not_empty),  [is_not_map](#is_not_map),  [is_not_null](#is_not_null),  [is_null](#is_null),  [is_numeric](#is_numeric),  [is_present](#is_present),  [is_string](#is_string),  [typeof](#typeof).
 
 ## Arithmetic functions
 
@@ -118,126 +118,144 @@ pow  (class=arithmetic #args=2) Exponentiation. Same as **, but as a function.
 </pre>
 
 
-<a id=percent />
+<a id=percent> </a>
+
 ### %
 <pre class="pre-non-highlight-non-pair">
 %  (class=arithmetic #args=2) Remainder; never negative-valued (pythonic).
 </pre>
 
 
-<a id=bitwise-and />
+<a id=bitwise-and> </a>
+
 ### &
 <pre class="pre-non-highlight-non-pair">
 &  (class=arithmetic #args=2) Bitwise AND.
 </pre>
 
 
-<a id=times />
+<a id=times> </a>
+
 ### \*
 <pre class="pre-non-highlight-non-pair">
 *  (class=arithmetic #args=2) Multiplication, with integer*integer overflow to float.
 </pre>
 
 
-<a id=exponentiation />
+<a id=exponentiation> </a>
+
 ### \**
 <pre class="pre-non-highlight-non-pair">
 **  (class=arithmetic #args=2) Exponentiation. Same as pow, but as an infix operator.
 </pre>
 
 
-<a id=plus />
+<a id=plus> </a>
+
 ### \+
 <pre class="pre-non-highlight-non-pair">
 +  (class=arithmetic #args=1,2) Addition as binary operator; unary plus operator.
 </pre>
 
 
-<a id=minus />
+<a id=minus> </a>
+
 ### \-
 <pre class="pre-non-highlight-non-pair">
 -  (class=arithmetic #args=1,2) Subtraction as binary operator; unary negation operator.
 </pre>
 
 
-<a id=dot-times />
+<a id=dot-times> </a>
+
 ### \.\*
 <pre class="pre-non-highlight-non-pair">
 .*  (class=arithmetic #args=2) Multiplication, with integer-to-integer overflow.
 </pre>
 
 
-<a id=dot-plus />
+<a id=dot-plus> </a>
+
 ### \.\+
 <pre class="pre-non-highlight-non-pair">
 .+  (class=arithmetic #args=2) Addition, with integer-to-integer overflow.
 </pre>
 
 
-<a id=dot-minus />
+<a id=dot-minus> </a>
+
 ### \.\-
 <pre class="pre-non-highlight-non-pair">
 .-  (class=arithmetic #args=2) Subtraction, with integer-to-integer overflow.
 </pre>
 
 
-<a id=dot-slash />
+<a id=dot-slash> </a>
+
 ### \./
 <pre class="pre-non-highlight-non-pair">
-./  (class=arithmetic #args=2) Integer division; not pythonic.
+./  (class=arithmetic #args=2) Integer division, rounding toward zero.
 </pre>
 
 
-<a id=slash />
+<a id=slash> </a>
+
 ### /
 <pre class="pre-non-highlight-non-pair">
-/  (class=arithmetic #args=2) Division. Integer / integer is floating-point.
+/  (class=arithmetic #args=2) Division. Integer / integer is integer when exact, else floating-point: e.g. 6/3 is 2 but 6/4 is 1.5.
 </pre>
 
 
-<a id=slash-slash />
+<a id=slash-slash> </a>
+
 ### //
 <pre class="pre-non-highlight-non-pair">
 //  (class=arithmetic #args=2) Pythonic integer division, rounding toward negative.
 </pre>
 
 
-<a id=lsh />
+<a id=lsh> </a>
+
 ### <<
 <pre class="pre-non-highlight-non-pair">
 <<  (class=arithmetic #args=2) Bitwise left-shift.
 </pre>
 
 
-<a id=srsh />
+<a id=srsh> </a>
+
 ### >>
 <pre class="pre-non-highlight-non-pair">
 >>  (class=arithmetic #args=2) Bitwise signed right-shift.
 </pre>
 
 
-<a id=ursh />
+<a id=ursh> </a>
+
 ### >>>
 <pre class="pre-non-highlight-non-pair">
 >>>  (class=arithmetic #args=2) Bitwise unsigned right-shift.
 </pre>
 
 
-<a id=bitwise-xor />
+<a id=bitwise-xor> </a>
+
 ### ^
 <pre class="pre-non-highlight-non-pair">
 ^  (class=arithmetic #args=2) Bitwise XOR.
 </pre>
 
 
-<a id=bitwise-or />
+<a id=bitwise-or> </a>
+
 ### \|
 <pre class="pre-non-highlight-non-pair">
 |  (class=arithmetic #args=2) Bitwise OR.
 </pre>
 
 
-<a id=bitwise-not />
+<a id=bitwise-not> </a>
+
 ### ~
 <pre class="pre-non-highlight-non-pair">
 ~  (class=arithmetic #args=1) Bitwise NOT. Beware '$y=~$x' since =~ is the regex-match operator: try '$y = ~$x'.
@@ -246,42 +264,48 @@ pow  (class=arithmetic #args=2) Exponentiation. Same as **, but as a function.
 ## Boolean functions
 
 
-<a id=exclamation-point />
+<a id=exclamation-point> </a>
+
 ### \!
 <pre class="pre-non-highlight-non-pair">
 !  (class=boolean #args=1) Logical negation.
 </pre>
 
 
-<a id=exclamation-point-equals />
+<a id=exclamation-point-equals> </a>
+
 ### \!=
 <pre class="pre-non-highlight-non-pair">
 !=  (class=boolean #args=2) String/numeric inequality. Mixing number and string results in string compare.
 </pre>
 
 
-<a id=regnotmatch />
+<a id=regnotmatch> </a>
+
 ### !=~
 <pre class="pre-non-highlight-non-pair">
 !=~  (class=boolean #args=2) String (left-hand side) does not match regex (right-hand side), e.g. '$name !=~ "^a.*b$"'.
 </pre>
 
 
-<a id=logical-and />
+<a id=logical-and> </a>
+
 ### &&
 <pre class="pre-non-highlight-non-pair">
 &&  (class=boolean #args=2) Logical AND.
 </pre>
 
 
-<a id=less-than />
+<a id=less-than> </a>
+
 ### <
 <pre class="pre-non-highlight-non-pair">
 <  (class=boolean #args=2) String/numeric less-than. Mixing number and string results in string compare.
 </pre>
 
 
-<a id=less-than-or-equals />
+<a id=less-than-or-equals> </a>
+
 ### <=
 <pre class="pre-non-highlight-non-pair">
 <=  (class=boolean #args=2) String/numeric less-than-or-equals. Mixing number and string results in string compare.
@@ -294,63 +318,75 @@ pow  (class=arithmetic #args=2) Exponentiation. Same as **, but as a function.
 </pre>
 
 
-<a id=double-equals />
+<a id=double-equals> </a>
+
 ### ==
 <pre class="pre-non-highlight-non-pair">
 ==  (class=boolean #args=2) String/numeric equality. Mixing number and string results in string compare.
 </pre>
 
 
-<a id=regmatch />
+<a id=regmatch> </a>
+
 ### =~
 <pre class="pre-non-highlight-non-pair">
-=~  (class=boolean #args=2) String (left-hand side) matches regex (right-hand side), e.g. '$name =~ "^a.*b$"'.
+=~  (class=boolean #args=2) String (left-hand side) matches regex (right-hand side), e.g. '$name =~ "^a.*b$"'. Capture groups \1 through \9 are matched from (...) in the right-hand side, and can be used within subsequent DSL statements. See also "Regular expressions" at https://miller.readthedocs.io.
+Examples:
+With if-statement: if ($url =~ "http.*com") { ... }
+Without if-statement: given $line = "index ab09 file", and $line =~ "([a-z][a-z])([0-9][0-9])", then $label = "[\1:\2]", $label is "[ab:09]"
 </pre>
 
 
-<a id=greater-than />
+<a id=greater-than> </a>
+
 ### >
 <pre class="pre-non-highlight-non-pair">
 >  (class=boolean #args=2) String/numeric greater-than. Mixing number and string results in string compare.
 </pre>
 
 
-<a id=greater-than-or-equals />
+<a id=greater-than-or-equals> </a>
+
 ### >=
 <pre class="pre-non-highlight-non-pair">
 >=  (class=boolean #args=2) String/numeric greater-than-or-equals. Mixing number and string results in string compare.
 </pre>
 
 
-<a id=question-mark-colon />
+<a id=question-mark-colon> </a>
+
 ### ?:
 <pre class="pre-non-highlight-non-pair">
 ?:  (class=boolean #args=3) Standard ternary operator.
 </pre>
 
 
-<a id=absent-coalesce />
+<a id=absent-coalesce> </a>
+
 ### ??
 <pre class="pre-non-highlight-non-pair">
 ??  (class=boolean #args=2) Absent-coalesce operator. $a ?? 1 evaluates to 1 if $a isn't defined in the current record.
 </pre>
 
 
-<a id=absent-empty-coalesce />
+<a id=absent-empty-coalesce> </a>
+
 ### ???
 <pre class="pre-non-highlight-non-pair">
-???  (class=boolean #args=2) Absent-coalesce operator. $a ?? 1 evaluates to 1 if $a isn't defined in the current record, or has empty value.
+???  (class=boolean #args=2) Absent/empty-coalesce operator. $a ??? 1 evaluates to 1 if $a isn't defined in the current record, or has empty value.
 </pre>
 
 
-<a id=logical-xor />
+<a id=logical-xor> </a>
+
 ### ^^
 <pre class="pre-non-highlight-non-pair">
 ^^  (class=boolean #args=2) Logical XOR.
 </pre>
 
 
-<a id=logical-or />
+<a id=logical-or> </a>
+
 ### \|\|
 <pre class="pre-non-highlight-non-pair">
 ||  (class=boolean #args=2) Logical OR.
@@ -371,6 +407,16 @@ arrayify  (class=collections #args=1) Walks through a nested map/array, converti
 </pre>
 
 
+### concat
+<pre class="pre-non-highlight-non-pair">
+concat  (class=collections #args=variadic) Returns the array concatenation of the arguments. Non-array arguments are treated as single-element arrays.
+Examples:
+concat(1,2,3) is [1,2,3]
+concat([1,2],3) is [1,2,3]
+concat([1,2],[3]) is [1,2,3]
+</pre>
+
+
 ### depth
 <pre class="pre-non-highlight-non-pair">
 depth  (class=collections #args=1) Prints maximum depth of map/array. Scalars have depth 0.
@@ -379,11 +425,11 @@ depth  (class=collections #args=1) Prints maximum depth of map/array. Scalars ha
 
 ### flatten
 <pre class="pre-non-highlight-non-pair">
-flatten  (class=collections #args=2,3) Flattens multi-level maps to single-level ones. Useful for nested JSON-like structures for non-JSON file formats like CSV.
+flatten  (class=collections #args=2,3) Flattens multi-level maps to single-level ones. Useful for nested JSON-like structures for non-JSON file formats like CSV. With two arguments, the first argument is a map (maybe $*) and the second argument is the flatten separator. With three arguments, the first argument is prefix, the second is the flatten separator, and the third argument is a map; flatten($*, ".") is the same as flatten("", ".", $*). See "Flatten/unflatten: converting between JSON and tabular formats" at https://miller.readthedocs.io for more information.
 Examples:
+flatten({"a":[1,2],"b":3}, ".") is {"a.1": 1, "a.2": 2, "b": 3}.
 flatten("a", ".", {"b": { "c": 4 }}) is {"a.b.c" : 4}.
 flatten("", ".", {"a": { "b": 3 }}) is {"a.b" : 3}.
-Two-argument version: flatten($*, ".") is the same as flatten("", ".", $*).
 </pre>
 
 
@@ -395,7 +441,7 @@ get_keys  (class=collections #args=1) Returns array of keys of map or array
 
 ### get_values
 <pre class="pre-non-highlight-non-pair">
-get_values  (class=collections #args=1) Returns array of keys of map or array -- in the latter case, returns a copy of the array
+get_values  (class=collections #args=1) Returns array of values of map or array -- in the latter case, returns a copy of the array
 </pre>
 
 
@@ -455,7 +501,7 @@ mapsum  (class=collections #args=variadic) With 0 args, returns empty map. With 
 
 ### unflatten
 <pre class="pre-non-highlight-non-pair">
-unflatten  (class=collections #args=2) Reverses flatten. Useful for nested JSON-like structures for non-JSON file formats like CSV. See also arrayify.
+unflatten  (class=collections #args=2) Reverses flatten. Useful for nested JSON-like structures for non-JSON file formats like CSV. The first argument is a map, and the second argument is the flatten separator. See also arrayify. See "Flatten/unflatten: converting between JSON and tabular formats" at https://miller.readthedocs.io for more information.
 Example:
 unflatten({"a.b.c" : 4}, ".") is {"a": "b": { "c": 4 }}.
 </pre>
@@ -475,9 +521,21 @@ float  (class=conversion #args=1) Convert int/float/bool/string to float.
 </pre>
 
 
+### fmtifnum
+<pre class="pre-non-highlight-non-pair">
+fmtifnum  (class=conversion #args=2) Identical to fmtnum, except returns the first argument as-is if the output would be an error.
+Examples:
+fmtifnum(3.4, "%.6f") gives 3.400000"
+fmtifnum("abc", "%.6f") gives abc"
+$* = fmtifnum($*, "%.6f") formats numeric fields in the current record, leaving non-numeric ones alone
+</pre>
+
+
 ### fmtnum
 <pre class="pre-non-highlight-non-pair">
-fmtnum  (class=conversion #args=2) Convert int/float/bool to string using printf-style format string, e.g. '$s = fmtnum($n, "%08d")' or '$t = fmtnum($n, "%.6e")'.
+fmtnum  (class=conversion #args=2) Convert int/float/bool to string using printf-style format string (https://pkg.go.dev/fmt), e.g. '$s = fmtnum($n, "%08d")' or '$t = fmtnum($n, "%.6e")'. This function recurses on array and map values.
+Example:
+$x = fmtnum($x, "%.6f")
 </pre>
 
 
@@ -495,7 +553,7 @@ int  (class=conversion #args=1) Convert int/float/bool/string to int.
 
 ### joink
 <pre class="pre-non-highlight-non-pair">
-joink  (class=conversion #args=2) Makes string from map/array keys.
+joink  (class=conversion #args=2) Makes string from map/array keys. First argument is map/array; second is separator string.
 Examples:
 joink({"a":3,"b":4,"c":5}, ",") = "a,b,c".
 joink([1,2,3], ",") = "1,2,3".
@@ -504,16 +562,16 @@ joink([1,2,3], ",") = "1,2,3".
 
 ### joinkv
 <pre class="pre-non-highlight-non-pair">
-joinkv  (class=conversion #args=3) Makes string from map/array key-value pairs.
+joinkv  (class=conversion #args=3) Makes string from map/array key-value pairs. First argument is map/array; second is pair-separator string; third is field-separator string. Mnemonic: the "=" comes before the "," in the output and in the arguments to joinkv.
 Examples:
 joinkv([3,4,5], "=", ",") = "1=3,2=4,3=5"
-joinkv({"a":3,"b":4,"c":5}, "=", ",") = "a=3,b=4,c=5"
+joinkv({"a":3,"b":4,"c":5}, ":", ";") = "a:3;b:4;c:5"
 </pre>
 
 
 ### joinv
 <pre class="pre-non-highlight-non-pair">
-joinv  (class=conversion #args=2) Makes string from map/array values.
+joinv  (class=conversion #args=2) Makes string from map/array values. First argument is map/array; second is separator string.
 Examples:
 joinv([3,4,5], ",") = "3,4,5"
 joinv({"a":3,"b":4,"c":5}, ",") = "3,4,5"
@@ -522,7 +580,7 @@ joinv({"a":3,"b":4,"c":5}, ",") = "3,4,5"
 
 ### splita
 <pre class="pre-non-highlight-non-pair">
-splita  (class=conversion #args=2) Splits string into array with type inference.
+splita  (class=conversion #args=2) Splits string into array with type inference. First argument is string to split; second is the separator to split on.
 Example:
 splita("3,4,5", ",") = [3,4,5]
 </pre>
@@ -530,15 +588,15 @@ splita("3,4,5", ",") = [3,4,5]
 
 ### splitax
 <pre class="pre-non-highlight-non-pair">
-splitax  (class=conversion #args=2) Splits string into array without type inference.
+splitax  (class=conversion #args=2) Splits string into array without type inference. First argument is string to split; second is the separator to split on.
 Example:
-splita("3,4,5", ",") = ["3","4","5"]
+splitax("3,4,5", ",") = ["3","4","5"]
 </pre>
 
 
 ### splitkv
 <pre class="pre-non-highlight-non-pair">
-splitkv  (class=conversion #args=3) Splits string by separators into map with type inference.
+splitkv  (class=conversion #args=3) Splits string by separators into map with type inference. First argument is string to split; second argument is pair separator; third argument is field separator.
 Example:
 splitkv("a=3,b=4,c=5", "=", ",") = {"a":3,"b":4,"c":5}
 </pre>
@@ -546,7 +604,7 @@ splitkv("a=3,b=4,c=5", "=", ",") = {"a":3,"b":4,"c":5}
 
 ### splitkvx
 <pre class="pre-non-highlight-non-pair">
-splitkvx  (class=conversion #args=3) Splits string by separators into map without type inference (keys and values are strings).
+splitkvx  (class=conversion #args=3) Splits string by separators into map without type inference (keys and values are strings). First argument is string to split; second argument is pair separator; third argument is field separator.
 Example:
 splitkvx("a=3,b=4,c=5", "=", ",") = {"a":"3","b":"4","c":"5"}
 </pre>
@@ -554,7 +612,7 @@ splitkvx("a=3,b=4,c=5", "=", ",") = {"a":"3","b":"4","c":"5"}
 
 ### splitnv
 <pre class="pre-non-highlight-non-pair">
-splitnv  (class=conversion #args=2) Splits string by separator into integer-indexed map with type inference.
+splitnv  (class=conversion #args=2) Splits string by separator into integer-indexed map with type inference. First argument is string to split; second argument is separator to split on.
 Example:
 splitnv("a,b,c", ",") = {"1":"a","2":"b","3":"c"}
 </pre>
@@ -562,7 +620,7 @@ splitnv("a,b,c", ",") = {"1":"a","2":"b","3":"c"}
 
 ### splitnvx
 <pre class="pre-non-highlight-non-pair">
-splitnvx  (class=conversion #args=2) Splits string by separator into integer-indexed map without type inference (values are strings).
+splitnvx  (class=conversion #args=2) Splits string by separator into integer-indexed map without type inference (values are strings). First argument is string to split; second argument is separator to split on.
 Example:
 splitnvx("3,4,5", ",") = {"1":"3","2":"4","3":"5"}
 </pre>
@@ -658,10 +716,17 @@ Map example: select({"a":1, "b":3, "c":5}, func(k,v) {return v >= 3}) returns {"
 
 ### sort
 <pre class="pre-non-highlight-non-pair">
-sort  (class=higher-order-functions #args=1-2) Given a map or array as first argument and string flags or function as optional second argument, returns a sorted copy of the input. With one argument, sorts array elements naturally, and maps naturally by map keys. If the second argument is a string, it can contain any of "f" for lexical (default "n" for natural/numeric), "), "c" for case-folded lexical, and "r" for reversed/descending sort. If the second argument is a function, then for arrays it should take two arguments a and b, returning < 0, 0, or > 0 as a < b, a == b, or a > b respectively; for maps the function should take four arguments ak, av, bk, and bv, again returning < 0, 0, or > 0, using a and b's keys and values.
+sort  (class=higher-order-functions #args=1-2) Given a map or array as first argument and string flags or function as optional second argument, returns a sorted copy of the input. With one argument, sorts array elements with numbers first numerically and then strings lexically, and map elements likewise by map keys. If the second argument is a string, it can contain any of "f" for lexical ("n" is for the above default), "c" for case-folded lexical, or "t" for natural sort order. An additional "r" in that string is for reverse. If the second argument is a function, then for arrays it should take two arguments a and b, returning < 0, 0, or > 0 as a < b, a == b, or a > b respectively; for maps the function should take four arguments ak, av, bk, and bv, again returning < 0, 0, or > 0, using a and b's keys and values.
 Examples:
-Array example: sort([5,2,3,1,4], func(a,b) {return b <=> a}) returns [5,4,3,2,1].
-Map example: sort({"c":2,"a":3,"b":1}, func(ak,av,bk,bv) {return bv <=> av}) returns {"a":3,"c":2,"b":1}.
+Default sorting: sort([3,"A",1,"B",22]) returns [1, 3, 20, "A", "B"].
+  Note that this is numbers before strings.
+Default sorting: sort(["E","a","c","B","d"]) returns ["B", "E", "a", "c", "d"].
+  Note that this is uppercase before lowercase.
+Case-folded ascending: sort(["E","a","c","B","d"], "c") returns ["a", "B", "c", "d", "E"].
+Case-folded descending: sort(["E","a","c","B","d"], "cr") returns ["E", "d", "c", "B", "a"].
+Natural sorting: sort(["a1","a10","a100","a2","a20","a200"], "t") returns ["a1", "a2", "a10", "a20", "a100", "a200"].
+Array with function: sort([5,2,3,1,4], func(a,b) {return b <=> a}) returns [5,4,3,2,1].
+Map with function: sort({"c":2,"a":3,"b":1}, func(ak,av,bk,bv) {return bv <=> av}) returns {"a":3,"c":2,"b":1}.
 </pre>
 
 ## Math functions
@@ -917,9 +982,25 @@ collapse_whitespace  (class=string #args=1) Strip repeated whitespace from strin
 </pre>
 
 
+### format
+<pre class="pre-non-highlight-non-pair">
+format  (class=string #args=variadic) Using first argument as format string, interpolate remaining arguments in place of each "{}" in the format string. Too-few arguments are treated as the empty string; too-many arguments are discarded.
+Examples:
+format("{}:{}:{}", 1,2)     gives "1:2:".
+format("{}:{}:{}", 1,2,3)   gives "1:2:3".
+format("{}:{}:{}", 1,2,3,4) gives "1:2:3".
+</pre>
+
+
 ### gsub
 <pre class="pre-non-highlight-non-pair">
-gsub  (class=string #args=3) '$name=gsub($name, "old", "new")' (replace all).
+gsub  (class=string #args=3) '$name = gsub($name, "old", "new")': replace all, with support for regular expressions. Capture groups \1 through \9 in the new part are matched from (...) in the old part, and must be used within the same call to gsub -- they don't persist for subsequent DSL statements. See also =~ and regextract. See also "Regular expressions" at https://miller.readthedocs.io.
+Examples:
+gsub("ababab", "ab", "XY") gives "XYXYXY"
+gsub("abc.def", ".", "X") gives "XXXXXXX"
+gsub("abc.def", "\.", "X") gives "abcXdef"
+gsub("abcdefg", "[ce]", "X") gives "abXdXfg"
+gsub("prefix4529:suffix8567", "(....ix)([0-9]+)", "[\1 : \2]") gives "[prefix : 4529]:[suffix : 8567]"
 </pre>
 
 
@@ -931,13 +1012,19 @@ lstrip  (class=string #args=1) Strip leading whitespace from string.
 
 ### regextract
 <pre class="pre-non-highlight-non-pair">
-regextract  (class=string #args=2) '$name=regextract($name, "[A-Z]{3}[0-9]{2}")'
+regextract  (class=string #args=2) Extracts a substring (the first, if there are multiple matches), matching a regular expression, from the input. Does not use capture groups; see also the =~ operator which does.
+Examples:
+regextract("index ab09 file", "[a-z][a-z][0-9][0-9]") gives "ab09"
+regextract("index a999 file", "[a-z][a-z][0-9][0-9]") gives (absent), which will result in an assignment not happening.
 </pre>
 
 
 ### regextract_or_else
 <pre class="pre-non-highlight-non-pair">
-regextract_or_else  (class=string #args=3) '$name=regextract_or_else($name, "[A-Z]{3}[0-9]{2}", "default")'
+regextract_or_else  (class=string #args=3) Like regextract but the third argument is the return value in case the input string (first argument) doesn't match the pattern (second argument).
+Examples:
+regextract_or_else("index ab09 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "ab09"
+regextract_or_else("index a999 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "nonesuch"
 </pre>
 
 
@@ -950,6 +1037,8 @@ rstrip  (class=string #args=1) Strip trailing whitespace from string.
 ### ssub
 <pre class="pre-non-highlight-non-pair">
 ssub  (class=string #args=3) Like sub but does no regexing. No characters are special.
+Example:
+ssub("abc.def", ".", "X") gives "abcXdef"
 </pre>
 
 
@@ -967,7 +1056,13 @@ strlen  (class=string #args=1) String length.
 
 ### sub
 <pre class="pre-non-highlight-non-pair">
-sub  (class=string #args=3) '$name=sub($name, "old", "new")' (replace once).
+sub  (class=string #args=3) '$name = sub($name, "old", "new")': replace once (first match, if there are multiple matches), with support for regular expressions. Capture groups \1 through \9 in the new part are matched from (...) in the old part, and must be used within the same call to sub -- they don't persist for subsequent DSL statements. See also =~ and regextract. See also "Regular expressions" at https://miller.readthedocs.io.
+Examples:
+sub("ababab", "ab", "XY") gives "XYabab"
+sub("abc.def", ".", "X") gives "Xbc.def"
+sub("abc.def", "\.", "X") gives "abcXdef"
+sub("abcdefg", "[ce]", "X") gives "abXdefg"
+sub("prefix4529:suffix8567", "suffix([0-9]+)", "name\1") gives "prefix4529:name8567"
 </pre>
 
 
@@ -1007,10 +1102,31 @@ truncate  (class=string #args=2) Truncates string first argument to max length o
 </pre>
 
 
-<a id=dot />
+### unformat
+<pre class="pre-non-highlight-non-pair">
+unformat  (class=string #args=2) Using first argument as format string, unpacks second argument into an array of matches, with type-inference. On non-match, returns error -- use is_error() to check.
+Examples:
+unformat("{}:{}:{}",  "1:2:3") gives [1, 2, 3].
+unformat("{}h{}m{}s", "3h47m22s") gives [3, 47, 22].
+is_error(unformat("{}h{}m{}s", "3:47:22")) gives true.
+</pre>
+
+
+### unformatx
+<pre class="pre-non-highlight-non-pair">
+unformatx  (class=string #args=2) Same as unformat, but without type-inference.
+Examples:
+unformatx("{}:{}:{}",  "1:2:3") gives ["1", "2", "3"].
+unformatx("{}h{}m{}s", "3h47m22s") gives ["3", "47", "22"].
+is_error(unformatx("{}h{}m{}s", "3:47:22")) gives true.
+</pre>
+
+
+<a id=dot> </a>
+
 ### \.
 <pre class="pre-non-highlight-non-pair">
-.  (class=string #args=2) String concatenation.
+.  (class=string #args=2) String concatenation. Non-strings are coerced, so you can do '"ax".98' etc.
 </pre>
 
 ## System functions
@@ -1165,7 +1281,7 @@ sec2localtime(1234567890.123456, 6, "Asia/Istanbul") = "2009-02-14 01:31:30.1234
 
 ### strftime
 <pre class="pre-non-highlight-non-pair">
-strftime  (class=time #args=2) Formats seconds since the epoch as timestamp. Format strings are as in the C library (please see "man strftime" on your system), with the Miller-specific addition of "%1S" through "%9S" which format the seconds with 1 through 9 decimal places, respectively. ("%S" uses no decimal places.) See also strftime_local.
+strftime  (class=time #args=2) Formats seconds since the epoch as timestamp. Format strings are as at https://pkg.go.dev/github.com/lestrrat-go/strftime, with the Miller-specific addition of "%1S" through "%9S" which format the seconds with 1 through 9 decimal places, respectively. ("%S" uses no decimal places.) See also https://miller.readthedocs.io/en/latest/reference-dsl-time/ for more information on the differences from the C library ("man strftime" on your system). See also strftime_local.
 Examples:
 strftime(1440768801.7,"%Y-%m-%dT%H:%M:%SZ")  = "2015-08-28T13:33:21Z"
 strftime(1440768801.7,"%Y-%m-%dT%H:%M:%3SZ") = "2015-08-28T13:33:21.700Z"
@@ -1195,7 +1311,7 @@ strptime("1970-01-01 00:00:00 EET",   "%Y-%m-%d %H:%M:%S %Z") = -7200
 
 ### strptime_local
 <pre class="pre-non-highlight-non-pair">
-strptime_local  (class=time #args=2,3) Like stpftime but consults the $TZ environment variable to get local time zone.
+strptime_local  (class=time #args=2,3) Like strftime but consults the $TZ environment variable to get local time zone.
 Examples:
 strptime_local("2015-08-28T13:33:21Z",    "%Y-%m-%dT%H:%M:%SZ") = 1440758001     with TZ="Asia/Istanbul"
 strptime_local("2015-08-28T13:33:21.345Z","%Y-%m-%dT%H:%M:%SZ") = 1440758001.345 with TZ="Asia/Istanbul"
@@ -1206,19 +1322,19 @@ strptime_local("2015-08-28 13:33:21",     "%Y-%m-%d %H:%M:%S", "Asia/Istanbul") 
 
 ### systime
 <pre class="pre-non-highlight-non-pair">
-systime  (class=time #args=0) help string will go here
+systime  (class=time #args=0) Returns the system time in floating-point seconds since the epoch.
 </pre>
 
 
 ### systimeint
 <pre class="pre-non-highlight-non-pair">
-systimeint  (class=time #args=0) help string will go here
+systimeint  (class=time #args=0) Returns the system time in integer seconds since the epoch.
 </pre>
 
 
 ### uptime
 <pre class="pre-non-highlight-non-pair">
-uptime  (class=time #args=0) help string will go here
+uptime  (class=time #args=0) Returns the time in floating-point seconds since the current Miller program was started.
 </pre>
 
 ## Typing functions
@@ -1398,6 +1514,12 @@ is_map  (class=typing #args=1) True if argument is a map.
 </pre>
 
 
+### is_nan
+<pre class="pre-non-highlight-non-pair">
+is_nan  (class=typing #args=1) True if the argument is the NaN (not-a-number) floating-point value. Note that NaN has the property that NaN != NaN, so you need 'is_nan(x)' rather than 'x == NaN'.
+</pre>
+
+
 ### is_nonempty_map
 <pre class="pre-non-highlight-non-pair">
 is_nonempty_map  (class=typing #args=1) True if argument is a map which is non-empty.
@@ -1412,7 +1534,7 @@ is_not_array  (class=typing #args=1) True if argument is not an array.
 
 ### is_not_empty
 <pre class="pre-non-highlight-non-pair">
-is_not_empty  (class=typing #args=1) False if field is present in input with empty value, true otherwise
+is_not_empty  (class=typing #args=1) True if field is present in input with non-empty value, false otherwise
 </pre>
 
 
@@ -1424,13 +1546,13 @@ is_not_map  (class=typing #args=1) True if argument is not a map.
 
 ### is_not_null
 <pre class="pre-non-highlight-non-pair">
-is_not_null  (class=typing #args=1) False if argument is null (empty or absent), true otherwise.
+is_not_null  (class=typing #args=1) False if argument is null (empty, absent, or JSON null), true otherwise.
 </pre>
 
 
 ### is_null
 <pre class="pre-non-highlight-non-pair">
-is_null  (class=typing #args=1) True if argument is null (empty or absent), false otherwise.
+is_null  (class=typing #args=1) True if argument is null (empty, absent, or JSON null), false otherwise.
 </pre>
 
 

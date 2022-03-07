@@ -300,7 +300,7 @@ num_total=5,num_positive=3
 
 ## Local variables
 
-Local variables are similar to out-of-stream variables, except that their extent is limited to the expressions in which they appear (and their basenames can't be computed using square brackets). There are three kinds of local variables: **arguments** to functions/subroutines, **variables bound within for-loops**, and **locals** defined within control blocks. They may be untyped using `var`, or typed using `num`, `int`, `float`, `str`, `bool`, and `map`.
+Local variables are similar to out-of-stream variables, except that their extent is limited to the expressions in which they appear (and their basenames can't be computed using square brackets). There are three kinds of local variables: **arguments** to functions/subroutines, **variables bound within for-loops**, and **locals** defined within control blocks. They may be untyped using `var`, or typed using `num`, `int`, `float`, `str`, `bool`, `arr`, `map`, and `funct`.
 
 For example:
 
@@ -351,7 +351,7 @@ Things which are completely unsurprising, resembling many other languages:
 
 Things which are perhaps surprising compared to other languages:
 
-* Type declarations using `var`, or typed using `num`, `int`, `float`, `str`, and `bool` are not necessary to declare local variables.  Function arguments and variables bound in for-loops over stream records and out-of-stream variables are *implicitly* declared using `var`. (Some examples are shown below.)
+* Type declarations using `var`, or typed using `num`, `int`, `float`, `str`, `bool`, `arr`, `map`, `funct` are not necessary to declare local variables.  Function arguments and variables bound in for-loops over stream records and out-of-stream variables are *implicitly* declared using `var`. (Some examples are shown below.)
 
 * Type-checking is done at assignment time. For example, `float f = 0` is an error (since `0` is an integer), as is `float f = 0.0; f = 1`. For this reason I prefer to use `num` over `float` in most contexts since `num` encompasses integer and floating-point values. More information is at [Type-checking](reference-dsl-variables.md#type-checking).
 
@@ -656,6 +656,7 @@ is_error
 is_float
 is_int
 is_map
+is_nan
 is_nonempty_map
 is_not_array
 is_not_empty
@@ -696,7 +697,7 @@ See [Data-cleaning Examples](data-cleaning-examples.md) for examples of how to u
 
 ### Type-declarations for local variables, function parameter, and function return values
 
-Local variables can be defined either untyped as in `x = 1`, or typed as in `int x = 1`. Types include **var** (explicitly untyped), **int**, **float**, **num** (int or float), **str**, **bool**, and **map**. These optional type declarations are enforced at the time values are assigned to variables: whether at the initial value assignment as in `int x = 1` or in any subsequent assignments to the same variable farther down in the scope.
+Local variables can be defined either untyped as in `x = 1`, or typed as in `int x = 1`. Types include **var** (explicitly untyped), **int**, **float**, **num** (int or float), **str**, **bool**, **arr**, **map**, and **funct**. These optional type declarations are enforced at the time values are assigned to variables: whether at the initial value assignment as in `int x = 1` or in any subsequent assignments to the same variable farther down in the scope.
 
 The reason for `num` is that `int` and `float` typedecls are very precise:
 
@@ -763,6 +764,41 @@ func f(map m, int i): bool {
   # So it would also be a runtime error on reaching the end of this function without
   # an explicit return statement.
 }
+</pre>
+
+The `funct` keyword, for _function type_, indicates that a variable, argument, or return value is a function -- either a [function literal](reference-dsl-user-defined-functions.md#function-literals) or a (named) [user-defined function](reference-dsl-user-defined-functions.md).
+
+<pre class="pre-non-highlight-non-pair">
+$ cat funct-example.mlr
+func makefunc(): funct {
+  return func(x,y) {
+    return 10*x + y
+  }
+}
+
+func callfunc(funct f, num x, num y): num {
+  return f(x, y)
+}
+</pre>
+
+<pre class="pre-non-highlight-non-pair">
+$ rlwrap mlr repl
+Miller 6.0.0-dev REPL for darwin/amd64/go1.17
+Docs: https://miller.readthedocs.io
+Type ':h' or ':help' for online help; ':q' or ':quit' to quit.
+
+[mlr] :load funct-example.mlr
+
+[mlr] f = makefunc()
+
+[mlr] f
+function-literal-000001
+
+[mlr] f(2,3)
+23
+
+[mlr] callfunc(f, 3, 5)
+35
 </pre>
 
 ## Aggregate variable assignments
@@ -935,8 +971,8 @@ in curly braces.
 dump: prints all currently defined out-of-stream variables immediately
 to stdout as JSON.
 
-With >, >>, or |, the data do not become part of the output record stream but
-are instead redirected.
+With >, >>, or |, the data do not go directly to stdout but are instead
+redirected.
 
 The > and >> are for write and append, as in the shell, but (as with awk) the
 file-overwrite for > is on first write, not per record. The | is for piping to
@@ -1231,4 +1267,3 @@ ORS: evaluates to the output record separator from the command line,
 or to LF or CRLF from the input data if in autodetect mode (which is
 the default).
 </pre>
-

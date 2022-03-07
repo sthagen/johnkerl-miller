@@ -501,3 +501,18 @@ func (root *RootNode) ShowBlockReport() {
 	fmt.Printf("#main  %d\n", len(root.mainBlock.executables))
 	fmt.Printf("#end   %d\n", len(root.endBlocks))
 }
+
+// This is for the REPL's resetblocks command.
+func (root *RootNode) ResetBeginBlocksForREPL() {
+	root.beginBlocks = make([]*StatementBlockNode, 0)
+}
+
+// This is for the REPL's resetblocks command.
+func (root *RootNode) ResetMainBlockForREPL() {
+	root.mainBlock.executables = make([]IExecutable, 0)
+}
+
+// This is for the REPL's resetblocks command.
+func (root *RootNode) ResetEndBlocksForREPL() {
+	root.endBlocks = make([]*StatementBlockNode, 0)
+}

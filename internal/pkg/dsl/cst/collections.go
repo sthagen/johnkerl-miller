@@ -44,9 +44,9 @@ func (node *RootNode) BuildArrayLiteralNode(
 func (node *ArrayLiteralNode) Evaluate(
 	state *runtime.State,
 ) *mlrval.Mlrval {
-	mlrvals := make([]mlrval.Mlrval, len(node.evaluables))
+	mlrvals := make([]*mlrval.Mlrval, len(node.evaluables))
 	for i := range node.evaluables {
-		mlrvals[i] = *node.evaluables[i].Evaluate(state)
+		mlrvals[i] = node.evaluables[i].Evaluate(state)
 	}
 	return mlrval.FromArray(mlrvals)
 }
@@ -102,7 +102,7 @@ func (node *CollectionIndexAccessNode) Evaluate(
 		// Handle UTF-8 correctly: len(input1.printrep) will count bytes, not runes.
 		runes := []rune(baseMlrval.String())
 		// Miller uses 1-up, and negatively aliased, indexing for strings and arrays.
-		zindex, inBounds := mlrval.UnaliasArrayLengthIndex(len(runes), mindex)
+		zindex, inBounds := mlrval.UnaliasArrayLengthIndex(len(runes), int(mindex))
 		if !inBounds {
 			return mlrval.ERROR
 		}
@@ -173,73 +173,25 @@ func (node *ArraySliceAccessNode) Evaluate(
 	}
 	n := len(array)
 
-	if lowerIndexMlrval.IsAbsent() {
-		return mlrval.ABSENT
-	}
-	if upperIndexMlrval.IsAbsent() {
-		return mlrval.ABSENT
-	}
+	sliceIsEmpty, absentOrError, lowerZindex, upperZindex :=
+		bifs.MillerSliceAccess(lowerIndexMlrval, upperIndexMlrval, n, false)
 
-	lowerIndex, ok := lowerIndexMlrval.GetIntValue()
-	if !ok {
-		if lowerIndexMlrval.IsVoid() {
-			lowerIndex = 1
-		} else {
-			return mlrval.ERROR
-		}
+	if sliceIsEmpty {
+		return mlrval.FromEmptyArray()
 	}
-	upperIndex, ok := upperIndexMlrval.GetIntValue()
-	if !ok {
-		if upperIndexMlrval.IsVoid() {
-			upperIndex = n
-		} else {
-			return mlrval.ERROR
-		}
-	}
-
-	// UnaliasArrayIndex returns a boolean second return value to indicate
-	// whether the index is in range. But here, for the slicing operation, we
-	// inspect the in-range-ness ourselves so we discard that 2nd return value.
-	lowerZindex, _ := mlrval.UnaliasArrayIndex(&array, lowerIndex)
-	upperZindex, _ := mlrval.UnaliasArrayIndex(&array, upperIndex)
-
-	if lowerZindex > upperZindex {
-		return mlrval.FromArray(make([]mlrval.Mlrval, 0))
-	}
-
-	// Semantics: say x=[1,2,3,4,5]. Then x[3:10] is [3,4,5].
-	//
-	// Cases:
-	//      [* * * * *]              actual data
-	//  [o o]                        1. attempted indexing: lo, hi both out of bounds
-	//  [o o o o o o ]               2. attempted indexing: hi in bounds, lo out
-	//  [o o o o o o o o o o o o]    3. attempted indexing: lo, hi both out of bounds
-	//        [o o o]                4. attempted indexing: lo, hi in bounds
-	//        [o o o o o o ]         5. attempted indexing: lo in bounds, hi out
-	//                  [o o o o]    6. attempted indexing: lo, hi both out of bounds
-
-	if lowerZindex < 0 {
-		lowerZindex = 0
-		if lowerZindex > upperZindex {
-			return mlrval.FromArray(make([]mlrval.Mlrval, 0))
-		}
-	}
-	if upperZindex > n-1 {
-		upperZindex = n - 1
-		if lowerZindex > upperZindex {
-			return mlrval.FromArray(make([]mlrval.Mlrval, 0))
-		}
+	if absentOrError != nil {
+		return absentOrError
 	}
 
 	// Go     slices have inclusive lower bound, exclusive upper bound.
 	// Miller slices have inclusive lower bound, inclusive upper bound.
 	var m = upperZindex - lowerZindex + 1
 
-	retval := make([]mlrval.Mlrval, m)
+	retval := make([]*mlrval.Mlrval, m)
 
 	di := 0
 	for si := lowerZindex; si <= upperZindex; si++ {
-		retval[di] = *array[si].Copy()
+		retval[di] = array[si].Copy()
 		di++
 	}
 
@@ -388,9 +340,9 @@ func (node *ArrayOrMapPositionalNameAccessNode) Evaluate(
 
 	if baseMlrval.IsArray() {
 		n, _ := baseMlrval.GetArrayLength()
-		zindex, ok := mlrval.UnaliasArrayLengthIndex(int(n), index)
+		zindex, ok := mlrval.UnaliasArrayLengthIndex(int(n), int(index))
 		if ok {
-			return mlrval.FromInt(zindex + 1) // Miller user-space indices are 1-up
+			return mlrval.FromInt(int64(zindex + 1)) // Miller user-space indices are 1-up
 		} else {
 			return mlrval.ABSENT
 		}

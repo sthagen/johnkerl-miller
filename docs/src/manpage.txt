@@ -29,7 +29,7 @@ DESCRIPTION
        insertion-ordered hash map.  This encompasses a variety of data
        formats, including but not limited to the familiar CSV, TSV, and JSON.
        (Miller can handle positionally-indexed data as a special case.) This
-       manpage documents mlr 6.0.0.
+       manpage documents mlr 6.1.0.
 
 EXAMPLES
        mlr --icsv --opprint cat example.csv
@@ -124,7 +124,7 @@ HELP OPTIONS
          mlr help list-separator-regex-aliases
          mlr help comments-in-data-flags
          mlr help compressed-data-flags
-         mlr help csv-only-flags
+         mlr help csv/tsv-only-flags
          mlr help file-format-flags
          mlr help flatten-unflatten-flags
          mlr help format-conversion-keystroke-saver-flags
@@ -174,8 +174,8 @@ VERB LIST
        json-stringify join label least-frequent merge-fields most-frequent nest
        nothing put regularize remove-empty-columns rename reorder repeat reshape
        sample sec2gmtdate sec2gmt seqgen shuffle skip-trivial-records sort
-       sort-within-records stats1 stats2 step tac tail tee template top unflatten
-       uniq unsparsify
+       sort-within-records split stats1 stats2 step tac tail tee template top
+       unflatten uniq unsparsify
 
 FUNCTION LIST
        abs acos acosh any append apply arrayify asin asinh asserting_absent
@@ -184,23 +184,23 @@ FUNCTION LIST
        asserting_map asserting_nonempty_map asserting_not_array asserting_not_empty
        asserting_not_map asserting_not_null asserting_null asserting_numeric
        asserting_present asserting_string atan atan2 atanh bitcount boolean
-       capitalize cbrt ceil clean_whitespace collapse_whitespace cos cosh depth
-       dhms2fsec dhms2sec erf erfc every exp expm1 flatten float floor fmtnum fold
-       fsec2dhms fsec2hms get_keys get_values gmt2localtime gmt2sec gsub haskey
-       hexfmt hms2fsec hms2sec hostname int invqnorm is_absent is_array is_bool
-       is_boolean is_empty is_empty_map is_error is_float is_int is_map
-       is_nonempty_map is_not_array is_not_empty is_not_map is_not_null is_null
-       is_numeric is_present is_string joink joinkv joinv json_parse json_stringify
-       leafcount length localtime2gmt localtime2sec log log10 log1p logifit lstrip
-       madd mapdiff mapexcept mapselect mapsum max md5 mexp min mmul msub os pow
-       qnorm reduce regextract regextract_or_else round roundm rstrip sec2dhms
-       sec2gmt sec2gmtdate sec2hms sec2localdate sec2localtime select sgn sha1 sha256
-       sha512 sin sinh sort splita splitax splitkv splitkvx splitnv splitnvx sqrt
-       ssub strftime strftime_local string strip strlen strptime strptime_local sub
-       substr substr0 substr1 system systime systimeint tan tanh tolower toupper
-       truncate typeof unflatten uptime urand urand32 urandelement urandint
-       urandrange version ! != !=~ % & && * ** + - . .* .+ .- ./ / // < << <= <=> ==
-       =~ > >= >> >>> ?: ?? ??? ^ ^^ | || ~
+       capitalize cbrt ceil clean_whitespace collapse_whitespace concat cos cosh
+       depth dhms2fsec dhms2sec erf erfc every exp expm1 flatten float floor fmtifnum
+       fmtnum fold format fsec2dhms fsec2hms get_keys get_values gmt2localtime
+       gmt2sec gsub haskey hexfmt hms2fsec hms2sec hostname int invqnorm is_absent
+       is_array is_bool is_boolean is_empty is_empty_map is_error is_float is_int
+       is_map is_nan is_nonempty_map is_not_array is_not_empty is_not_map is_not_null
+       is_null is_numeric is_present is_string joink joinkv joinv json_parse
+       json_stringify leafcount length localtime2gmt localtime2sec log log10 log1p
+       logifit lstrip madd mapdiff mapexcept mapselect mapsum max md5 mexp min mmul
+       msub os pow qnorm reduce regextract regextract_or_else round roundm rstrip
+       sec2dhms sec2gmt sec2gmtdate sec2hms sec2localdate sec2localtime select sgn
+       sha1 sha256 sha512 sin sinh sort splita splitax splitkv splitkvx splitnv
+       splitnvx sqrt ssub strftime strftime_local string strip strlen strptime
+       strptime_local sub substr substr0 substr1 system systime systimeint tan tanh
+       tolower toupper truncate typeof unflatten unformat unformatx uptime urand
+       urand32 urandelement urandint urandrange version ! != !=~ % & && * ** + - . .*
+       .+ .- ./ / // < << <= <=> == =~ > >= >> >>> ?: ?? ??? ^ ^^ | || ~
 
 COMMENTS-IN-DATA FLAGS
        Miller lets you put comments in your data, such as
@@ -284,28 +284,32 @@ COMPRESSED-DATA FLAGS
        --zin                    Uncompress zlib within the Miller process. Done by
                                 default if file ends in `.z`.
 
-CSV-ONLY FLAGS
+CSV/TSV-ONLY FLAGS
        These are flags which are applicable to CSV format.
 
-       --allow-ragged-csv-input or --ragged
+       --allow-ragged-csv-input or --ragged or --allow-ragged-tsv-input
                                 If a data line has fewer fields than the header line,
                                 fill remaining keys with empty string. If a data line
                                 has more fields than the header line, use integer
                                 field labels as in the implicit-header case.
-       --headerless-csv-output or --ho
-                                Print only CSV data lines; do not print CSV header
-                                lines.
-       --implicit-csv-header or --headerless-csv-input or --hi
+       --headerless-csv-output or --ho or --headerless-tsv-output
+                                Print only CSV/TSV data lines; do not print CSV/TSV
+                                header lines.
+       --implicit-csv-header or --headerless-csv-input or --hi or --implicit-tsv-header
                                 Use 1,2,3,... as field labels, rather than from line
                                 1 of input files. Tip: combine with `label` to
                                 recreate missing headers.
-       --no-implicit-csv-header Opposite of `--implicit-csv-header`. This is the
+       --lazy-quotes            Accepts quotes appearing in unquoted fields, and
+                                non-doubled quotes appearing in quoted fields.
+       --no-implicit-csv-header or --no-implicit-tsv-header
+                                Opposite of `--implicit-csv-header`. This is the
                                 default anyway -- the main use is for the flags to
                                 `mlr join` if you have main file(s) which are
                                 headerless but you want to join in on a file which
-                                does have a CSV header. Then you could use `mlr --csv
-                                --implicit-csv-header join --no-implicit-csv-header
-                                -l your-join-in-with-header.csv ...
+                                does have a CSV/TSV header. Then you could use `mlr
+                                --csv --implicit-csv-header join
+                                --no-implicit-csv-header -l
+                                your-join-in-with-header.csv ...
                                 your-headerless.csv`.
        -N                       Keystroke-saver for `--implicit-csv-header
                                 --headerless-csv-output`.
@@ -365,7 +369,7 @@ FILE-FORMAT FLAGS
        --oxtab                  Use XTAB format for output data.
        --pprint                 Use PPRINT format for input and output data.
        --tsv                    Use TSV format for input and output data.
-       --tsvlite or -t          Use TSV-lite format for input and output data.
+       --tsv or -t              Use TSV-lite format for input and output data.
        --usv or --usvlite       Use USV format for input and output data.
        --xtab                   Use XTAB format for input and output data.
        -i {format name}         Use format name for input data. For example: `-i csv`
@@ -523,9 +527,10 @@ MISCELLANEOUS FLAGS
        --nr-progress-mod {m}    With m a positive integer: print filename and record
                                 count to os.Stderr every m input records.
        --ofmt {format}          E.g. `%.18f`, `%.0f`, `%9.6e`. Please use
-                                sprintf-style codes for floating-point numbers. If
-                                not specified, default formatting is used. See also
-                                the `fmtnum` function and the `format-values` verb.
+                                sprintf-style codes (https://pkg.go.dev/fmt) for
+                                floating-point numbers. If not specified, default
+                                formatting is used. See also the `fmtnum` function
+                                and the `format-values` verb.
        --records-per-batch {n}  This is an internal parameter for maximum number of
                                 records in a batch size. Normally this does not need
                                 to be modified.
@@ -545,6 +550,9 @@ MISCELLANEOUS FLAGS
                                 only. (Same as `--from /dev/null`.) Also useful in
                                 `mlr -n put -v '...'` for analyzing abstract syntax
                                 trees (if that's your thing).
+       -s {file name}           Take command-line flags from file name. For more
+                                information please see
+                                https://miller.readthedocs.io/en/latest/scripting/.
 
 OUTPUT-COLORIZATION FLAGS
        Miller uses colors to highlight outputs. You can specify color preferences.
@@ -599,8 +607,11 @@ OUTPUT-COLORIZATION FLAGS
        If environment-variable settings and command-line flags are both provided, the
        latter take precedence.
 
-       Please do mlr `--list-color-codes` to see the available color codes (like 170),
-       and `mlr --list-color-names` to see available names (like `orchid`).
+       Colors can be specified using names such as "red" or "orchid": please see
+       `mlr --list-color-names` to see available names. They can also be specified using
+       numbers in the range 0..255, like 170: please see `mlr --list-color-codes`.
+       You can also use "bold", "underline", and/or "reverse". Additionally, combinations of
+       those can be joined with a "-", like "red-bold", "bold-170", "bold-underline", etc.
 
        --always-color or -C     Instructs Miller to colorize output even when it
                                 normally would not. Useful for piping output to `less
@@ -683,7 +694,6 @@ SEPARATOR FLAGS
          alignment impossible.
        * OPS may be multi-character for XTAB format, in which case alignment is
          disabled.
-       * TSV is simply CSV using tab as field separator (`--fs tab`).
        * FS/PS are ignored for markdown format; RS is used.
        * All FS and PS options are ignored for JSON format, since they are not relevant
          to the JSON format.
@@ -738,6 +748,7 @@ SEPARATOR FLAGS
                markdown " "    N/A    "\n"
                nidx     " "    N/A    "\n"
                pprint   " "    N/A    "\n"
+               tsv      "  "    N/A    "\n"
                xtab     "\n"   " "    "\n\n"
 
        --fs {string}            Specify FS for input and output.
@@ -1237,6 +1248,9 @@ VERBS
                       defaults to -j values if omitted.
          -r {a,b,c}   Comma-separated join-field names for right input file(s);
                       defaults to -j values if omitted.
+         --lk|--left-keep-field-names {a,b,c} If supplied, this means keep only the specified field
+                      names from the left file. Automatically includes the join-field name(s). Helpful
+                      for when you only want a limited subset of information from the left file.
          --lp {text}  Additional prefix for non-join output field names from
                       the left file
          --rp {text}  Additional prefix for non-join output field names from
@@ -1263,7 +1277,9 @@ VERBS
          --ips {pair-separator character}
          --repifs
          --implicit-csv-header
+         --implicit-tsv-header
          --no-implicit-csv-header
+         --no-implicit-tsv-header
        For example, if you have 'mlr --csv ... join -l foo ... ' then the left-file format will
        be specified CSV as well unless you override with 'mlr --csv ... join --ijson -l foo' etc.
        Likewise, if you have 'mlr --csv --implicit-csv-header ...' then the join-in file will be
@@ -1701,6 +1717,8 @@ VERBS
        -n  {comma-separated field names}  Numerical ascending; nulls sort last
        -nf {comma-separated field names}  Same as -n
        -nr {comma-separated field names}  Numerical descending; nulls sort first
+       -t  {comma-separated field names}  Natural ascending
+       -tr {comma-separated field names}  Natural descending
        -h|--help Show this message.
 
        Example:
@@ -1714,6 +1732,46 @@ VERBS
        Options:
        -r        Recursively sort subobjects/submaps, e.g. for JSON input.
        -h|--help Show this message.
+
+   split
+       Usage: mlr split [options] {filename}
+       Options:
+       -n {n}:      Cap file sizes at N records.
+       -m {m}:      Produce M files, round-robining records among them.
+       -g {a,b,c}:  Write separate files with records having distinct values for fields named a,b,c.
+       Exactly one  of -m, -n, or -g must be supplied.
+       --prefix {p} Specify filename prefix; default "split".
+       --suffix {s} Specify filename suffix; default is from mlr output format, e.g. "csv".
+       -a           Append to existing file(s), if any, rather than overwriting.
+       -v           Send records along to downstream verbs as well as splitting to files.
+       -h|--help    Show this message.
+       Any of the output-format command-line flags (see mlr -h). For example, using
+         mlr --icsv --from myfile.csv split --ojson -n 1000
+       the input is CSV, but the output files are JSON.
+
+       Examples: Suppose myfile.csv has 1,000,000 records.
+
+       100 output files, 10,000 records each. First 10,000 records in split_1.csv, next in split_2.csv, etc.
+         mlr --csv --from myfile.csv split -n 10000
+
+       10 output files, 100,000 records each. Records 1,11,21,etc in split_1.csv, records 2,12,22, etc in split_2.csv, etc.
+         mlr --csv --from myfile.csv split -m 10
+       Same, but with JSON output.
+         mlr --csv --from myfile.csv split -m 10 -o json
+
+       Same but instead of split_1.csv, split_2.csv, etc. there are test_1.dat, test_2.dat, etc.
+         mlr --csv --from myfile.csv split -m 10 --prefix test --suffix dat
+       Same, but written to the /tmp/ directory.
+         mlr --csv --from myfile.csv split -m 10 --prefix /tmp/test --suffix dat
+
+       If the shape field has values triangle and square, then there will be split_triangle.csv and split_square.csv.
+         mlr --csv --from myfile.csv split -g shape
+
+       If the color field has values yellow and green, and the shape field has values triangle and square,
+       then there will be split_yellow_triangle.csv, split_yellow_square.csv, etc.
+         mlr --csv --from myfile.csv split -g color,shape
+
+       See also the "tee" DSL function which lets you do more ad-hoc customization.
 
    stats1
        Usage: mlr stats1 [options]
@@ -1804,31 +1862,34 @@ VERBS
 
    step
        Usage: mlr step [options]
-       Computes values dependent on the previous record, optionally grouped by category.
+       Computes values dependent on earlier/later records, optionally grouped by category.
        Options:
-       -a {delta,rsum,...}   Names of steppers: comma-separated, one or more of:
-         delta    Compute differences in field(s) between successive records
-         shift    Include value(s) in field(s) from previous record, if any
+       -a {delta,rsum,...} Names of steppers: comma-separated, one or more of:
+         counter    Count instances of field(s) between successive records
+         delta      Compute differences in field(s) between successive records
+         ewma       Exponentially weighted moving average over successive records
          from-first Compute differences in field(s) from first record
-         ratio    Compute ratios in field(s) between successive records
-         rsum     Compute running sums of field(s) between successive records
-         counter  Count instances of field(s) between successive records
-         ewma     Exponentially weighted moving average over successive records
+         ratio      Compute ratios in field(s) between successive records
+         rsum       Compute running sums of field(s) between successive records
+         shift      Alias for shift_lag
+         shift_lag  Include value(s) in field(s) from the previous record, if any
+         shift_lead Include value(s) in field(s) from the next record, if any
+         slwin      Sliding-window averages over m records back and n forward. E.g. slwin_7_2 for 7 back and 2 forward.
 
-       -f {a,b,c} Value-field names on which to compute statistics
-       -g {d,e,f} Optional group-by-field names
-       -F         Computes integerable things (e.g. counter) in floating point.
-                  As of Miller 6 this happens automatically, but the flag is accepted
-                  as a no-op for backward compatibility with Miller 5 and below.
-       -d {x,y,z} Weights for ewma. 1 means current sample gets all weight (no
-                  smoothing), near under under 1 is light smoothing, near over 0 is
-                  heavy smoothing. Multiple weights may be specified, e.g.
-                  "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
-                  is "-d 0.5".
-       -o {a,b,c} Custom suffixes for EWMA output fields. If omitted, these default to
-                  the -d values. If supplied, the number of -o values must be the same
-                  as the number of -d values.
-       -h|--help Show this message.
+       -f {a,b,c}   Value-field names on which to compute statistics
+       -g {d,e,f}   Optional group-by-field names
+       -F           Computes integerable things (e.g. counter) in floating point.
+                    As of Miller 6 this happens automatically, but the flag is accepted
+                    as a no-op for backward compatibility with Miller 5 and below.
+       -d {x,y,z}   Weights for EWMA. 1 means current sample gets all weight (no
+                    smoothing), near under under 1 is light smoothing, near over 0 is
+                    heavy smoothing. Multiple weights may be specified, e.g.
+                    "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
+                    is "-d 0.5".
+       -o {a,b,c}   Custom suffixes for EWMA output fields. If omitted, these default to
+                    the -d values. If supplied, the number of -o values must be the same
+                    as the number of -d values.
+       -h|--help   Show this message.
 
        Examples:
          mlr step -a rsum -f request_size
@@ -1836,6 +1897,7 @@ VERBS
          mlr step -a ewma -d 0.1,0.9 -f x,y
          mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y
          mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y -g group_name
+         mlr step -a slwin_9_0,slwin_0_9 -f x
 
        Please see https://miller.readthedocs.io/en/latest/reference-verbs.html#filter or
        https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
@@ -1893,8 +1955,12 @@ VERBS
        --min         Print top smallest values; default is top largest values.
        -F            Keep top values as floats even if they look like integers.
        -o {name}     Field name for output indices. Default "top_idx".
+                     This is ignored if -a is used.
        Prints the n records with smallest/largest values at specified fields,
-       optionally by category.
+       optionally by category. If -a is given, then the top records are emitted
+       with the same fields as they appeared in the input. Without -a, only fields
+       from -f, fields from -g, and the top-index field are emitted. For more information
+       please see https://miller.readthedocs.io/en/latest/reference-verbs#top
 
    unflatten
        Usage: mlr unflatten [options]
@@ -2056,6 +2122,13 @@ FUNCTIONS FOR FILTER/PUT
    collapse_whitespace
         (class=string #args=1) Strip repeated whitespace from string.
 
+   concat
+        (class=collections #args=variadic) Returns the array concatenation of the arguments. Non-array arguments are treated as single-element arrays.
+       Examples:
+       concat(1,2,3) is [1,2,3]
+       concat([1,2],3) is [1,2,3]
+       concat([1,2],[3]) is [1,2,3]
+
    cos
         (class=math #args=1) Trigonometric cosine.
 
@@ -2090,11 +2163,11 @@ FUNCTIONS FOR FILTER/PUT
         (class=math #args=1) e**x - 1.
 
    flatten
-        (class=collections #args=2,3) Flattens multi-level maps to single-level ones. Useful for nested JSON-like structures for non-JSON file formats like CSV.
+        (class=collections #args=2,3) Flattens multi-level maps to single-level ones. Useful for nested JSON-like structures for non-JSON file formats like CSV. With two arguments, the first argument is a map (maybe $*) and the second argument is the flatten separator. With three arguments, the first argument is prefix, the second is the flatten separator, and the third argument is a map; flatten($*, ".") is the same as flatten("", ".", $*). See "Flatten/unflatten: converting between JSON and tabular formats" at https://miller.readthedocs.io for more information.
        Examples:
+       flatten({"a":[1,2],"b":3}, ".") is {"a.1": 1, "a.2": 2, "b": 3}.
        flatten("a", ".", {"b": { "c": 4 }}) is {"a.b.c" : 4}.
        flatten("", ".", {"a": { "b": 3 }}) is {"a.b" : 3}.
-       Two-argument version: flatten($*, ".") is the same as flatten("", ".", $*).
 
    float
         (class=conversion #args=1) Convert int/float/bool/string to float.
@@ -2102,14 +2175,30 @@ FUNCTIONS FOR FILTER/PUT
    floor
         (class=math #args=1) Floor: nearest integer at or below.
 
+   fmtifnum
+        (class=conversion #args=2) Identical to fmtnum, except returns the first argument as-is if the output would be an error.
+       Examples:
+       fmtifnum(3.4, "%.6f") gives 3.400000"
+       fmtifnum("abc", "%.6f") gives abc"
+       $* = fmtifnum($*, "%.6f") formats numeric fields in the current record, leaving non-numeric ones alone
+
    fmtnum
-        (class=conversion #args=2) Convert int/float/bool to string using printf-style format string, e.g. '$s = fmtnum($n, "%08d")' or '$t = fmtnum($n, "%.6e")'.
+        (class=conversion #args=2) Convert int/float/bool to string using printf-style format string (https://pkg.go.dev/fmt), e.g. '$s = fmtnum($n, "%08d")' or '$t = fmtnum($n, "%.6e")'. This function recurses on array and map values.
+       Example:
+       $x = fmtnum($x, "%.6f")
 
    fold
         (class=higher-order-functions #args=3) Given a map or array as first argument and a function as second argument, accumulates entries into a final output -- for example, sum or product. For arrays, the function should take two arguments, for accumulated value and array element. For maps, it should take four arguments, for accumulated key and value, and map-element key and value; it should return the updated accumulator as a new key-value pair (i.e. a single-entry map). The start value for the accumulator is taken from the third argument.
        Examples:
        Array example: fold([1,2,3,4,5], func(acc,e) {return acc + e**3}, 10000) returns 10225.
        Map example: fold({"a":1, "b":3, "c": 5}, func(acck,accv,ek,ev) {return {"sum": accv+ev**2}}, {"sum":10000}) returns 10035.
+
+   format
+        (class=string #args=variadic) Using first argument as format string, interpolate remaining arguments in place of each "{}" in the format string. Too-few arguments are treated as the empty string; too-many arguments are discarded.
+       Examples:
+       format("{}:{}:{}", 1,2)     gives "1:2:".
+       format("{}:{}:{}", 1,2,3)   gives "1:2:3".
+       format("{}:{}:{}", 1,2,3,4) gives "1:2:3".
 
    fsec2dhms
         (class=time #args=1) Formats floating-point seconds as in fsec2dhms(500000.25) = "5d18h53m20.250000s"
@@ -2121,7 +2210,7 @@ FUNCTIONS FOR FILTER/PUT
         (class=collections #args=1) Returns array of keys of map or array
 
    get_values
-        (class=collections #args=1) Returns array of keys of map or array -- in the latter case, returns a copy of the array
+        (class=collections #args=1) Returns array of values of map or array -- in the latter case, returns a copy of the array
 
    gmt2localtime
         (class=time #args=1,2) Convert from a GMT-time string to a local-time string. Consulting $TZ unless second argument is supplied.
@@ -2135,7 +2224,13 @@ FUNCTIONS FOR FILTER/PUT
        gmt2sec("2001-02-03T04:05:06Z") = 981173106
 
    gsub
-        (class=string #args=3) '$name=gsub($name, "old", "new")' (replace all).
+        (class=string #args=3) '$name = gsub($name, "old", "new")': replace all, with support for regular expressions. Capture groups \1 through \9 in the new part are matched from (...) in the old part, and must be used within the same call to gsub -- they don't persist for subsequent DSL statements. See also =~ and regextract. See also "Regular expressions" at https://miller.readthedocs.io.
+       Examples:
+       gsub("ababab", "ab", "XY") gives "XYXYXY"
+       gsub("abc.def", ".", "X") gives "XXXXXXX"
+       gsub("abc.def", "\.", "X") gives "abcXdef"
+       gsub("abcdefg", "[ce]", "X") gives "abXdXfg"
+       gsub("prefix4529:suffix8567", "(....ix)([0-9]+)", "[\1 : \2]") gives "[prefix : 4529]:[suffix : 8567]"
 
    haskey
         (class=collections #args=2) True/false if map has/hasn't key, e.g. 'haskey($*, "a")' or 'haskey(mymap, mykey)', or true/false if array index is in bounds / out of bounds. Error if 1st argument is not a map or array. Note -n..-1 alias to 1..n in Miller arrays.
@@ -2188,6 +2283,9 @@ FUNCTIONS FOR FILTER/PUT
    is_map
         (class=typing #args=1) True if argument is a map.
 
+   is_nan
+        (class=typing #args=1) True if the argument is the NaN (not-a-number) floating-point value. Note that NaN has the property that NaN != NaN, so you need 'is_nan(x)' rather than 'x == NaN'.
+
    is_nonempty_map
         (class=typing #args=1) True if argument is a map which is non-empty.
 
@@ -2195,16 +2293,16 @@ FUNCTIONS FOR FILTER/PUT
         (class=typing #args=1) True if argument is not an array.
 
    is_not_empty
-        (class=typing #args=1) False if field is present in input with empty value, true otherwise
+        (class=typing #args=1) True if field is present in input with non-empty value, false otherwise
 
    is_not_map
         (class=typing #args=1) True if argument is not a map.
 
    is_not_null
-        (class=typing #args=1) False if argument is null (empty or absent), true otherwise.
+        (class=typing #args=1) False if argument is null (empty, absent, or JSON null), true otherwise.
 
    is_null
-        (class=typing #args=1) True if argument is null (empty or absent), false otherwise.
+        (class=typing #args=1) True if argument is null (empty, absent, or JSON null), false otherwise.
 
    is_numeric
         (class=typing #args=1) True if field is present with value inferred to be int or float
@@ -2216,19 +2314,19 @@ FUNCTIONS FOR FILTER/PUT
         (class=typing #args=1) True if field is present with string (including empty-string) value
 
    joink
-        (class=conversion #args=2) Makes string from map/array keys.
+        (class=conversion #args=2) Makes string from map/array keys. First argument is map/array; second is separator string.
        Examples:
        joink({"a":3,"b":4,"c":5}, ",") = "a,b,c".
        joink([1,2,3], ",") = "1,2,3".
 
    joinkv
-        (class=conversion #args=3) Makes string from map/array key-value pairs.
+        (class=conversion #args=3) Makes string from map/array key-value pairs. First argument is map/array; second is pair-separator string; third is field-separator string. Mnemonic: the "=" comes before the "," in the output and in the arguments to joinkv.
        Examples:
        joinkv([3,4,5], "=", ",") = "1=3,2=4,3=5"
-       joinkv({"a":3,"b":4,"c":5}, "=", ",") = "a=3,b=4,c=5"
+       joinkv({"a":3,"b":4,"c":5}, ":", ";") = "a:3;b:4;c:5"
 
    joinv
-        (class=conversion #args=2) Makes string from map/array values.
+        (class=conversion #args=2) Makes string from map/array values. First argument is map/array; second is separator string.
        Examples:
        joinv([3,4,5], ",") = "3,4,5"
        joinv({"a":3,"b":4,"c":5}, ",") = "3,4,5"
@@ -2321,10 +2419,16 @@ FUNCTIONS FOR FILTER/PUT
        Map example: reduce({"a":1, "b":3, "c": 5}, func(acck,accv,ek,ev) {return {"sum_of_squares": accv + ev**2}}) returns {"sum_of_squares": 35}.
 
    regextract
-        (class=string #args=2) '$name=regextract($name, "[A-Z]{3}[0-9]{2}")'
+        (class=string #args=2) Extracts a substring (the first, if there are multiple matches), matching a regular expression, from the input. Does not use capture groups; see also the =~ operator which does.
+       Examples:
+       regextract("index ab09 file", "[a-z][a-z][0-9][0-9]") gives "ab09"
+       regextract("index a999 file", "[a-z][a-z][0-9][0-9]") gives (absent), which will result in an assignment not happening.
 
    regextract_or_else
-        (class=string #args=3) '$name=regextract_or_else($name, "[A-Z]{3}[0-9]{2}", "default")'
+        (class=string #args=3) Like regextract but the third argument is the return value in case the input string (first argument) doesn't match the pattern (second argument).
+       Examples:
+       regextract_or_else("index ab09 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "ab09"
+       regextract_or_else("index a999 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "nonesuch"
 
    round
         (class=math #args=1) Round to nearest integer.
@@ -2392,38 +2496,45 @@ FUNCTIONS FOR FILTER/PUT
         (class=math #args=1) Hyperbolic sine.
 
    sort
-        (class=higher-order-functions #args=1-2) Given a map or array as first argument and string flags or function as optional second argument, returns a sorted copy of the input. With one argument, sorts array elements naturally, and maps naturally by map keys. If the second argument is a string, it can contain any of "f" for lexical (default "n" for natural/numeric), "), "c" for case-folded lexical, and "r" for reversed/descending sort. If the second argument is a function, then for arrays it should take two arguments a and b, returning < 0, 0, or > 0 as a < b, a == b, or a > b respectively; for maps the function should take four arguments ak, av, bk, and bv, again returning < 0, 0, or > 0, using a and b's keys and values.
+        (class=higher-order-functions #args=1-2) Given a map or array as first argument and string flags or function as optional second argument, returns a sorted copy of the input. With one argument, sorts array elements with numbers first numerically and then strings lexically, and map elements likewise by map keys. If the second argument is a string, it can contain any of "f" for lexical ("n" is for the above default), "c" for case-folded lexical, or "t" for natural sort order. An additional "r" in that string is for reverse. If the second argument is a function, then for arrays it should take two arguments a and b, returning < 0, 0, or > 0 as a < b, a == b, or a > b respectively; for maps the function should take four arguments ak, av, bk, and bv, again returning < 0, 0, or > 0, using a and b's keys and values.
        Examples:
-       Array example: sort([5,2,3,1,4], func(a,b) {return b <=> a}) returns [5,4,3,2,1].
-       Map example: sort({"c":2,"a":3,"b":1}, func(ak,av,bk,bv) {return bv <=> av}) returns {"a":3,"c":2,"b":1}.
+       Default sorting: sort([3,"A",1,"B",22]) returns [1, 3, 20, "A", "B"].
+         Note that this is numbers before strings.
+       Default sorting: sort(["E","a","c","B","d"]) returns ["B", "E", "a", "c", "d"].
+         Note that this is uppercase before lowercase.
+       Case-folded ascending: sort(["E","a","c","B","d"], "c") returns ["a", "B", "c", "d", "E"].
+       Case-folded descending: sort(["E","a","c","B","d"], "cr") returns ["E", "d", "c", "B", "a"].
+       Natural sorting: sort(["a1","a10","a100","a2","a20","a200"], "t") returns ["a1", "a2", "a10", "a20", "a100", "a200"].
+       Array with function: sort([5,2,3,1,4], func(a,b) {return b <=> a}) returns [5,4,3,2,1].
+       Map with function: sort({"c":2,"a":3,"b":1}, func(ak,av,bk,bv) {return bv <=> av}) returns {"a":3,"c":2,"b":1}.
 
    splita
-        (class=conversion #args=2) Splits string into array with type inference.
+        (class=conversion #args=2) Splits string into array with type inference. First argument is string to split; second is the separator to split on.
        Example:
        splita("3,4,5", ",") = [3,4,5]
 
    splitax
-        (class=conversion #args=2) Splits string into array without type inference.
+        (class=conversion #args=2) Splits string into array without type inference. First argument is string to split; second is the separator to split on.
        Example:
-       splita("3,4,5", ",") = ["3","4","5"]
+       splitax("3,4,5", ",") = ["3","4","5"]
 
    splitkv
-        (class=conversion #args=3) Splits string by separators into map with type inference.
+        (class=conversion #args=3) Splits string by separators into map with type inference. First argument is string to split; second argument is pair separator; third argument is field separator.
        Example:
        splitkv("a=3,b=4,c=5", "=", ",") = {"a":3,"b":4,"c":5}
 
    splitkvx
-        (class=conversion #args=3) Splits string by separators into map without type inference (keys and values are strings).
+        (class=conversion #args=3) Splits string by separators into map without type inference (keys and values are strings). First argument is string to split; second argument is pair separator; third argument is field separator.
        Example:
        splitkvx("a=3,b=4,c=5", "=", ",") = {"a":"3","b":"4","c":"5"}
 
    splitnv
-        (class=conversion #args=2) Splits string by separator into integer-indexed map with type inference.
+        (class=conversion #args=2) Splits string by separator into integer-indexed map with type inference. First argument is string to split; second argument is separator to split on.
        Example:
        splitnv("a,b,c", ",") = {"1":"a","2":"b","3":"c"}
 
    splitnvx
-        (class=conversion #args=2) Splits string by separator into integer-indexed map without type inference (values are strings).
+        (class=conversion #args=2) Splits string by separator into integer-indexed map without type inference (values are strings). First argument is string to split; second argument is separator to split on.
        Example:
        splitnvx("3,4,5", ",") = {"1":"3","2":"4","3":"5"}
 
@@ -2432,9 +2543,11 @@ FUNCTIONS FOR FILTER/PUT
 
    ssub
         (class=string #args=3) Like sub but does no regexing. No characters are special.
+       Example:
+       ssub("abc.def", ".", "X") gives "abcXdef"
 
    strftime
-        (class=time #args=2) Formats seconds since the epoch as timestamp. Format strings are as in the C library (please see "man strftime" on your system), with the Miller-specific addition of "%1S" through "%9S" which format the seconds with 1 through 9 decimal places, respectively. ("%S" uses no decimal places.) See also strftime_local.
+        (class=time #args=2) Formats seconds since the epoch as timestamp. Format strings are as at https://pkg.go.dev/github.com/lestrrat-go/strftime, with the Miller-specific addition of "%1S" through "%9S" which format the seconds with 1 through 9 decimal places, respectively. ("%S" uses no decimal places.) See also https://miller.readthedocs.io/en/latest/reference-dsl-time/ for more information on the differences from the C library ("man strftime" on your system). See also strftime_local.
        Examples:
        strftime(1440768801.7,"%Y-%m-%dT%H:%M:%SZ")  = "2015-08-28T13:33:21Z"
        strftime(1440768801.7,"%Y-%m-%dT%H:%M:%3SZ") = "2015-08-28T13:33:21.700Z"
@@ -2464,7 +2577,7 @@ FUNCTIONS FOR FILTER/PUT
        strptime("1970-01-01 00:00:00 EET",   "%Y-%m-%d %H:%M:%S %Z") = -7200
 
    strptime_local
-        (class=time #args=2,3) Like stpftime but consults the $TZ environment variable to get local time zone.
+        (class=time #args=2,3) Like strftime but consults the $TZ environment variable to get local time zone.
        Examples:
        strptime_local("2015-08-28T13:33:21Z",    "%Y-%m-%dT%H:%M:%SZ") = 1440758001     with TZ="Asia/Istanbul"
        strptime_local("2015-08-28T13:33:21.345Z","%Y-%m-%dT%H:%M:%SZ") = 1440758001.345 with TZ="Asia/Istanbul"
@@ -2472,7 +2585,13 @@ FUNCTIONS FOR FILTER/PUT
        strptime_local("2015-08-28 13:33:21",     "%Y-%m-%d %H:%M:%S", "Asia/Istanbul") = 1440758001
 
    sub
-        (class=string #args=3) '$name=sub($name, "old", "new")' (replace once).
+        (class=string #args=3) '$name = sub($name, "old", "new")': replace once (first match, if there are multiple matches), with support for regular expressions. Capture groups \1 through \9 in the new part are matched from (...) in the old part, and must be used within the same call to sub -- they don't persist for subsequent DSL statements. See also =~ and regextract. See also "Regular expressions" at https://miller.readthedocs.io.
+       Examples:
+       sub("ababab", "ab", "XY") gives "XYabab"
+       sub("abc.def", ".", "X") gives "Xbc.def"
+       sub("abc.def", "\.", "X") gives "abcXdef"
+       sub("abcdefg", "[ce]", "X") gives "abXdefg"
+       sub("prefix4529:suffix8567", "suffix([0-9]+)", "name\1") gives "prefix4529:name8567"
 
    substr
         (class=string #args=3) substr is an alias for substr0. See also substr1. Miller is generally 1-up with all array and string indices, but, this is a backward-compatibility issue with Miller 5 and below. Arrays are new in Miller 6; the substr function is older.
@@ -2487,10 +2606,10 @@ FUNCTIONS FOR FILTER/PUT
         (class=system #args=1) Run command string, yielding its stdout minus final carriage return.
 
    systime
-        (class=time #args=0) help string will go here
+        (class=time #args=0) Returns the system time in floating-point seconds since the epoch.
 
    systimeint
-        (class=time #args=0) help string will go here
+        (class=time #args=0) Returns the system time in integer seconds since the epoch.
 
    tan
         (class=math #args=1) Trigonometric tangent.
@@ -2511,12 +2630,26 @@ FUNCTIONS FOR FILTER/PUT
         (class=typing #args=1) Convert argument to type of argument (e.g. "str"). For debug.
 
    unflatten
-        (class=collections #args=2) Reverses flatten. Useful for nested JSON-like structures for non-JSON file formats like CSV. See also arrayify.
+        (class=collections #args=2) Reverses flatten. Useful for nested JSON-like structures for non-JSON file formats like CSV. The first argument is a map, and the second argument is the flatten separator. See also arrayify. See "Flatten/unflatten: converting between JSON and tabular formats" at https://miller.readthedocs.io for more information.
        Example:
        unflatten({"a.b.c" : 4}, ".") is {"a": "b": { "c": 4 }}.
 
+   unformat
+        (class=string #args=2) Using first argument as format string, unpacks second argument into an array of matches, with type-inference. On non-match, returns error -- use is_error() to check.
+       Examples:
+       unformat("{}:{}:{}",  "1:2:3") gives [1, 2, 3].
+       unformat("{}h{}m{}s", "3h47m22s") gives [3, 47, 22].
+       is_error(unformat("{}h{}m{}s", "3:47:22")) gives true.
+
+   unformatx
+        (class=string #args=2) Same as unformat, but without type-inference.
+       Examples:
+       unformatx("{}:{}:{}",  "1:2:3") gives ["1", "2", "3"].
+       unformatx("{}h{}m{}s", "3h47m22s") gives ["3", "47", "22"].
+       is_error(unformatx("{}h{}m{}s", "3:47:22")) gives true.
+
    uptime
-        (class=time #args=0) help string will go here
+        (class=time #args=0) Returns the time in floating-point seconds since the current Miller program was started.
 
    urand
         (class=math #args=0) Floating-point numbers uniformly distributed on the unit interval.
@@ -2569,7 +2702,7 @@ FUNCTIONS FOR FILTER/PUT
         (class=arithmetic #args=1,2) Subtraction as binary operator; unary negation operator.
 
    .
-        (class=string #args=2) String concatenation.
+        (class=string #args=2) String concatenation. Non-strings are coerced, so you can do '"ax".98' etc.
 
    .*
         (class=arithmetic #args=2) Multiplication, with integer-to-integer overflow.
@@ -2581,10 +2714,10 @@ FUNCTIONS FOR FILTER/PUT
         (class=arithmetic #args=2) Subtraction, with integer-to-integer overflow.
 
    ./
-        (class=arithmetic #args=2) Integer division; not pythonic.
+        (class=arithmetic #args=2) Integer division, rounding toward zero.
 
    /
-        (class=arithmetic #args=2) Division. Integer / integer is floating-point.
+        (class=arithmetic #args=2) Division. Integer / integer is integer when exact, else floating-point: e.g. 6/3 is 2 but 6/4 is 1.5.
 
    //
         (class=arithmetic #args=2) Pythonic integer division, rounding toward negative.
@@ -2605,7 +2738,10 @@ FUNCTIONS FOR FILTER/PUT
         (class=boolean #args=2) String/numeric equality. Mixing number and string results in string compare.
 
    =~
-        (class=boolean #args=2) String (left-hand side) matches regex (right-hand side), e.g. '$name =~ "^a.*b$"'.
+        (class=boolean #args=2) String (left-hand side) matches regex (right-hand side), e.g. '$name =~ "^a.*b$"'. Capture groups \1 through \9 are matched from (...) in the right-hand side, and can be used within subsequent DSL statements. See also "Regular expressions" at https://miller.readthedocs.io.
+       Examples:
+       With if-statement: if ($url =~ "http.*com") { ... }
+       Without if-statement: given $line = "index ab09 file", and $line =~ "([a-z][a-z])([0-9][0-9])", then $label = "[\1:\2]", $label is "[ab:09]"
 
    >
         (class=boolean #args=2) String/numeric greater-than. Mixing number and string results in string compare.
@@ -2626,7 +2762,7 @@ FUNCTIONS FOR FILTER/PUT
         (class=boolean #args=2) Absent-coalesce operator. $a ?? 1 evaluates to 1 if $a isn't defined in the current record.
 
    ???
-        (class=boolean #args=2) Absent-coalesce operator. $a ?? 1 evaluates to 1 if $a isn't defined in the current record, or has empty value.
+        (class=boolean #args=2) Absent/empty-coalesce operator. $a ??? 1 evaluates to 1 if $a isn't defined in the current record, or has empty value.
 
    ^
         (class=arithmetic #args=2) Bitwise XOR.
@@ -2677,8 +2813,8 @@ KEYWORDS FOR PUT AND FILTER
        dump: prints all currently defined out-of-stream variables immediately
        to stdout as JSON.
 
-       With >, >>, or |, the data do not become part of the output record stream but
-       are instead redirected.
+       With >, >>, or |, the data do not go directly to stdout but are instead
+       redirected.
 
        The > and >> are for write and append, as in the shell, but (as with awk) the
        file-overwrite for > is on first write, not per record. The | is for piping to
@@ -3033,4 +3169,4 @@ SEE ALSO
 
 
 
-                                  2022-01-10                         MILLER(1)
+                                  2022-03-07                         MILLER(1)

@@ -278,14 +278,6 @@ func divide_n_ii(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
 	} else {
 		return mlrval.FromFloat(float64(a) / float64(b))
 	}
-
-	c := float64(a) * float64(b)
-
-	if math.Abs(c) > 9223372036854774784.0 {
-		return mlrval.FromFloat(c)
-	} else {
-		return mlrval.FromInt(a * b)
-	}
 }
 
 func divide_f_if(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
@@ -649,7 +641,7 @@ func BIF_modulus(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
 
 // ================================================================
 // Pythonic
-func mlrmod(a, m int) int {
+func mlrmod(a, m int64) int64 {
 	retval := a % m
 	if retval < 0 {
 		retval += m
@@ -657,18 +649,18 @@ func mlrmod(a, m int) int {
 	return retval
 }
 
-type i_iii_func func(a, b, m int) int
+type i_iii_func func(a, b, m int64) int64
 
-func imodadd(a, b, m int) int {
+func imodadd(a, b, m int64) int64 {
 	return mlrmod(a+b, m)
 }
-func imodsub(a, b, m int) int {
+func imodsub(a, b, m int64) int64 {
 	return mlrmod(a-b, m)
 }
-func imodmul(a, b, m int) int {
+func imodmul(a, b, m int64) int64 {
 	return mlrmod(a*b, m)
 }
-func imodexp(a, e, m int) int {
+func imodexp(a, e, m int64) int64 {
 	if e == 0 {
 		return 1
 	}
@@ -679,7 +671,7 @@ func imodexp(a, e, m int) int {
 	// Repeated-squaring algorithm.
 	// We assume our caller has verified the exponent is not negative.
 	apower := a
-	c := int(1)
+	c := int64(1)
 	u := uint64(e)
 
 	for u != 0 {
@@ -769,8 +761,8 @@ func min_f_if(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
 }
 
 func min_i_ii(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
-	var a int = input1.AcquireIntValue()
-	var b int = input2.AcquireIntValue()
+	var a int64 = input1.AcquireIntValue()
+	var b int64 = input2.AcquireIntValue()
 	if a < b {
 		return input1
 	} else {
@@ -853,8 +845,8 @@ func max_f_if(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
 }
 
 func max_i_ii(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
-	var a int = input1.AcquireIntValue()
-	var b int = input2.AcquireIntValue()
+	var a int64 = input1.AcquireIntValue()
+	var b int64 = input2.AcquireIntValue()
 	if a > b {
 		return input1
 	} else {

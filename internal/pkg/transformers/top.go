@@ -41,9 +41,13 @@ func transformerTopUsage(
 	fmt.Fprintf(o, "--min         Print top smallest values; default is top largest values.\n")
 	fmt.Fprintf(o, "-F            Keep top values as floats even if they look like integers.\n")
 	fmt.Fprintf(o, "-o {name}     Field name for output indices. Default \"%s\".\n", verbTopDefaultOutputFieldName)
+	fmt.Fprintf(o, "              This is ignored if -a is used.\n")
 
 	fmt.Fprintf(o, "Prints the n records with smallest/largest values at specified fields,\n")
-	fmt.Fprintf(o, "optionally by category.\n")
+	fmt.Fprintf(o, "optionally by category. If -a is given, then the top records are emitted\n")
+	fmt.Fprintf(o, "with the same fields as they appeared in the input. Without -a, only fields\n")
+	fmt.Fprintf(o, "from -f, fields from -g, and the top-index field are emitted. For more information\n")
+	fmt.Fprintf(o, "please see https://miller.readthedocs.io/en/latest/reference-verbs#top\n")
 
 	if doExit {
 		os.Exit(exitCode)
@@ -64,7 +68,7 @@ func transformerTopParseCLI(
 	argi++
 
 	// Parse local flags
-	topCount := 1
+	topCount := int64(1)
 	var valueFieldNames []string = nil
 	var groupByFieldNames []string = nil
 	showFullRecords := false
@@ -132,7 +136,7 @@ func transformerTopParseCLI(
 
 // ----------------------------------------------------------------
 type TransformerTop struct {
-	topCount          int
+	topCount          int64
 	valueFieldNames   []string
 	groupByFieldNames []string
 	showFullRecords   bool
@@ -147,7 +151,7 @@ type TransformerTop struct {
 
 // ----------------------------------------------------------------
 func NewTransformerTop(
-	topCount int,
+	topCount int64,
 	valueFieldNames []string,
 	groupByFieldNames []string,
 	showFullRecords bool,
@@ -249,14 +253,14 @@ func (tr *TransformerTop) emit(
 		if tr.showFullRecords {
 			for pb := secondLevel.Head; pb != nil; pb = pb.Next {
 				topKeeper := pb.Value.(*utils.TopKeeper)
-				for i := 0; i < topKeeper.GetSize(); i++ {
+				for i := int64(0); i < topKeeper.GetSize(); i++ {
 					outputRecordsAndContexts.PushBack(topKeeper.TopRecordsAndContexts[i].Copy())
 				}
 			}
 
 		} else {
 
-			for i := 0; i < tr.topCount; i++ {
+			for i := int64(0); i < tr.topCount; i++ {
 				newrec := mlrval.NewMlrmapAsRecord()
 
 				// Add in a=s,b=t fields:

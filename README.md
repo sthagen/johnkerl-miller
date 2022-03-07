@@ -68,36 +68,49 @@ There's a good chance you can get Miller pre-built for your system:
 |Mac|`brew install miller`<br/>`port install miller`|
 |Windows|`choco install miller`|
 
+See also [README-versions.md](./README-versions.md) for a full list of package versions. Note that long-term-support (LtS) releases will likely be on older versions.
+
 See also [building from source](https://miller.readthedocs.io/en/latest/build.html).
+
+# Community
+
+[![GitHub stars](https://img.shields.io/github/stars/johnkerl/miller.svg?label=GitHub%20stars)](https://github.com/johnkerl/miller/stargazers)
+[![Homebrew downloads](https://badges.weareopensource.me:/homebrew/installs/dy/miller?label=Homebrew%20downloads)](https://formulae.brew.sh/formula/miller)
+[![Conda downloads](https://anaconda.org/conda-forge/miller/badges/downloads.svg?label=Conda%20downloads)](https://anaconda.org/conda-forge/miller)
+<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
+[![All Contributors](https://img.shields.io/badge/all_contributors-41-orange.svg?style=flat-square)](#contributors-)
+<!-- ALL-CONTRIBUTORS-BADGE:END -->
+
+* Discussion forum: https://github.com/johnkerl/miller/discussions
+* Feature requests / bug reports: https://github.com/johnkerl/miller/issues
+* How to contribute: [https://miller.readthedocs.io/en/latest/contributing/](https://miller.readthedocs.io/en/latest/contributing/)
 
 # Build status
 
-[![Go-port multi-platform build status](https://github.com/johnkerl/miller/actions/workflows/go.yml/badge.svg)](https://github.com/johnkerl/miller/actions)
+[![Multi-platform build status](https://github.com/johnkerl/miller/actions/workflows/go.yml/badge.svg)](https://github.com/johnkerl/miller/actions/workflows/go.yml)
+[![CodeQL status](https://github.com/johnkerl/miller/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/johnkerl/miller/actions/workflows/codeql-analysis.yml)
+[![Codespell status](https://github.com/johnkerl/miller/actions/workflows/codespell.yml/badge.svg)](https://github.com/johnkerl/miller/actions/workflows/codespell.yml)
+<!--
+[![Release status](https://github.com/johnkerl/miller/actions/workflows/release.yml/badge.svg)](https://github.com/johnkerl/miller/actions/workflows/release.yml)
+-->
 
 # Building from source
 
-* `make`: takes just a few seconds and produces the Miller executable, which is `./mlr` (or `.\mlr.exe` on Windows).
-  * Without `make`: `go build github.com/johnkerl/miller/cmd/mlr`
-* `make check` runs tests.
-  * Without `make`: `go test github.com/johnkerl/miller/internal/pkg/...` and `mlr regtest`
-* `make install` installs executable `/usr/local/bin/mlr` and manual page `/usr/local/share/man/man1/mlr.1` (so you can do `man mlr`).
-  * You can instead do `./configure --prefix=/some/install/path` followed by `make install` if you want to install somewhere other than `/usr/local`.
-  * Without make: `go install github.com/johnkerl/miller/cmd/mlr` will install to _GOPATH_`/bin/mlr`
+* With `make`:
+  * To build: `make`. This takes just a few seconds and produces the Miller executable, which is `./mlr` (or `.\mlr.exe` on Windows).
+  * To run tests: `make check`.
+  * To install: `make install`. This installs the executable `/usr/local/bin/mlr` and manual page `/usr/local/share/man/man1/mlr.1` (so you can do `man mlr`).
+  * You can do `./configure --prefix=/some/install/path` before `make install` if you want to install somewhere other than `/usr/local`.
+* Without `make`:
+  * To build: `go build github.com/johnkerl/miller/cmd/mlr`.
+  * To run tests: `go test github.com/johnkerl/miller/internal/pkg/...` and `mlr regtest`.
+  * To install: `go install github.com/johnkerl/miller/cmd/mlr` will install to _GOPATH_`/bin/mlr`.
 * See also the doc page on [building from source](https://miller.readthedocs.io/en/latest/build).
 * For more developer information please see [README-go-port.md](./README-go-port.md).
 
 # License
 
 [License: BSD2](https://github.com/johnkerl/miller/blob/main/LICENSE.txt)
-
-# Community
-
-* Discussion forum: https://github.com/johnkerl/miller/discussions
-* Feature requests / bug reports: https://github.com/johnkerl/miller/issues
-
-<!-- ALL-CONTRIBUTORS-BADGE:START - Do not remove or modify this section -->
-[![All Contributors](https://img.shields.io/badge/all_contributors-40-orange.svg?style=flat-square)](#contributors-)
-<!-- ALL-CONTRIBUTORS-BADGE:END -->
 
 # Features
 
@@ -225,6 +238,8 @@ Thanks to all the fine people who help make Miller better ([emoji key](https://a
     <td align="center"><a href="https://github.com/ChCyrill"><img src="https://avatars.githubusercontent.com/u/2165604?v=4?s=50" width="50px;" alt=""/><br /><sub><b>ChCyrill</b></sub></a><br /><a href="#ideas-ChCyrill" title="Ideas, Planning, & Feedback">🤔</a></td>
     <td align="center"><a href="https://github.com/jauderho"><img src="https://avatars.githubusercontent.com/u/13562?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Jauder Ho</b></sub></a><br /><a href="https://github.com/johnkerl/miller/commits?author=jauderho" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/psacawa"><img src="https://avatars.githubusercontent.com/u/21274063?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Paweł Sacawa</b></sub></a><br /><a href="https://github.com/johnkerl/miller/issues?q=author%3Apsacawa" title="Bug reports">🐛</a></td>
+    <td align="center"><a href="https://github.com/schragge"><img src="https://avatars.githubusercontent.com/u/4294278?v=4?s=50" width="50px;" alt=""/><br /><sub><b>schragge</b></sub></a><br /><a href="https://github.com/johnkerl/miller/commits?author=schragge" title="Documentation">📖</a></td>
+    <td align="center"><a href="https://github.com/Poshi"><img src="https://avatars.githubusercontent.com/u/1780510?v=4?s=50" width="50px;" alt=""/><br /><sub><b>Jordi</b></sub></a><br /><a href="https://github.com/johnkerl/miller/commits?author=Poshi" title="Documentation">📖</a> <a href="#ideas-Poshi" title="Ideas, Planning, & Feedback">🤔</a></td>
   </tr>
 </table>
 

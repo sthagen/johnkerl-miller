@@ -109,17 +109,18 @@ decisions that might have been made based on the file suffix. Likewise,
 * `--prepipex {decompression command}`: Like `--prepipe` with one exception: doesn't insert `<` between command and filename at runtime. Useful for some commands like `unzip -qc` which don't read standard input.  Allowed at the command line, but not in `.mlrrc` to avoid unexpected code execution.
 * `--zin`: Uncompress zlib within the Miller process. Done by default if file ends in `.z`.
 
-## CSV-only flags
+## CSV/TSV-only flags
 
 These are flags which are applicable to CSV format.
 
 
 **Flags:**
 
-* `--allow-ragged-csv-input or --ragged`: If a data line has fewer fields than the header line, fill remaining keys with empty string. If a data line has more fields than the header line, use integer field labels as in the implicit-header case.
-* `--headerless-csv-output or --ho`: Print only CSV data lines; do not print CSV header lines.
-* `--implicit-csv-header or --headerless-csv-input or --hi`: Use 1,2,3,... as field labels, rather than from line 1 of input files. Tip: combine with `label` to recreate missing headers.
-* `--no-implicit-csv-header`: Opposite of `--implicit-csv-header`. This is the default anyway -- the main use is for the flags to `mlr join` if you have main file(s) which are headerless but you want to join in on a file which does have a CSV header. Then you could use `mlr --csv --implicit-csv-header join --no-implicit-csv-header -l your-join-in-with-header.csv ... your-headerless.csv`.
+* `--allow-ragged-csv-input or --ragged or --allow-ragged-tsv-input`: If a data line has fewer fields than the header line, fill remaining keys with empty string. If a data line has more fields than the header line, use integer field labels as in the implicit-header case.
+* `--headerless-csv-output or --ho or --headerless-tsv-output`: Print only CSV/TSV data lines; do not print CSV/TSV header lines.
+* `--implicit-csv-header or --headerless-csv-input or --hi or --implicit-tsv-header`: Use 1,2,3,... as field labels, rather than from line 1 of input files. Tip: combine with `label` to recreate missing headers.
+* `--lazy-quotes`: Accepts quotes appearing in unquoted fields, and non-doubled quotes appearing in quoted fields.
+* `--no-implicit-csv-header or --no-implicit-tsv-header`: Opposite of `--implicit-csv-header`. This is the default anyway -- the main use is for the flags to `mlr join` if you have main file(s) which are headerless but you want to join in on a file which does have a CSV/TSV header. Then you could use `mlr --csv --implicit-csv-header join --no-implicit-csv-header -l your-join-in-with-header.csv ... your-headerless.csv`.
 * `-N`: Keystroke-saver for `--implicit-csv-header --headerless-csv-output`.
 
 ## File-format flags
@@ -177,7 +178,7 @@ are overridden in all cases by setting output format to `format2`.
 * `--oxtab`: Use XTAB format for output data.
 * `--pprint`: Use PPRINT format for input and output data.
 * `--tsv`: Use TSV format for input and output data.
-* `--tsvlite or -t`: Use TSV-lite format for input and output data.
+* `--tsv`: Use TSV format for input and output data.
 * `--usv or --usvlite`: Use USV format for input and output data.
 * `--xtab`: Use XTAB format for input and output data.
 * `-i {format name}`: Use format name for input data. For example: `-i csv` is the same as `--icsv`.
@@ -266,12 +267,13 @@ These are flags which don't fit into any other category.
 * `--no-fflush`: Let buffered output not be written after every output record. The default is flush output after every record if the output is to the terminal, or less often if the output is to a file or a pipe. The default is a significant performance optimization for large files.  Use this flag to allow less-frequent updates when output is to the terminal. This is unlikely to be a noticeable performance improvement, since direct-to-screen output for large files has its own overhead.
 * `--no-hash-records`: See --hash-records.
 * `--nr-progress-mod {m}`: With m a positive integer: print filename and record count to os.Stderr every m input records.
-* `--ofmt {format}`: E.g. `%.18f`, `%.0f`, `%9.6e`. Please use sprintf-style codes for floating-point numbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.
+* `--ofmt {format}`: E.g. `%.18f`, `%.0f`, `%9.6e`. Please use sprintf-style codes (https://pkg.go.dev/fmt) for floating-point numbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.
 * `--records-per-batch {n}`: This is an internal parameter for maximum number of records in a batch size. Normally this does not need to be modified.
 * `--seed {n}`: with `n` of the form `12345678` or `0xcafefeed`. For `put`/`filter` `urand`, `urandint`, and `urand32`.
 * `--tz {timezone}`: Specify timezone, overriding `$TZ` environment variable (if any).
 * `-I`: Process files in-place. For each file name on the command line, output is written to a temp file in the same directory, which is then renamed over the original. Each file is processed in isolation: if the output format is CSV, CSV headers will be present in each output file, statistics are only over each file's own records; and so on.
 * `-n`: Process no input files, nor standard input either. Useful for `mlr put` with `begin`/`end` statements only. (Same as `--from /dev/null`.) Also useful in `mlr -n put -v '...'` for analyzing abstract syntax trees (if that's your thing).
+* `-s {file name}`: Take command-line flags from file name. For more information please see https://miller.readthedocs.io/en/latest/scripting/.
 
 ## Output-colorization flags
 
@@ -327,8 +329,11 @@ How you can control colorization:
 If environment-variable settings and command-line flags are both provided, the
 latter take precedence.
 
-Please do mlr `--list-color-codes` to see the available color codes (like 170),
-and `mlr --list-color-names` to see available names (like `orchid`).
+Colors can be specified using names such as "red" or "orchid": please see
+`mlr --list-color-names` to see available names. They can also be specified using
+numbers in the range 0..255, like 170: please see `mlr --list-color-codes`.
+You can also use "bold", "underline", and/or "reverse". Additionally, combinations of
+those can be joined with a "-", like "red-bold", "bold-170", "bold-underline", etc.
 
 
 **Flags:**
@@ -402,7 +407,6 @@ Notes about all other separators:
   alignment impossible.
 * OPS may be multi-character for XTAB format, in which case alignment is
   disabled.
-* TSV is simply CSV using tab as field separator (`--fs tab`).
 * FS/PS are ignored for markdown format; RS is used.
 * All FS and PS options are ignored for JSON format, since they are not relevant
   to the JSON format.
@@ -457,6 +461,7 @@ Notes about all other separators:
         markdown " "    N/A    "\n"
         nidx     " "    N/A    "\n"
         pprint   " "    N/A    "\n"
+        tsv      "	"    N/A    "\n"
         xtab     "\n"   " "    "\n\n"
 
 

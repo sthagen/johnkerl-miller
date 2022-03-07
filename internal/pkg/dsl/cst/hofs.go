@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/facette/natsort"
+
 	"github.com/johnkerl/miller/internal/pkg/lib"
 	"github.com/johnkerl/miller/internal/pkg/mlrval"
 	"github.com/johnkerl/miller/internal/pkg/runtime"
@@ -224,10 +226,10 @@ func selectArray(
 	udfCallsite := hofSpace.udfCallsite
 	argsArray := hofSpace.argsArray
 
-	outputArray := make([]mlrval.Mlrval, 0, len(inputArray))
+	outputArray := make([]*mlrval.Mlrval, 0, len(inputArray))
 
 	for i := range inputArray {
-		argsArray[0] = &inputArray[i]
+		argsArray[0] = inputArray[i]
 		mret := udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray)
 		bret, ok := mret.GetBoolValue()
 		if !ok {
@@ -239,7 +241,7 @@ func selectArray(
 			os.Exit(1)
 		}
 		if bret {
-			outputArray = append(outputArray, *inputArray[i].Copy())
+			outputArray = append(outputArray, inputArray[i].Copy())
 		}
 	}
 	return mlrval.FromArray(outputArray)
@@ -315,13 +317,14 @@ func applyArray(
 	udfCallsite := hofSpace.udfCallsite
 	argsArray := hofSpace.argsArray
 
-	outputArray := make([]mlrval.Mlrval, len(inputArray))
+	outputArray := make([]*mlrval.Mlrval, len(inputArray))
 
 	for i := range inputArray {
-		argsArray[0] = &inputArray[i]
-		retval := *(udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray))
-		isNonAbsentOrDie(&retval, "apply")
-		outputArray[i] = retval
+		argsArray[0] = inputArray[i]
+		outputArray[i] = isNonAbsentOrDie(
+			(udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray)),
+			"apply",
+		)
 	}
 	return mlrval.FromArray(outputArray)
 }
@@ -393,7 +396,7 @@ func reduceArray(
 
 	for i := 1; i < n; i++ {
 		argsArray[0] = accumulator
-		argsArray[1] = &inputArray[i]
+		argsArray[1] = inputArray[i]
 		accumulator = (udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray))
 		isNonAbsentOrDie(accumulator, "apply")
 	}
@@ -470,7 +473,7 @@ func foldArray(
 
 	for i := range inputArray {
 		argsArray[0] = accumulator
-		argsArray[1] = &inputArray[i]
+		argsArray[1] = inputArray[i]
 		accumulator = (udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray))
 		isNonAbsentOrDie(accumulator, "apply")
 	}
@@ -561,9 +564,10 @@ func SortHOF(
 type tSortType int
 
 const (
-	sortTypeLexical   tSortType = 1
-	sortTypeCaseFold            = 2
-	sortTypeNumerical           = 3
+	sortTypeLexical tSortType = iota
+	sortTypeCaseFold
+	sortTypeNumerical
+	sortTypeNatural
 )
 
 // decodeSortFlags maps strings like "cr" in the second argument to sort
@@ -579,6 +583,8 @@ func decodeSortFlags(flags string) (tSortType, bool) {
 			sortType = sortTypeLexical
 		case 'c':
 			sortType = sortTypeCaseFold
+		case 't':
+			sortType = sortTypeNatural
 		case 'r':
 			reverse = true
 		}
@@ -607,24 +613,26 @@ func sortA(
 		sortALexical(a, reverse)
 	case sortTypeCaseFold:
 		sortACaseFold(a, reverse)
+	case sortTypeNatural:
+		sortANatural(a, reverse)
 	}
 
 	return output
 }
 
-func sortANumerical(array []mlrval.Mlrval, reverse bool) {
+func sortANumerical(array []*mlrval.Mlrval, reverse bool) {
 	if !reverse {
 		sort.Slice(array, func(i, j int) bool {
-			return mlrval.LessThan(&array[i], &array[j])
+			return mlrval.LessThan(array[i], array[j])
 		})
 	} else {
 		sort.Slice(array, func(i, j int) bool {
-			return mlrval.GreaterThan(&array[i], &array[j])
+			return mlrval.GreaterThan(array[i], array[j])
 		})
 	}
 }
 
-func sortALexical(array []mlrval.Mlrval, reverse bool) {
+func sortALexical(array []*mlrval.Mlrval, reverse bool) {
 	if !reverse {
 		sort.Slice(array, func(i, j int) bool {
 			return array[i].String() < array[j].String()
@@ -636,7 +644,7 @@ func sortALexical(array []mlrval.Mlrval, reverse bool) {
 	}
 }
 
-func sortACaseFold(array []mlrval.Mlrval, reverse bool) {
+func sortACaseFold(array []*mlrval.Mlrval, reverse bool) {
 	if !reverse {
 		sort.Slice(array, func(i, j int) bool {
 			return strings.ToLower(array[i].String()) < strings.ToLower(array[j].String())
@@ -644,6 +652,18 @@ func sortACaseFold(array []mlrval.Mlrval, reverse bool) {
 	} else {
 		sort.Slice(array, func(i, j int) bool {
 			return strings.ToLower(array[i].String()) > strings.ToLower(array[j].String())
+		})
+	}
+}
+
+func sortANatural(array []*mlrval.Mlrval, reverse bool) {
+	if !reverse {
+		sort.Slice(array, func(i, j int) bool {
+			return natsort.Compare(array[i].String(), array[j].String())
+		})
+	} else {
+		sort.Slice(array, func(i, j int) bool {
+			return natsort.Compare(array[j].String(), array[i].String())
 		})
 	}
 }
@@ -679,11 +699,13 @@ func sortMK(
 		sortMKLexical(keys, reverse)
 	case sortTypeCaseFold:
 		sortMKCaseFold(keys, reverse)
+	case sortTypeNatural:
+		sortMKNatural(keys, reverse)
 	}
 
 	// Make a new map with keys in the new sort order.
 	outmap := mlrval.NewMlrmap()
-	for i := 0; i < n; i++ {
+	for i := int64(0); i < n; i++ {
 		key := keys[i]
 		outmap.PutCopy(key, inmap.Get(key))
 	}
@@ -740,6 +762,18 @@ func sortMKCaseFold(array []string, reverse bool) {
 	}
 }
 
+func sortMKNatural(array []string, reverse bool) {
+	if !reverse {
+		sort.Slice(array, func(i, j int) bool {
+			return natsort.Compare(strings.ToLower(array[i]), strings.ToLower(array[j]))
+		})
+	} else {
+		sort.Slice(array, func(i, j int) bool {
+			return natsort.Compare(strings.ToLower(array[j]), strings.ToLower(array[i]))
+		})
+	}
+}
+
 // sortAF implements sort on arrays with callback UDF.
 func sortAF(
 	input1 *mlrval.Mlrval,
@@ -761,8 +795,8 @@ func sortAF(
 	outputArray := mlrval.CopyMlrvalArray(inputArray)
 
 	sort.Slice(outputArray, func(i, j int) bool {
-		argsArray[0] = &outputArray[i]
-		argsArray[1] = &outputArray[j]
+		argsArray[0] = outputArray[i]
+		argsArray[1] = outputArray[j]
 		// Call the user's comparator function.
 		mret := udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray)
 		// Unpack the mlrval.Mlrval return value into a number.
@@ -865,7 +899,7 @@ func anyArray(
 
 	boolAny := false
 	for i := range inputArray {
-		argsArray[0] = &inputArray[i]
+		argsArray[0] = inputArray[i]
 		mret := udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray)
 		bret, ok := mret.GetBoolValue()
 		if !ok {
@@ -957,7 +991,7 @@ func everyArray(
 
 	boolEvery := true
 	for i := range inputArray {
-		argsArray[0] = &inputArray[i]
+		argsArray[0] = inputArray[i]
 		mret := udfCallsite.EvaluateWithArguments(state, udfCallsite.udf, argsArray)
 		bret, ok := mret.GetBoolValue()
 		if !ok {

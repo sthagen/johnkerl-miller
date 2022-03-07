@@ -24,10 +24,12 @@ Miller gives you three ways to sort your data:
 
 ## Sorting records: the sort verb
 
-The `sort` verb (see [its documentation](reference-verbs.md#sort) for more
-information) reorders entire records within the data stream. You can sort
-lexically (with or without case-folding) or numerically, ascending or
-descending; and you can sort primary by one column, then secondarily by
+The `sort` verb (see [its documentation](reference-verbs.md#sort) for more information) reorders
+entire records within the data stream. You can sort lexically (with or without case-folding),
+numerically, or naturally (see
+[https://en.wikipedia.org/wiki/Natural_sort_order](https://en.wikipedia.org/wiki/Natural_sort_order)
+or [https://github.com/facette/natsort](https://github.com/facette/natsort) for more about natural
+sorting); ascending or descending; and you can sort primarily by one column, then secondarily by
 another, etc.
 
 Input data:
@@ -87,6 +89,76 @@ yellow circle   true  9  87    63.5058  8.3350
 yellow triangle true  1  11    43.6498  9.8870
 </pre>
 
+Example of natural sort, adapted from [https://github.com/facette/natsort](https://github.com/facette/natsort):
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --c2p cat data/natsort.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+n  name
+1  Allegia 51 Clasteron
+2  Callisto Morphamax 6000 SE
+3  Xiph Xlater 58
+4  1000X Radonius Maximus
+5  20X Radonius Prime
+6  30X Radonius
+7  Alpha 2
+8  Allegia 50 Clasteron
+9  Alpha 2A-8000
+10 200X Radonius
+11 Allegia 50B Clasteron
+12 Xiph Xlater 5
+13 Callisto Morphamax 700
+14 Xiph Xlater 500
+15 Alpha 2A-900
+16 20X Radonius
+17 Callisto Morphamax 6000 SE2
+18 Allegia 500 Clasteron
+19 Alpha 100
+20 Alpha 2A
+21 Xiph Xlater 300
+22 Callisto Morphamax
+23 Callisto Morphamax 7000
+24 10X Radonius
+25 Xiph Xlater 40
+26 Allegia 6R Clasteron
+27 Callisto Morphamax 5000
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --c2p sort -t name data/natsort.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+n  name
+24 10X Radonius
+16 20X Radonius
+5  20X Radonius Prime
+6  30X Radonius
+10 200X Radonius
+4  1000X Radonius Maximus
+26 Allegia 6R Clasteron
+8  Allegia 50 Clasteron
+11 Allegia 50B Clasteron
+1  Allegia 51 Clasteron
+18 Allegia 500 Clasteron
+7  Alpha 2
+20 Alpha 2A
+15 Alpha 2A-900
+9  Alpha 2A-8000
+19 Alpha 100
+22 Callisto Morphamax
+13 Callisto Morphamax 700
+27 Callisto Morphamax 5000
+2  Callisto Morphamax 6000 SE
+17 Callisto Morphamax 6000 SE2
+23 Callisto Morphamax 7000
+12 Xiph Xlater 5
+25 Xiph Xlater 40
+3  Xiph Xlater 58
+21 Xiph Xlater 300
+14 Xiph Xlater 500
+</pre>
+
 ## Sorting fields within records: the sort-within-records verb
 
 The `sort-within-records` verb (see [its
@@ -143,13 +215,13 @@ a b c
 ## The sort function by example
 
 * It returns a sorted copy of an input array or map.
-* Without second argument, uses the natural ordering.
-* With second which is string, takes sorting flags from it: `"f"` for lexical or `"c"` for case-folded lexical, and/or `"r"` for reverse/descending.
+* Without second argument, uses Miller's default ordering which is numbers numerically, then strings lexically.
+* With second which is string, takes sorting flags from it: `"f"` for lexical or `"c"` for case-folded lexical, or `"t"` for natural sort order. An additional `"r"` in this string is for reverse/descending.
 
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort array with natural ordering</b>
+<b>    # Sort array with default ordering</b>
 <b>    print sort([5,2,3,1,4]);</b>
 <b>  }</b>
 <b>'</b>
@@ -161,7 +233,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort array with reverse-natural ordering</b>
+<b>    # Sort array with reverse-default ordering</b>
 <b>    print sort([5,2,3,1,4], "r");</b>
 <b>  }</b>
 <b>'</b>
@@ -173,7 +245,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort array with custom function: natural ordering</b>
+<b>    # Sort array with custom function: another way to get default ordering</b>
 <b>    print sort([5,2,3,1,4], func(a,b) { return a <=> b});</b>
 <b>  }</b>
 <b>'</b>
@@ -185,7 +257,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort array with custom function: reverse-natural ordering</b>
+<b>    # Sort array with custom function: another way to get reverse-default ordering</b>
 <b>    print sort([5,2,3,1,4], func(a,b) { return b <=> a});</b>
 <b>  }</b>
 <b>'</b>
@@ -197,7 +269,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort map with natural ordering on keys</b>
+<b>    # Sort map with default ordering on keys</b>
 <b>    print sort({"c":2, "a": 3, "b": 1});</b>
 <b>  }</b>
 <b>'</b>
@@ -213,7 +285,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort map with reverse-natural ordering on keys</b>
+<b>    # Sort map with reverse-default ordering on keys</b>
 <b>    print sort({"c":2, "a": 3, "b": 1}, "r");</b>
 <b>  }</b>
 <b>'</b>
@@ -229,7 +301,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort map with custom function: natural ordering on values</b>
+<b>    # Sort map with custom function: default ordering on values</b>
 <b>    print sort({"c":2, "a": 3, "b": 1}, func(ak,av,bk,bv){return av <=> bv});</b>
 <b>  }</b>
 <b>'</b>
@@ -245,7 +317,7 @@ a b c
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
 <b>  end {</b>
-<b>    # Sort map with custom function: reverse-natural ordering on values</b>
+<b>    # Sort map with custom function: reverse-default ordering on values</b>
 <b>    print sort({"c":2, "a": 3, "b": 1}, func(ak,av,bk,bv){return bv <=> av});</b>
 <b>  }</b>
 <b>'</b>
@@ -256,6 +328,18 @@ a b c
   "c": 2,
   "b": 1
 }
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr -n put '</b>
+<b>  end {</b>
+<b>    # Natural sort</b>
+<b>    print sort(["a1","a10","a100","a2","a20","a200"], "t");</b>
+<b>  }</b>
+<b>'</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+["a1", "a2", "a10", "a20", "a100", "a200"]
 </pre>
 
 In the rest of this page we'll look more closely at these variants.
@@ -496,7 +580,7 @@ alpha,5;2;8;6;1;4;9;10;3;7
 </pre>
 
 In the following example we sort data in several ways -- the first two just
-recaptiulate (for reference) what `sort` with default flags already does; the third is novel:
+recapitulate (for reference) what `sort` with default flags already does; the third is novel:
 
 <pre class="pre-highlight-in-pair">
 <b>mlr --icsv --ojson --from data/sortaf-example.csv put '</b>

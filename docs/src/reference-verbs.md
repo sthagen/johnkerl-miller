@@ -235,7 +235,7 @@ green  0.5129018241860459  1075
 
 ## cat
 
-Most useful for format conversions (see [File Formats](file-formats.md), and concatenating multiple same-schema CSV files to have the same header:
+Most useful for format conversions (see [File Formats](file-formats.md)) and concatenating multiple same-schema CSV files to have the same header:
 
 <pre class="pre-highlight-in-pair">
 <b>mlr cat -h</b>
@@ -1514,7 +1514,7 @@ Usage: mlr histogram [options]
 -h|--help Show this message.
 </pre>
 
-This is just a histogram; there's not too much to say here. A note about binning, by example: Suppose you use `--lo 0.0 --hi 1.0 --nbins 10 -f x`.  The input numbers less than 0 or greater than 1 aren't counted in any bin.  Input numbers equal to 1 are counted in the last bin. That is, bin 0 has `0.0 &le; x < 0.1`, bin 1 has `0.1 &le; x < 0.2`, etc., but bin 9 has `0.9 &le; x &le; 1.0`.
+This is just a histogram; there's not too much to say here. A note about binning, by example: Suppose you use `--lo 0.0 --hi 1.0 --nbins 10 -f x`.  The input numbers less than 0 or greater than 1 aren't counted in any bin.  Input numbers equal to 1 are counted in the last bin. That is, bin 0 has `0.0 < x < 0.1`, bin 1 has `0.1 < x < 0.2`, etc., but bin 9 has `0.9 < x < 1.0`.
 
 <pre class="pre-highlight-in-pair">
 <b>mlr --opprint put '$x2=$x**2;$x3=$x2*$x' \</b>
@@ -1572,6 +1572,9 @@ Options:
                defaults to -j values if omitted.
   -r {a,b,c}   Comma-separated join-field names for right input file(s);
                defaults to -j values if omitted.
+  --lk|--left-keep-field-names {a,b,c} If supplied, this means keep only the specified field
+               names from the left file. Automatically includes the join-field name(s). Helpful
+               for when you only want a limited subset of information from the left file.
   --lp {text}  Additional prefix for non-join output field names from
                the left file
   --rp {text}  Additional prefix for non-join output field names from
@@ -1598,7 +1601,9 @@ the main "mlr --help" for more information on syntax for these arguments:
   --ips {pair-separator character}
   --repifs
   --implicit-csv-header
+  --implicit-tsv-header
   --no-implicit-csv-header
+  --no-implicit-tsv-header
 For example, if you have 'mlr --csv ... join -l foo ... ' then the left-file format will
 be specified CSV as well unless you override with 'mlr --csv ... join --ijson -l foo' etc.
 Likewise, if you have 'mlr --csv --implicit-csv-header ...' then the join-in file will be
@@ -2803,6 +2808,8 @@ Options:
 -n  {comma-separated field names}  Numerical ascending; nulls sort last
 -nf {comma-separated field names}  Same as -n
 -nr {comma-separated field names}  Numerical descending; nulls sort first
+-t  {comma-separated field names}  Natural ascending
+-tr {comma-separated field names}  Natural descending
 -h|--help Show this message.
 
 Example:
@@ -2976,6 +2983,52 @@ a b c
 1 2 3
 5 4 6
 9 8 7
+</pre>
+
+## split
+
+<pre class="pre-highlight-in-pair">
+<b>mlr split --help</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr split [options] {filename}
+Options:
+-n {n}:      Cap file sizes at N records.
+-m {m}:      Produce M files, round-robining records among them.
+-g {a,b,c}:  Write separate files with records having distinct values for fields named a,b,c.
+Exactly one  of -m, -n, or -g must be supplied.
+--prefix {p} Specify filename prefix; default "split".
+--suffix {s} Specify filename suffix; default is from mlr output format, e.g. "csv".
+-a           Append to existing file(s), if any, rather than overwriting.
+-v           Send records along to downstream verbs as well as splitting to files.
+-h|--help    Show this message.
+Any of the output-format command-line flags (see mlr -h). For example, using
+  mlr --icsv --from myfile.csv split --ojson -n 1000
+the input is CSV, but the output files are JSON.
+
+Examples: Suppose myfile.csv has 1,000,000 records.
+
+100 output files, 10,000 records each. First 10,000 records in split_1.csv, next in split_2.csv, etc.
+  mlr --csv --from myfile.csv split -n 10000
+
+10 output files, 100,000 records each. Records 1,11,21,etc in split_1.csv, records 2,12,22, etc in split_2.csv, etc.
+  mlr --csv --from myfile.csv split -m 10
+Same, but with JSON output.
+  mlr --csv --from myfile.csv split -m 10 -o json
+
+Same but instead of split_1.csv, split_2.csv, etc. there are test_1.dat, test_2.dat, etc.
+  mlr --csv --from myfile.csv split -m 10 --prefix test --suffix dat
+Same, but written to the /tmp/ directory.
+  mlr --csv --from myfile.csv split -m 10 --prefix /tmp/test --suffix dat
+
+If the shape field has values triangle and square, then there will be split_triangle.csv and split_square.csv.
+  mlr --csv --from myfile.csv split -g shape
+
+If the color field has values yellow and green, and the shape field has values triangle and square,
+then there will be split_yellow_triangle.csv, split_yellow_square.csv, etc.
+  mlr --csv --from myfile.csv split -g color,shape
+
+See also the "tee" DSL function which lets you do more ad-hoc customization.
 </pre>
 
 ## stats1
@@ -3280,31 +3333,34 @@ donesec                 25.10852919630297
 </pre>
 <pre class="pre-non-highlight-in-pair">
 Usage: mlr step [options]
-Computes values dependent on the previous record, optionally grouped by category.
+Computes values dependent on earlier/later records, optionally grouped by category.
 Options:
--a {delta,rsum,...}   Names of steppers: comma-separated, one or more of:
-  delta    Compute differences in field(s) between successive records
-  shift    Include value(s) in field(s) from previous record, if any
+-a {delta,rsum,...} Names of steppers: comma-separated, one or more of:
+  counter    Count instances of field(s) between successive records
+  delta      Compute differences in field(s) between successive records
+  ewma       Exponentially weighted moving average over successive records
   from-first Compute differences in field(s) from first record
-  ratio    Compute ratios in field(s) between successive records
-  rsum     Compute running sums of field(s) between successive records
-  counter  Count instances of field(s) between successive records
-  ewma     Exponentially weighted moving average over successive records
+  ratio      Compute ratios in field(s) between successive records
+  rsum       Compute running sums of field(s) between successive records
+  shift      Alias for shift_lag
+  shift_lag  Include value(s) in field(s) from the previous record, if any
+  shift_lead Include value(s) in field(s) from the next record, if any
+  slwin      Sliding-window averages over m records back and n forward. E.g. slwin_7_2 for 7 back and 2 forward.
 
--f {a,b,c} Value-field names on which to compute statistics
--g {d,e,f} Optional group-by-field names
--F         Computes integerable things (e.g. counter) in floating point.
-           As of Miller 6 this happens automatically, but the flag is accepted
-           as a no-op for backward compatibility with Miller 5 and below.
--d {x,y,z} Weights for ewma. 1 means current sample gets all weight (no
-           smoothing), near under under 1 is light smoothing, near over 0 is
-           heavy smoothing. Multiple weights may be specified, e.g.
-           "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
-           is "-d 0.5".
--o {a,b,c} Custom suffixes for EWMA output fields. If omitted, these default to
-           the -d values. If supplied, the number of -o values must be the same
-           as the number of -d values.
--h|--help Show this message.
+-f {a,b,c}   Value-field names on which to compute statistics
+-g {d,e,f}   Optional group-by-field names
+-F           Computes integerable things (e.g. counter) in floating point.
+             As of Miller 6 this happens automatically, but the flag is accepted
+             as a no-op for backward compatibility with Miller 5 and below.
+-d {x,y,z}   Weights for EWMA. 1 means current sample gets all weight (no
+             smoothing), near under under 1 is light smoothing, near over 0 is
+             heavy smoothing. Multiple weights may be specified, e.g.
+             "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
+             is "-d 0.5".
+-o {a,b,c}   Custom suffixes for EWMA output fields. If omitted, these default to
+             the -d values. If supplied, the number of -o values must be the same
+             as the number of -d values.
+-h|--help   Show this message.
 
 Examples:
   mlr step -a rsum -f request_size
@@ -3312,6 +3368,7 @@ Examples:
   mlr step -a ewma -d 0.1,0.9 -f x,y
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y -g group_name
+  mlr step -a slwin_9_0,slwin_0_9 -f x
 
 Please see https://miller.readthedocs.io/en/latest/reference-verbs.html#filter or
 https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
@@ -3564,49 +3621,79 @@ Usage: mlr top [options]
 --min         Print top smallest values; default is top largest values.
 -F            Keep top values as floats even if they look like integers.
 -o {name}     Field name for output indices. Default "top_idx".
+              This is ignored if -a is used.
 Prints the n records with smallest/largest values at specified fields,
-optionally by category.
+optionally by category. If -a is given, then the top records are emitted
+with the same fields as they appeared in the input. Without -a, only fields
+from -f, fields from -g, and the top-index field are emitted. For more information
+please see https://miller.readthedocs.io/en/latest/reference-verbs#top
 </pre>
 
 Note that `top` is distinct from [head](reference-verbs.md#head) -- `head` shows fields which appear first in the data stream; `top` shows fields which are numerically largest (or smallest).
 
 <pre class="pre-highlight-in-pair">
-<b>mlr --opprint top -n 4 -f x data/medium</b>
+<b>mlr --c2p cat example.csv</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-top_idx x_top
-1       0.999952670371898
-2       0.9998228522652893
-3       0.99973332327313
-4       0.9995625801977208
+color  shape    flag  k  index quantity rate
+yellow triangle true  1  11    43.6498  9.8870
+red    square   true  2  15    79.2778  0.0130
+red    circle   true  3  16    13.8103  2.9010
+red    square   false 4  48    77.5542  7.4670
+purple triangle false 5  51    81.2290  8.5910
+red    square   false 6  64    77.1991  9.5310
+purple triangle false 7  65    80.1405  5.8240
+yellow circle   true  8  73    63.9785  4.2370
+yellow circle   true  9  87    63.5058  8.3350
+purple square   false 10 91    72.3735  8.2430
 </pre>
 
 <pre class="pre-highlight-in-pair">
-<b>mlr --opprint top -n 4 -f x -o someothername data/medium</b>
+<b>mlr --c2p top -n 1 -f quantity example.csv</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-someothername x_top
-1             0.999952670371898
-2             0.9998228522652893
-3             0.99973332327313
-4             0.9995625801977208
+top_idx quantity_top
+1       81.2290
 </pre>
 
 <pre class="pre-highlight-in-pair">
-<b>mlr --opprint top -n 2 -f x -g a then sort -f a data/medium</b>
+<b>mlr --c2p top -n 1 -f quantity -g shape example.csv</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-a   top_idx x_top
-eks 1       0.9988110946859143
-eks 2       0.9985342548358704
-hat 1       0.999952670371898
-hat 2       0.99973332327313
-pan 1       0.9994029107062516
-pan 2       0.9990440068491747
-wye 1       0.9998228522652893
-wye 2       0.9992635865771493
-zee 1       0.9994904324789629
-zee 2       0.9994378171787394
+shape    top_idx quantity_top
+triangle 1       81.2290
+square   1       79.2778
+circle   1       63.9785
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --c2p top -n 1 -f quantity -g shape -o someothername example.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+shape    someothername quantity_top
+triangle 1             81.2290
+square   1             79.2778
+circle   1             63.9785
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --c2p top -n 1 -f quantity -g shape -a example.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+color  shape    flag  k index quantity rate
+purple triangle false 5 51    81.2290  8.5910
+red    square   true  2 15    79.2778  0.0130
+yellow circle   true  8 73    63.9785  4.2370
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --c2p top -n 1 -f quantity -g shape -a then sort -f shape example.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+color  shape    flag  k index quantity rate
+yellow circle   true  8 73    63.9785  4.2370
+red    square   true  2 15    79.2778  0.0130
+purple triangle false 5 51    81.2290  8.5910
 </pre>
 
 ## unflatten

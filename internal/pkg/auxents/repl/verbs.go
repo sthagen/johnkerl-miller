@@ -54,6 +54,7 @@ func init() {
 		{verbNames: []string{":e", ":end"}, handlerFunc: handleEnd, usageFunc: usageEnd},
 		{verbNames: []string{":astprint"}, handlerFunc: handleASTPrint, usageFunc: usageASTPrint},
 		{verbNames: []string{":blocks"}, handlerFunc: handleBlocks, usageFunc: usageBlocks},
+		{verbNames: []string{":rb", ":resetblocks"}, handlerFunc: handleResetBlocks, usageFunc: usageResetBlocks},
 		{verbNames: []string{":q", ":quit"}, handlerFunc: nil, usageFunc: usageQuit},
 		{verbNames: []string{":h", ":help"}, handlerFunc: handleHelp, usageFunc: usageHelp},
 	}
@@ -105,6 +106,21 @@ func (repl *Repl) handleNonDSLLine(trimmedLine string) bool {
 		return false
 	}
 	verbName := args[0]
+
+	// TODO: describe me
+	if strings.HasPrefix(verbName, "??") {
+		if verbName[2:] != "" {
+			handleHelpFindSingle(repl, verbName[2:])
+			return true
+		}
+	} else if strings.HasPrefix(verbName, "?") {
+		if verbName[1:] != "" {
+			handleHelpSingle(repl, verbName[1:])
+		} else {
+			usageHelp(repl)
+		}
+		return true
+	}
 
 	// We handle all single lines starting with a colon.  Anything that starts
 	// with a semicolon but which we don't recognize, we should say so here --
@@ -419,11 +435,11 @@ func handleProcess(repl *Repl, args []string) bool {
 }
 
 // ----------------------------------------------------------------
-func handleSkipOrProcessN(repl *Repl, n int, processingNotSkipping bool) {
+func handleSkipOrProcessN(repl *Repl, n int64, processingNotSkipping bool) {
 	var recordsAndContexts *list.List // list of *types.RecordAndContext
 	var err error = nil
 
-	for i := 1; i <= n; i++ {
+	for i := int64(1); i <= n; i++ {
 		select {
 		case recordsAndContexts = <-repl.readerChannel:
 			break
@@ -809,6 +825,41 @@ func handleBlocks(repl *Repl, args []string) bool {
 }
 
 // ----------------------------------------------------------------
+func usageResetBlocks(repl *Repl) {
+	fmt.Println(":resetblocks with no arguments clears out all begin, main, and end blocks that have been loaded.")
+	fmt.Println(":resetblocks begin clears out begin blocks.")
+	fmt.Println(":resetblocks main  clears out main-block statements.")
+	fmt.Println(":resetblocks end   clears out end blocks.")
+
+}
+func handleResetBlocks(repl *Repl, args []string) bool {
+	args = args[1:] // strip off verb
+	if len(args) == 0 {
+		repl.cstRootNode.ResetBeginBlocksForREPL()
+		repl.cstRootNode.ResetMainBlockForREPL()
+		repl.cstRootNode.ResetEndBlocksForREPL()
+	} else {
+		for _, arg := range args {
+			if arg != "begin" && arg != "main" && arg != "end" {
+				return false
+			}
+		}
+		for _, arg := range args {
+			if arg == "begin" {
+				repl.cstRootNode.ResetBeginBlocksForREPL()
+			}
+			if arg == "main" {
+				repl.cstRootNode.ResetMainBlockForREPL()
+			}
+			if arg == "end" {
+				repl.cstRootNode.ResetEndBlocksForREPL()
+			}
+		}
+	}
+	return true
+}
+
+// ----------------------------------------------------------------
 func usageQuit(repl *Repl) {
 	fmt.Println(":quit with no arguments.")
 	fmt.Println("Ends the Miller REPL session.")
@@ -827,8 +878,8 @@ func usageHelp(repl *Repl) {
 	fmt.Println(":help prompt")
 	fmt.Println(":help function-names")
 	fmt.Println(":help function-details")
-	fmt.Println(":help find {substring}, e.g. :help find gmt or :help find map")
-	fmt.Println(":help {function name}, e.g. :help sec2gmt")
+	fmt.Println(":help find {substring}, e.g. :help find gmt or :help find map. Shorthand: ??map")
+	fmt.Println(":help {name}, e.g. :help sec2gmt. Shorthand: ?sec2gmt")
 }
 
 func handleHelp(repl *Repl, args []string) bool {
@@ -984,6 +1035,9 @@ to record-processing using the put/filter DSL (domain-specific language).`)
   or ':open'.
 * Specify filenames either on the command line or via ':open' at the Miller REPL.
 * Read records one at a time using ':read'.
+* The current record can be read via '$*'; also you can assign to it.
+* The current record's context -- 'FILENAME', 'FILENUM', 'NR', 'FNR' -- can be read
+  via ':context'. Unlike R*, this is read-only.
 * Write the current record (maybe after you've modified it with things like '$z = $x + $y')
   using ':write'. This goes to the terminal; you can use ':> {filename}' to make writes
   go to a file, or ':>> {filename}' to append.

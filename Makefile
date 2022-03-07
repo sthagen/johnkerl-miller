@@ -29,25 +29,25 @@ install: build
 
 # ----------------------------------------------------------------
 # Unit tests (small number)
-unit-test ut:
+unit-test ut: build
 	go test github.com/johnkerl/miller/internal/pkg/...
 
-ut-lib:
+ut-lib:build
 	go test github.com/johnkerl/miller/internal/pkg/lib...
-ut-scan:
+ut-scan:build
 	go test github.com/johnkerl/miller/internal/pkg/scan/...
-ut-mlv:
+ut-mlv:build
 	go test github.com/johnkerl/miller/internal/pkg/mlrval/...
-ut-bifs:
+ut-bifs:build
 	go test github.com/johnkerl/miller/internal/pkg/bifs/...
-ut-input:
+ut-input:build
 	go test github.com/johnkerl/miller/internal/pkg/input/...
 
-bench:
+bench:build
 	go test -run=nonesuch -bench=. github.com/johnkerl/miller/internal/pkg/...
-bench-mlv:
+bench-mlv:build
 	go test -run=nonesuch -bench=. github.com/johnkerl/miller/internal/pkg/mlrval/...
-bench-input:
+bench-input:build
 	go test -run=nonesuch -bench=. github.com/johnkerl/miller/internal/pkg/input/...
 
 # ----------------------------------------------------------------
@@ -57,7 +57,7 @@ bench-input:
 # for debugging.  TL;DR is for CI jobs, we have 'go test -v'; for
 # interactive use, instead of 'go test -v' simply use 'mlr regtest
 # -vvv' or 'mlr regtest -s 20'. See also internal/pkg/auxents/regtest.
-regression-test:
+regression-test: build
 	go test -v regression_test.go
 
 # ----------------------------------------------------------------
@@ -103,9 +103,12 @@ docs:
 
 # ----------------------------------------------------------------
 # Keystroke-savers
+
+sure: build check
+
 it: build check
 so: install
-sure: build check
+
 mlr:
 	go build github.com/johnkerl/miller/cmd/mlr
 

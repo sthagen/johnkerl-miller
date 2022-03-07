@@ -12,7 +12,7 @@ func BIF_dhms2sec(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	if !input1.IsString() {
 		return mlrval.ERROR
 	}
-	var d, h, m, s int
+	var d, h, m, s int64
 
 	if strings.HasPrefix(input1.AcquireStringValue(), "-") {
 
@@ -113,7 +113,7 @@ func BIF_hms2sec(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	if input1.AcquireStringValue() == "" {
 		return mlrval.ERROR
 	}
-	var h, m, s int
+	var h, m, s int64
 
 	if strings.HasPrefix(input1.AcquireStringValue(), "-") {
 		n, err := fmt.Sscanf(input1.AcquireStringValue(), "-%d:%d:%d", &h, &m, &s)
@@ -159,7 +159,7 @@ func BIF_sec2dhms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 		return mlrval.ERROR
 	}
 
-	var d, h, m, s int
+	var d, h, m, s int64
 
 	splitIntToDHMS(isec, &d, &h, &m, &s)
 	if d != 0 {
@@ -179,8 +179,6 @@ func BIF_sec2dhms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 			fmt.Sprintf("%ds", s),
 		)
 	}
-
-	return mlrval.ERROR
 }
 
 func BIF_sec2hms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
@@ -194,7 +192,7 @@ func BIF_sec2hms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 		isec = -isec
 	}
 
-	var d, h, m, s int
+	var d, h, m, s int64
 
 	splitIntToDHMS(isec, &d, &h, &m, &s)
 	h += d * 24
@@ -202,8 +200,6 @@ func BIF_sec2hms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	return mlrval.FromString(
 		fmt.Sprintf("%s%02d:%02d:%02d", sign, h, m, s),
 	)
-
-	return mlrval.ERROR
 }
 
 func BIF_fsec2dhms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
@@ -212,15 +208,15 @@ func BIF_fsec2dhms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 		return mlrval.ERROR
 	}
 
-	sign := 1
+	sign := int64(1)
 	if fsec < 0 {
 		sign = -1
 		fsec = -fsec
 	}
-	isec := int(math.Trunc(fsec))
+	isec := int64(math.Trunc(fsec))
 	fractional := fsec - float64(isec)
 
-	var d, h, m, s int
+	var d, h, m, s int64
 
 	splitIntToDHMS(isec, &d, &h, &m, &s)
 
@@ -267,10 +263,10 @@ func BIF_fsec2hms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 		sign = "-"
 		fsec = -fsec
 	}
-	isec := int(math.Trunc(fsec))
+	isec := int64(math.Trunc(fsec))
 	fractional := fsec - float64(isec)
 
-	var d, h, m, s int
+	var d, h, m, s int64
 
 	splitIntToDHMS(isec, &d, &h, &m, &s)
 	h += d * 24
@@ -285,17 +281,15 @@ func BIF_fsec2hms(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 			fmt.Sprintf("%s%02d:%02d:%.6f", sign, h, m, float64(s)+fractional),
 		)
 	}
-
-	return mlrval.ERROR
 }
 
 // Helper function
-func splitIntToDHMS(u int, pd, ph, pm, ps *int) {
-	d := 0
-	h := 0
-	m := 0
-	s := 0
-	sign := 1
+func splitIntToDHMS(u int64, pd, ph, pm, ps *int64) {
+	d := int64(0)
+	h := int64(0)
+	m := int64(0)
+	s := int64(0)
+	sign := int64(1)
 	if u < 0 {
 		u = -u
 		sign = -1

@@ -2,6 +2,7 @@ package bifs
 
 import (
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/johnkerl/miller/internal/pkg/lib"
@@ -25,7 +26,7 @@ func string_to_int(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 }
 
 func float_to_int(input1 *mlrval.Mlrval) *mlrval.Mlrval {
-	return mlrval.FromInt(int(input1.AcquireFloatValue()))
+	return mlrval.FromInt(int64(input1.AcquireFloatValue()))
 }
 
 func bool_to_int(input1 *mlrval.Mlrval) *mlrval.Mlrval {
@@ -175,7 +176,9 @@ func BIF_is_nonemptymap(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	return mlrval.FromBool(input1.IsMap() && input1.AcquireMapValue().FieldCount != 0)
 }
 func BIF_is_notempty(input1 *mlrval.Mlrval) *mlrval.Mlrval {
-	if input1.IsVoid() {
+	if input1.IsAbsent() {
+		return mlrval.FALSE
+	} else if input1.IsVoid() {
 		return mlrval.FALSE
 	} else if input1.IsString() {
 		if input1.AcquireStringValue() == "" {
@@ -194,10 +197,10 @@ func BIF_is_notarray(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	return mlrval.FromBool(!input1.IsArray())
 }
 func BIF_is_notnull(input1 *mlrval.Mlrval) *mlrval.Mlrval {
-	return mlrval.FromBool(!input1.IsAbsent() && !input1.IsVoid())
+	return mlrval.FromBool(!input1.IsAbsent() && !input1.IsVoid() && !input1.IsNull())
 }
 func BIF_is_null(input1 *mlrval.Mlrval) *mlrval.Mlrval {
-	return mlrval.FromBool(input1.IsAbsent() || input1.IsVoid())
+	return mlrval.FromBool(input1.IsAbsent() || input1.IsVoid() || input1.IsNull())
 }
 func BIF_is_numeric(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	return mlrval.FromBool(input1.IsInt() || input1.IsFloat())
@@ -207,6 +210,14 @@ func BIF_is_present(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 }
 func BIF_is_string(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	return mlrval.FromBool(input1.IsStringOrVoid())
+}
+func BIF_is_nan(input1 *mlrval.Mlrval) *mlrval.Mlrval {
+	fval, ok := input1.GetFloatValue()
+	if ok {
+		return mlrval.FromBool(math.IsNaN(fval))
+	} else {
+		return mlrval.FALSE
+	}
 }
 
 // ----------------------------------------------------------------

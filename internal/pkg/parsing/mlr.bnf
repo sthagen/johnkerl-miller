@@ -54,9 +54,10 @@
 // CHARACTER CLASSES
 // ----------------------------------------------------------------
 
-_letter : 'a'-'z' | 'A'-'Z' | '\u0100'-'\U0010FFFF';
+_letter : 'a'-'z' | 'A'-'Z' | '\u00a0'-'\u00ff' | '\u0100'-'\U0010ffff';
 _decdig : '0'-'9' ;
 _hexdig : '0'-'9' | 'a'-'f' | 'A'-'F';
+_octdig : '0'-'7' ;
 _bindig : '0'-'1' ;
 _leading_idchar : _letter | '_' ;
 _idchar : _letter | _decdig | '_' ;
@@ -78,23 +79,31 @@ _idchar : _letter | _decdig | '_' ;
 //
 //   the shell command is the 'tr ...' string and we need to spell out the
 //   escape sequence used by tr.
+// * See https://github.com/google/re2/wiki/Syntax
+
 _string_literal_element
   : 'A'-'Z' | 'a'-'z' | '0'-'9'
+
   | ' ' | '!' | '#' | '$' | '%' | '&' | '\'' | '\\'
   | '(' | ')' | '*' | '+' | ',' | '-' | '.' | '/'
   | ':' | ';' | '<' | '=' | '>' | '?' | '@' | '['
   | ']' | '^' | '_' | '`' | '{' | '|' | '}' | '~'
-  | ( '\\' '\\' ) | ( '\\' '"' )
-  | ( '\\' '[' ) | ( '\\' ']' )
-  | ( '\\' 'b' ) | ( '\\' 'f' )
-  | ( '\\' 'n' ) | ( '\\' 'r' )
-  | ( '\\' 't' )
-  | ( '\\' 'x' )
-  | ( '\\' '.' )
-  | ( '\\' '*' )
+  | ( '\\' '\\' ) | ( '\\' '"' ) | ( '\\' '[' ) | ( '\\' ']' )
+  | ( '\\' '.' ) | ( '\\' '*' ) | ( '\\' '%' )
+
+  | ( '\\' 'A') | ( '\\' 'B') | ( '\\' 'C') | ( '\\' 'D') | ( '\\' 'G') | ( '\\' 'H')
+  | ( '\\' 'K') | ( '\\' 'L') | ( '\\' 'N') | ( '\\' 'P') | ( '\\' 'R') | ( '\\' 'S')
+  | ( '\\' 'U') | ( '\\' 'V') | ( '\\' 'W') | ( '\\' 'X') | ( '\\' 'Z')
+  | ( '\\' 'a') | ( '\\' 'b') | ( '\\' 'c') | ( '\\' 'd') | ( '\\' 'f') | ( '\\' 'g')
+  | ( '\\' 'h') | ( '\\' 'k') | ( '\\' 'l') | ( '\\' 'n') | ( '\\' 'p') | ( '\\' 'r')
+  | ( '\\' 's') | ( '\\' 't') | ( '\\' 'u') | ( '\\' 'v') | ( '\\' 'w') | ( '\\' 'x')
+  | ( '\\' 'z')
+
   | ( '\\' '0' ) | ( '\\' '1' ) | ( '\\' '2' ) | ( '\\' '3' ) | ( '\\' '4' )
   | ( '\\' '5' ) | ( '\\' '6' ) | ( '\\' '7' ) | ( '\\' '8' ) | ( '\\' '9' )
-  | '\u0100'-'\U0010FFFF'
+
+  | '\u00a0'-'\u00ff'
+  | '\u0100'-'\U0010ffff'
 ;
 string_literal : '"' {_string_literal_element} '"' ;
 
@@ -106,6 +115,7 @@ regex_case_insensitive : '"' {_string_literal_element} '"' 'i';
 int_literal
   : _decdig { _decdig }
   | '0' 'x' _hexdig { _hexdig }
+  | '0' 'o' _octdig { _octdig }
   | '0' 'b' _bindig { _bindig }
 ;
 
@@ -147,6 +157,9 @@ _literal_false : 'f' 'a' 'l' 's' 'e';
 boolean_literal : ( _literal_true | _literal_false );
 
 null_literal  : 'n' 'u' 'l' 'l';
+
+inf_literal   : 'I' 'n' 'f';
+nan_literal   : 'N' 'a' 'N';
 
 // ----------------------------------------------------------------
 // MILLER CONTEXT VARIABLES
@@ -1541,6 +1554,12 @@ MlrvalOrFunction
 
   | null_literal
     << dsl.NewASTNode($0, dsl.NodeTypeNullLiteral) >>
+
+  | inf_literal
+    << dsl.NewASTNode($0, dsl.NodeTypeFloatLiteral) >>
+
+  | nan_literal
+    << dsl.NewASTNode($0, dsl.NodeTypeFloatLiteral) >>
 
   | const_M_PI
     << dsl.NewASTNode(

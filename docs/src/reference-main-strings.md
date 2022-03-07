@@ -122,9 +122,9 @@ bcd
 
 ## Out-of-bounds indexing
 
-Somewhat imitating Python, out-of-bounds index accesses are
-[errors](reference-main-data-types.md), but out-of-bounds slice accesses result
-in trimming the indices, resulting in a short string or even the empty string:
+Out-of-bounds index accesses are [errors](reference-main-data-types.md), but out-of-bounds slice
+accesses result in trimming the indices, resulting in a short string or even the empty string.
+(This behavior intentionally imitates Python.)
 
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put '</b>
@@ -132,7 +132,7 @@ in trimming the indices, resulting in a short string or even the empty string:
 <b>    x = "abcde";</b>
 <b>    print x[1];</b>
 <b>    print x[5];</b>
-<b>    print x[6]; # absent</b>
+<b>    print x[6];</b>
 <b>  }</b>
 <b>'</b>
 </pre>
@@ -146,16 +146,16 @@ e
 <b>mlr -n put '</b>
 <b>  end {</b>
 <b>    x = "abcde";</b>
-<b>    print x[1:2];</b>
-<b>    print x[1:6];</b>
-<b>    print x[10:20];</b>
+<b>    print "\"" . x[1:2] . "\"";</b>
+<b>    print "\"" . x[1:6] . "\"";</b>
+<b>    print "\"" . x[10:20] . "\"";</b>
 <b>  }</b>
 <b>'</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-ab
-
-
+"ab"
+"abcde"
+""
 </pre>
 
 ## Escape sequences for string literals
@@ -173,6 +173,25 @@ You can use the following backslash escapes for strings such as between the doub
 * `\"`: double quote
 * `\123`: Octal 123, etc. for `\000` up to `\377`
 * `\x7f`: Hexadecimal 7f, etc. for `\x00` up to `\xff`
+* `\u2766`, `\U00010877:`: Unicode literals. For technical reasons, you must supply four hex digits after `\u` and eight hex digits after `\U`.
+
+<pre class="pre-highlight-in-pair">
+<b>mlr repl</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+[mlr] "a\nb"
+"a
+b"
+
+[mlr] "a\tb"
+"a	b"
+
+[mlr] "a\x62c"
+"abc"
+
+[mlr] "\u2766\U00010877"
+"❦𐡷"
+</pre>
 
 See also [https://en.wikipedia.org/wiki/Escape_sequences_in_C](https://en.wikipedia.org/wiki/Escape_sequences_in_C).
 

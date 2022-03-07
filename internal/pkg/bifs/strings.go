@@ -1,6 +1,7 @@
 package bifs
 
 import (
+	"bytes"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,7 +16,7 @@ func BIF_strlen(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 	if !input1.IsStringOrVoid() {
 		return mlrval.ERROR
 	} else {
-		return mlrval.FromInt(int(utf8.RuneCountInString(input1.AcquireStringValue())))
+		return mlrval.FromInt(int64(utf8.RuneCountInString(input1.AcquireStringValue())))
 	}
 }
 
@@ -78,37 +79,19 @@ func BIF_substr_1_up(input1, input2, input3 *mlrval.Mlrval) *mlrval.Mlrval {
 	runes := []rune(sinput)
 	strlen := int(len(runes))
 
-	// For array slices like s[1:2], s[:2], s[1:], when the lower index is
-	// empty in the DSL expression it comes in here as a 1. But when the upper
-	// index is empty in the DSL expression it comes in here as "".
-	if !input2.IsInt() {
-		return mlrval.ERROR
-	}
-	lowerMindex := input2.AcquireIntValue()
+	sliceIsEmpty, absentOrError, lowerZindex, upperZindex := MillerSliceAccess(input2, input3, strlen, false)
 
-	upperMindex := strlen
-	if input3.IsVoid() {
-		// Keep strlen
-	} else if !input3.IsInt() {
-		return mlrval.ERROR
-	} else {
-		upperMindex = input3.AcquireIntValue()
-	}
-
-	// Convert from negative-aliased 1-up to positive-only 0-up
-	m, mok := unaliasArrayLengthIndex(strlen, lowerMindex)
-	n, nok := unaliasArrayLengthIndex(strlen, upperMindex)
-
-	if !mok || !nok {
+	if sliceIsEmpty {
 		return mlrval.VOID
-	} else if m > n {
-		return mlrval.VOID
-	} else {
-		// Note Golang slice indices are 0-up, and the 1st index is inclusive
-		// while the 2nd is exclusive. For Miller, indices are 1-up and both
-		// are inclusive.
-		return mlrval.FromString(string(runes[m : n+1]))
 	}
+	if absentOrError != nil {
+		return absentOrError
+	}
+
+	// Note Golang slice indices are 0-up, and the 1st index is inclusive
+	// while the 2nd is exclusive. For Miller, indices are 1-up and both
+	// are inclusive.
+	return mlrval.FromString(string(runes[lowerZindex : upperZindex+1]))
 }
 
 // ================================================================
@@ -128,45 +111,19 @@ func BIF_substr_0_up(input1, input2, input3 *mlrval.Mlrval) *mlrval.Mlrval {
 	runes := []rune(sinput)
 	strlen := int(len(runes))
 
-	// For array slices like s[1:2], s[:2], s[1:], when the lower index is
-	// empty in the DSL expression it comes in here as a 1. But when the upper
-	// index is empty in the DSL expression it comes in here as "".
-	if !input2.IsInt() {
-		return mlrval.ERROR
-	}
-	lowerMindex := input2.AcquireIntValue()
-	if lowerMindex >= 0 {
-		// Make 1-up
-		lowerMindex += 1
-	}
+	sliceIsEmpty, absentOrError, lowerZindex, upperZindex := MillerSliceAccess(input2, input3, strlen, true)
 
-	upperMindex := strlen
-	if input3.IsVoid() {
-		// Keep strlen
-	} else if !input3.IsInt() {
-		return mlrval.ERROR
-	} else {
-		upperMindex = input3.AcquireIntValue()
-		if upperMindex >= 0 {
-			// Make 1-up
-			upperMindex += 1
-		}
-	}
-
-	// Convert from negative-aliased 1-up to positive-only 0-up
-	m, mok := unaliasArrayLengthIndex(strlen, lowerMindex)
-	n, nok := unaliasArrayLengthIndex(strlen, upperMindex)
-
-	if !mok || !nok {
+	if sliceIsEmpty {
 		return mlrval.VOID
-	} else if m > n {
-		return mlrval.VOID
-	} else {
-		// Note Golang slice indices are 0-up, and the 1st index is inclusive
-		// while the 2nd is exclusive. For Miller, indices are 1-up and both
-		// are inclusive.
-		return mlrval.FromString(string(runes[m : n+1]))
 	}
+	if absentOrError != nil {
+		return absentOrError
+	}
+
+	// Note Golang slice indices are 0-up, and the 1st index is inclusive
+	// while the 2nd is exclusive. For Miller, indices are 1-up and both
+	// are inclusive.
+	return mlrval.FromString(string(runes[lowerZindex : upperZindex+1]))
 }
 
 // ================================================================
@@ -190,7 +147,7 @@ func BIF_truncate(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
 	// Handle UTF-8 correctly: len(input1.AcquireStringValue()) will count bytes, not runes.
 	runes := []rune(input1.AcquireStringValue())
 	oldLength := int(len(runes))
-	maxLength := input2.AcquireIntValue()
+	maxLength := int(input2.AcquireIntValue())
 	if oldLength <= maxLength {
 		return input1
 	} else {
@@ -237,7 +194,7 @@ func BIF_collapse_whitespace_regexp(input1 *mlrval.Mlrval, whitespaceRegexp *reg
 }
 
 func WhitespaceRegexp() *regexp.Regexp {
-	return regexp.MustCompile("\\s+")
+	return regexp.MustCompile(`\s+`)
 }
 
 // ================================================================
@@ -285,6 +242,114 @@ func BIF_clean_whitespace(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 			input1, WhitespaceRegexp(),
 		),
 	)
+}
+
+// ================================================================
+func BIF_format(mlrvals []*mlrval.Mlrval) *mlrval.Mlrval {
+	if len(mlrvals) == 0 {
+		return mlrval.VOID
+	}
+	formatString, ok := mlrvals[0].GetStringValue()
+	if !ok { // not a string
+		return mlrval.ERROR
+	}
+
+	pieces := lib.SplitString(formatString, "{}")
+
+	var buffer bytes.Buffer
+
+	// Example: format("{}:{}", 8, 9)
+	//
+	// * piece[0] ""
+	// * piece[1] ":"
+	// * piece[2] ""
+	// * mlrval[1] 8
+	// * mlrval[2] 9
+	//
+	// So:
+	// * Write piece[0]
+	// * Write mlrvals[1]
+	// * Write piece[1]
+	// * Write mlrvals[2]
+	// * Write piece[2]
+
+	// Q: What if too few arguments for format?
+	// A: Leave them off
+	// Q: What if too many arguments for format?
+	// A: Leave them off
+
+	n := len(mlrvals)
+	for i, piece := range pieces {
+		if i > 0 {
+			if i < n {
+				buffer.WriteString(mlrvals[i].String())
+			}
+		}
+		buffer.WriteString(piece)
+	}
+
+	return mlrval.FromString(buffer.String())
+}
+
+// unformat("{}:{}:{}",  "1:2:3")    gives [1, 2]
+// unformat("{}h{}m{}s", "3h47m22s") gives [3, 47, 22]
+func BIF_unformat(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
+	return bif_unformat_aux(input1, input2, true)
+}
+func BIF_unformatx(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
+	return bif_unformat_aux(input1, input2, false)
+}
+
+func bif_unformat_aux(input1, input2 *mlrval.Mlrval, inferTypes bool) *mlrval.Mlrval {
+	template, ok1 := input1.GetStringValue()
+	if !ok1 {
+		return mlrval.ERROR
+	}
+	input, ok2 := input2.GetStringValue()
+	if !ok2 {
+		return mlrval.ERROR
+	}
+
+	templatePieces := strings.Split(template, "{}")
+	output := mlrval.FromEmptyArray()
+
+	// template "{}h{}m{}s"
+	// input    "12h34m56s"
+	// templatePieces   ["", "h", "m", "s"]
+
+	remaining := input
+
+	if !strings.HasPrefix(remaining, templatePieces[0]) {
+		return mlrval.ERROR
+	}
+	remaining = remaining[len(templatePieces[0]):]
+	templatePieces = templatePieces[1:]
+
+	n := len(templatePieces)
+	for i, templatePiece := range templatePieces {
+
+		var index int
+		if i == n-1 && templatePiece == "" {
+			// strings.Index("", ...) will match the *start* of what's
+			// remaining, whereas we want it to match the end.
+			index = len(remaining)
+		} else {
+			index = strings.Index(remaining, templatePiece)
+			if index < 0 {
+				return mlrval.ERROR
+			}
+		}
+
+		inputPiece := remaining[:index]
+		remaining = remaining[index+len(templatePiece):]
+		if inferTypes {
+			output.ArrayAppend(mlrval.FromInferredType(inputPiece))
+		} else {
+			output.ArrayAppend(mlrval.FromString(inputPiece))
+		}
+	}
+
+	return output
 }
 
 // ================================================================
@@ -354,5 +419,22 @@ var fmtnum_dispositions = [mlrval.MT_DIM][mlrval.MT_DIM]BinaryFunc{
 }
 
 func BIF_fmtnum(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
-	return fmtnum_dispositions[input1.Type()][input2.Type()](input1, input2)
+	if input1.IsArray() || input1.IsMap() {
+		return recuriseBinaryFuncOnInput1(BIF_fmtnum, input1, input2)
+	} else {
+		return fmtnum_dispositions[input1.Type()][input2.Type()](input1, input2)
+	}
+}
+
+func BIF_fmtifnum(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
+	if input1.IsArray() || input1.IsMap() {
+		return recuriseBinaryFuncOnInput1(BIF_fmtifnum, input1, input2)
+	} else {
+		output := fmtnum_dispositions[input1.Type()][input2.Type()](input1, input2)
+		if output.IsError() {
+			return input1
+		} else {
+			return output
+		}
+	}
 }

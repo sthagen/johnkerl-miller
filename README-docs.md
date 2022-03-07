@@ -33,11 +33,14 @@
     * `sudo pip3 install git+https://github.com/linkchecker/linkchecker.git`
     * `cd site` and `linkchecker .`
 * Submitting:
-  * Do the for-publish editing steps -- in particular, `docs/src/*md.in` and `docs/src/*md` are both checked in to source control.
-  * `git add` your modified files, `git commit`, `git push`, and submit a PR at https://github.com/johnkerl/miller.
+  * Do the for-publish editing steps -- in particular, `docs/src/*.md.in` and `docs/src/*.md` are both checked in to source control.
+    * TL;DR edit `docs/src/foo.md.in` and run `make docs`
+    * If you don't want to do `pip install mkdocs` then feel free to put up a PR which edits a `foo.md.in` as well as its `foo.md`.
+  * `git add` your modified files (`*.md.in` as well as `*.md), `git commit`, `git push`, and submit a PR at https://github.com/johnkerl/miller.
 
 ## Notes
 
+* Miller documents use the Oxford comma: not _red, yellow and green_, but rather _red, yellow, and green_.
 * CSS:
   * I used the Mkdocs "material" theme which I like a lot. I customized `docs/src/extra.css` for Miller coloring/branding.
 * Live code:

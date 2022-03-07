@@ -20,6 +20,8 @@ Quick links:
 
 Features are driven largely by great feedback in the [2021 Miller User Survey results](https://github.com/johnkerl/miller/discussions/670) and [GitHub Issues](https://github.com/johnkerl/miller/issues?q=is%3Aissue).
 
+TL;DRs: [install](installing-miller.md), [binaries](https://github.com/johnkerl/miller/releases/tag/v6.0.0), [compatibility with Miller 5](#changes-from-miller-5).
+
 ### Performance
 
 Performance is on par with Miller 5 for simple processing, and is far better than Miller 5 for
@@ -307,11 +309,12 @@ IFS and IPS can be regular expressions now. Please see the section on [multi-cha
 * With `--ojson`, output records are written multiline (pretty-printed), with outermost `[...]`.
 * With `--ojsonl`, output records are written single-line, without outermost `[...]`.
 * This makes `--jvstack` and `--jlistwrap` unnecessary. However, if you want outermost `[...]` with single-line records, you can use `--ojson --no-jvstack`.
+* Miller 5 tolerated trailing commas, which are not compliant with the JSON specification: for example, `{"x":1,"y":2,}`. Miller 6 uses a JSON parser which is compliant with the JSON specification and does not accept trailing commas.
 
 ### Type-inference
 
 * The `-S` and `-F` flags to `mlr put` and `mlr filter` are ignored, since type-inference is no longer done in `mlr put` and `mlr filter`, but rather, when records are first read. You can use `mlr -S` and `mlr -A`, respectively, instead to control type-inference within the record-readers.
-* Octal numbers like `0123` and `07` are type-inferred as string. Use `mlr -O` to infer them as octal integers. Note that `08` and `09` will then infer as deicmal integers.
+* Octal numbers like `0123` and `07` are type-inferred as string. Use `mlr -O` to infer them as octal integers. Note that `08` and `09` will then infer as decimal integers.
 * Any numbers prefix with `0o`, e.g. `0o377`, are already treated as octal regardless of `mlr -O` -- `mlr -O` only affects how leading-zero integers are handled.
 * See also the [miscellaneous-flags reference](reference-main-flag-list.md#miscellaneous-flags).
 
@@ -319,12 +322,16 @@ IFS and IPS can be regular expressions now. Please see the section on [multi-cha
 
 Variables must be non-indexed on `emit`. To emit an indexed variable now requires the new `emit1` keyword.
 
+This worked in Miller 5 but is no longer supported in Miller 6:
+
 <pre class="pre-highlight-in-pair">
 <b>mlr5 -n put 'end {@input={"a":1}; emit @input["a"]}'</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
 input=1
 </pre>
+
+This works in Miller 6 (and worked in Miller 5 as well) and is supported:
 
 <pre class="pre-highlight-in-pair">
 <b>mlr -n put 'end {@input={"a":1}; emit1 {"input":@input["a"]}}'</b>
@@ -432,7 +439,7 @@ For the [third benchmark](https://github.com/johnkerl/miller/blob/main/scripts/c
 Notes:
 
 * CSV processing is particularly improved in Miller 6.
-* Record I/O is improved across the board, except that JSON continues to be a CPU-intensive format. Miller 6 JSON throughput is the same on Mac and Linux; Miller 5 did better on Miller 5 but only on Linux, not Mac.
+* Record I/O is improved across the board, except that JSON continues to be a CPU-intensive format. Miller 6 JSON throughput is the same on Mac and Linux; Miller 5 did better than Miller 6 but only on Linux, not Mac.
 * Miller 6's `sort` merits more performance analysis.
 * Even single-verb processing with `put` and `stats1` is significantly faster on both platforms.
 * Longer then-chains benefit even more from Miller 6's [multicore approach](cpu.md).

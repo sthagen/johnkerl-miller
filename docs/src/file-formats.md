@@ -104,36 +104,36 @@ NIDX: implicitly numerically indexed (Unix-toolkit style)
 
 When `mlr` is invoked with the `--csv` or `--csvlite` option, key names are found on the first record and values are taken from subsequent records.  This includes the case of CSV-formatted files.  See [Record Heterogeneity](record-heterogeneity.md) for how Miller handles changes of field names within a single data stream.
 
-Miller has record separator `RS` and field separator `FS`, just as `awk` does.  For TSV, use `--fs tab`; to convert TSV to CSV, use `--ifs tab --ofs comma`, etc.  (See also the [separators page](reference-main-separators.md).)
+Miller has record separator `RS` and field separator `FS`, just as `awk` does. (See also the [separators page](reference-main-separators.md).)
 
-**TSV (tab-separated values):** the following are synonymous pairs:
+**TSV (tab-separated values):** `FS` is tab and `RS` is newline (or carriage return + linefeed for
+Windows).  On input, if fields have `\r`, `\n`, `\t`, or `\\`, those are decoded as carriage return,
+newline, tab, and backslash, respectively. On output, the reverse is done -- for example, if a field
+has an embedded newline, that newline is replaced by `\n`.
 
-* `--tsv` and `--csv --fs tab`
-* `--itsv` and `--icsv --ifs tab`
-* `--otsv` and `--ocsv --ofs tab`
-* `--tsvlite` and `--csvlite --fs tab`
-* `--itsvlite` and `--icsvlite --ifs tab`
-* `--otsvlite` and `--ocsvlite --ofs tab`
+**ASV (ASCII-separated values):** the flags `--asv`, `--iasv`, `--oasv`, `--asvlite`, `--iasvlite`, and `--oasvlite` are analogous except they use ASCII FS and RS `0x1f` and `0x1e`, respectively.
 
-**ASV (ASCII-separated values):** the flags `--asv`, `--iasv`, `--oasv`, `--asvlite`, `--iasvlite`, and `--oasvlite` are analogous except they use ASCII FS and RS 0x1f and 0x1e, respectively.
-
-**USV (Unicode-separated values):** likewise, the flags `--usv`, `--iusv`, `--ousv`, `--usvlite`, `--iusvlite`, and `--ousvlite` use Unicode FS and RS U+241F (UTF-8 0x0xe2909f) and U+241E (UTF-8 0xe2909e), respectively.
+**USV (Unicode-separated values):** likewise, the flags `--usv`, `--iusv`, `--ousv`, `--usvlite`, `--iusvlite`, and `--ousvlite` use Unicode FS and RS `U+241F` (UTF-8 `0x0xe2909f`) and `U+241E` (UTF-8 `0xe2909e`), respectively.
 
 Miller's `--csv` flag supports [RFC-4180 CSV](https://tools.ietf.org/html/rfc4180). This includes CRLF line-terminators by default, regardless of platform.
 
 Here are the differences between CSV and CSV-lite:
 
+* CSV-lite naively splits lines on newline, and fields on comma -- embedded commas and newlines are not escaped in any way.
+
 * CSV supports [RFC-4180](https://tools.ietf.org/html/rfc4180)-style double-quoting, including the ability to have commas and/or LF/CRLF line-endings contained within an input field; CSV-lite does not.
 
 * CSV does not allow heterogeneous data; CSV-lite does (see also [Record Heterogeneity](record-heterogeneity.md)).
 
-* The CSV-lite input-reading code is fractionally more efficient than the CSV input-reader.
+* TSV-lite is simply CSV-lite with field separator set to tab instead of comma.
 
-Here are things they have in common:
+* CSV-lite allows changing FS and/or RS to any values, perhaps multi-character.
 
-* The ability to specify record/field separators other than the default, e.g. CR-LF vs. LF, or tab instead of comma for TSV, and so on.
+* In short, use-cases for CSV-lite and TSV-lite are often found when dealing with CSV/TSV files which are formatted in some non-standard way -- you have a little more flexibility available to you. (As an example of this flexibility: ASV and USV are nothing more than CSV-lite with different values for FS and RS.)
 
-* The `--implicit-csv-header` flag for input and the `--headerless-csv-output` flag for output.
+CSV, TSV, CSV-lite, and TSV-lite have in common the `--implicit-csv-header` flag for input and the `--headerless-csv-output` flag for output.
+
+See also the [`--lazy-quotes` flag](reference-main-flag-list.md#csv-only-flags) which can help with CSV files which are not fully compliant with RFC-4180.
 
 ## JSON
 
@@ -597,11 +597,28 @@ light
 While you can do format conversion using `mlr --icsv --ojson cat myfile.csv`, there are also keystroke-savers for this purpose, such as `mlr --c2j cat myfile.csv`.  For a complete list:
 
 <pre class="pre-highlight-in-pair">
-<b>mlr help format-conversion</b>
+<b>mlr help format-conversion-keystroke-saver-flags</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-No help found for "format-conversion". Please try 'mlr help find format-conversion' for approximate match.
-See also 'mlr help topics'.
+FORMAT-CONVERSION KEYSTROKE-SAVER FLAGS
+As keystroke-savers for format-conversion you may use the following.
+The letters c, t, j, l, d, n, x, p, and m refer to formats CSV, TSV, DKVP, NIDX,
+JSON, JSON Lines, XTAB, PPRINT, and markdown, respectively. Note that markdown
+format is available for output only.
+
+| In\out | CSV   | TSV   | JSON   | JSONL  | DKVP   | NIDX   | XTAB   | PPRINT | Markdown |
++--------+-------+-------+--------+--------+--------+--------+--------+----------+
+| CSV    |       | --c2t | --c2j  | --c2l  | --c2d  | --c2n  | --c2x  | --c2p  | --c2m    |
+| TSV    | --t2c |       | --t2j  | --t2l  | --t2d  | --t2n  | --t2x  | --t2p  | --t2m    |
+| JSON   | --j2c | --j2t |        | --j2l  | --j2d  | --j2n  | --j2x  | --j2p  | --j2m    |
+| JSONL  | --l2c | --l2t |        |        | --l2d  | --l2n  | --l2x  | --l2p  | --l2m    |
+| DKVP   | --d2c | --d2t | --d2j  | --d2l  |        | --d2n  | --d2x  | --d2p  | --d2m    |
+| NIDX   | --n2c | --n2t | --n2j  | --n2l  | --n2d  |        | --n2x  | --n2p  | --n2m    |
+| XTAB   | --x2c | --x2t | --x2j  | --x2l  | --x2d  | --x2n  |        | --x2p  | --x2m    |
+| PPRINT | --p2c | --p2t | --p2j  | --p2l  | --p2d  | --p2n  | --p2x  |        | --p2m    |
+
+-p                       Keystroke-saver for `--nidx --fs space --repifs`.
+-T                       Keystroke-saver for `--nidx --fs tab`.
 </pre>
 
 ## Comments in data
@@ -609,11 +626,37 @@ See also 'mlr help topics'.
 You can include comments within your data files, and either have them ignored, or passed directly through to the standard output as soon as they are encountered:
 
 <pre class="pre-highlight-in-pair">
-<b>mlr help comments-in-data</b>
+<b>mlr help comments-in-data-flags</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-No help found for "comments-in-data". Please try 'mlr help find comments-in-data' for approximate match.
-See also 'mlr help topics'.
+COMMENTS-IN-DATA FLAGS
+Miller lets you put comments in your data, such as
+
+    # This is a comment for a CSV file
+    a,b,c
+    1,2,3
+    4,5,6
+
+Notes:
+
+* Comments are only honored at the start of a line.
+* In the absence of any of the below four options, comments are data like
+  any other text. (The comments-in-data feature is opt-in.)
+* When `--pass-comments` is used, comment lines are written to standard output
+  immediately upon being read; they are not part of the record stream.  Results
+  may be counterintuitive. A suggestion is to place comments at the start of
+  data files.
+
+--pass-comments          Immediately print commented lines (prefixed by `#`)
+                         within the input.
+--pass-comments-with {string}
+                         Immediately print commented lines within input, with
+                         specified prefix.
+--skip-comments          Ignore commented lines (prefixed by `#`) within the
+                         input.
+--skip-comments-with {string}
+                         Ignore commented lines within input, with specified
+                         prefix.
 </pre>
 
 Examples:

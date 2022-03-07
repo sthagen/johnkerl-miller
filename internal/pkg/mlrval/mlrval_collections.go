@@ -86,7 +86,7 @@ func (mv *Mlrval) ArrayGet(mindex *Mlrval) Mlrval {
 	if !mindex.IsInt() {
 		return *ERROR
 	}
-	value := arrayGetAliased(&mv.arrayval, mindex.intval)
+	value := arrayGetAliased(&mv.arrayval, int(mindex.intval))
 	if value == nil {
 		return *ABSENT
 	} else {
@@ -116,7 +116,7 @@ func (mv *Mlrval) ArrayPut(mindex *Mlrval, value *Mlrval) {
 		os.Exit(1)
 	}
 
-	ok := arrayPutAliased(&mv.arrayval, mindex.intval, value)
+	ok := arrayPutAliased(&mv.arrayval, int(mindex.intval), value)
 	if !ok {
 		fmt.Fprintf(
 			os.Stderr,
@@ -128,27 +128,26 @@ func (mv *Mlrval) ArrayPut(mindex *Mlrval, value *Mlrval) {
 }
 
 // ----------------------------------------------------------------
-func arrayGetAliased(array *[]Mlrval, mindex int) *Mlrval {
+func arrayGetAliased(array *[]*Mlrval, mindex int) *Mlrval {
 	zindex, ok := UnaliasArrayIndex(array, mindex)
 	if ok {
-		return &(*array)[zindex]
+		return (*array)[zindex]
 	} else {
 		return nil
 	}
 }
 
-func arrayPutAliased(array *[]Mlrval, mindex int, value *Mlrval) bool {
+func arrayPutAliased(array *[]*Mlrval, mindex int, value *Mlrval) bool {
 	zindex, ok := UnaliasArrayIndex(array, mindex)
 	if ok {
-		clone := value.Copy()
-		(*array)[zindex] = *clone
+		(*array)[zindex] = value.Copy()
 		return true
 	} else {
 		return false
 	}
 }
 
-func UnaliasArrayIndex(array *[]Mlrval, mindex int) (int, bool) {
+func UnaliasArrayIndex(array *[]*Mlrval, mindex int) (int, bool) {
 	n := int(len(*array))
 	return UnaliasArrayLengthIndex(n, mindex)
 }
@@ -214,7 +213,7 @@ func (mv *Mlrval) ArrayAppend(value *Mlrval) {
 		// Silent no-ops are not good UX ...
 		return
 	}
-	mv.arrayval = append(mv.arrayval, *value)
+	mv.arrayval = append(mv.arrayval, value)
 }
 
 // ================================================================
@@ -311,8 +310,6 @@ func (mv *Mlrval) PutIndexed(indices []*Mlrval, rvalue *Mlrval) error {
 			)
 		}
 	}
-
-	return nil
 }
 
 // ----------------------------------------------------------------
@@ -366,7 +363,7 @@ func putIndexedOnMap(baseMap *Mlrmap, indices []*Mlrval, rvalue *Mlrval) error {
 // ----------------------------------------------------------------
 // Helper function for Mlrval.PutIndexed, for mlrvals of array type.
 func putIndexedOnArray(
-	baseArray *[]Mlrval,
+	baseArray *[]*Mlrval,
 	indices []*Mlrval,
 	rvalue *Mlrval,
 ) error {
@@ -382,12 +379,12 @@ func putIndexedOnArray(
 				".",
 		)
 	}
-	zindex, inBounds := UnaliasArrayIndex(baseArray, mindex.intval)
+	zindex, inBounds := UnaliasArrayIndex(baseArray, int(mindex.intval))
 
 	if numIndices == 1 {
 		// If last index, then assign.
 		if inBounds {
-			(*baseArray)[zindex] = *rvalue.Copy()
+			(*baseArray)[zindex] = rvalue.Copy()
 		} else if mindex.intval == 0 {
 			return errors.New("mlr: zero indices are not supported. Indices are 1-up.")
 		} else if mindex.intval < 0 {
@@ -395,9 +392,9 @@ func putIndexedOnArray(
 		} else {
 			// Array is [a,b,c] with mindices 1,2,3. Length is 3. Zindices are 0,1,2.
 			// Given mindex is 4.
-			LengthenMlrvalArray(baseArray, mindex.intval)
+			LengthenMlrvalArray(baseArray, int(mindex.intval))
 			zindex := mindex.intval - 1
-			(*baseArray)[zindex] = *rvalue.Copy()
+			(*baseArray)[zindex] = rvalue.Copy()
 		}
 		return nil
 
@@ -409,11 +406,11 @@ func putIndexedOnArray(
 			// Overwrite what's in this slot if it's the wrong type
 			if nextIndex.IsString() {
 				if !(*baseArray)[zindex].IsMap() {
-					(*baseArray)[zindex] = *FromEmptyMap()
+					(*baseArray)[zindex] = FromEmptyMap()
 				}
 			} else if nextIndex.IsInt() {
 				if !(*baseArray)[zindex].IsArray() {
-					(*baseArray)[zindex] = *FromEmptyArray()
+					(*baseArray)[zindex] = FromEmptyArray()
 				}
 			} else {
 				return errors.New(
@@ -429,14 +426,11 @@ func putIndexedOnArray(
 			return errors.New("mlr: Cannot use negative indices to auto-lengthen arrays.")
 		} else {
 			// Already allocated but needs to be longer
-			LengthenMlrvalArray(baseArray, mindex.intval)
+			LengthenMlrvalArray(baseArray, int(mindex.intval))
 			zindex := mindex.intval - 1
 			return (*baseArray)[zindex].PutIndexed(indices[1:], rvalue)
 		}
-
 	}
-
-	return nil
 }
 
 // ----------------------------------------------------------------
@@ -497,7 +491,7 @@ func removeIndexedOnMap(baseMap *Mlrmap, indices []*Mlrval) error {
 // ----------------------------------------------------------------
 // Helper function for Mlrval.PutIndexed, for mlrvals of array type.
 func removeIndexedOnArray(
-	baseArray *[]Mlrval,
+	baseArray *[]*Mlrval,
 	indices []*Mlrval,
 ) error {
 	numIndices := len(indices)
@@ -511,7 +505,7 @@ func removeIndexedOnArray(
 				".",
 		)
 	}
-	zindex, inBounds := UnaliasArrayIndex(baseArray, mindex.intval)
+	zindex, inBounds := UnaliasArrayIndex(baseArray, int(mindex.intval))
 
 	// If last index, then unset.
 	if numIndices == 1 {
@@ -542,35 +536,23 @@ func removeIndexedOnArray(
 }
 
 // ----------------------------------------------------------------
-// Used for API-matching in multi-index contexts.
-func MakePointerArray(
-	valueArray []Mlrval,
-) (pointerArray []*Mlrval) {
-	pointerArray = make([]*Mlrval, len(valueArray))
-	for i := range valueArray {
-		pointerArray[i] = &valueArray[i]
-	}
-	return pointerArray
-}
-
-// ----------------------------------------------------------------
 // Nominally for TopKeeper
 
 type BsearchMlrvalArrayFunc func(
 	array *[]*Mlrval,
-	size int, // maybe less than len(array)
+	size int64, // maybe less than len(array)
 	value *Mlrval,
-) int
+) int64
 
 func BsearchMlrvalArrayForDescendingInsert(
 	array *[]*Mlrval,
-	size int, // maybe less than len(array)
+	size int64, // maybe less than len(array)
 	value *Mlrval,
-) int {
-	lo := 0
+) int64 {
+	lo := int64(0)
 	hi := size - 1
 	mid := (hi + lo) / 2
-	var newmid int
+	var newmid int64
 
 	if size == 0 {
 		return 0
@@ -611,13 +593,13 @@ func BsearchMlrvalArrayForDescendingInsert(
 
 func BsearchMlrvalArrayForAscendingInsert(
 	array *[]*Mlrval,
-	size int, // maybe less than len(array)
+	size int64, // maybe less than len(array)
 	value *Mlrval,
-) int {
-	lo := 0
+) int64 {
+	lo := int64(0)
 	hi := size - 1
 	mid := (hi + lo) / 2
-	var newmid int
+	var newmid int64
 
 	if size == 0 {
 		return 0
@@ -693,10 +675,10 @@ func (mv *Mlrval) Arrayify() *Mlrval {
 		}
 
 		if convertible {
-			arrayval := make([]Mlrval, mv.mapval.FieldCount)
+			arrayval := make([]*Mlrval, mv.mapval.FieldCount)
 			i := 0
 			for pe := mv.mapval.Head; pe != nil; pe = pe.Next {
-				arrayval[i] = *pe.Value.Copy()
+				arrayval[i] = pe.Value.Copy()
 				i++
 			}
 			return FromArray(arrayval)
@@ -709,7 +691,7 @@ func (mv *Mlrval) Arrayify() *Mlrval {
 		// TODO: comment (or rethink) that this modifies its inputs!!
 		output := mv.Copy()
 		for i := range mv.arrayval {
-			output.arrayval[i] = *output.arrayval[i].Arrayify()
+			output.arrayval[i] = output.arrayval[i].Arrayify()
 		}
 		return output
 
@@ -718,7 +700,7 @@ func (mv *Mlrval) Arrayify() *Mlrval {
 	}
 }
 
-func LengthenMlrvalArray(array *[]Mlrval, newLength64 int) {
+func LengthenMlrvalArray(array *[]*Mlrval, newLength64 int) {
 	newLength := int(newLength64)
 	lib.InternalCodingErrorIf(newLength <= len(*array))
 
@@ -726,18 +708,18 @@ func LengthenMlrvalArray(array *[]Mlrval, newLength64 int) {
 		newArray := (*array)[:newLength]
 		for zindex := len(*array); zindex < newLength; zindex++ {
 			// TODO: comment why not MT_ABSENT or MT_VOID
-			newArray[zindex] = *NULL
+			newArray[zindex] = NULL
 		}
 		*array = newArray
 	} else {
-		newArray := make([]Mlrval, newLength, 2*newLength)
+		newArray := make([]*Mlrval, newLength, 2*newLength)
 		zindex := 0
 		for zindex = 0; zindex < len(*array); zindex++ {
 			newArray[zindex] = (*array)[zindex]
 		}
 		for zindex = len(*array); zindex < newLength; zindex++ {
 			// TODO: comment why not MT_ABSENT or MT_VOID
-			newArray[zindex] = *NULL
+			newArray[zindex] = NULL
 		}
 		*array = newArray
 	}

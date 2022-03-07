@@ -23,7 +23,7 @@ func (mv *Mlrval) GetStringValue() (stringValue string, isString bool) {
 	}
 }
 
-func (mv *Mlrval) GetIntValue() (intValue int, isInt bool) {
+func (mv *Mlrval) GetIntValue() (intValue int64, isInt bool) {
 	if mv.Type() == MT_INT {
 		return mv.intval, true
 	} else {
@@ -63,7 +63,7 @@ func (mv *Mlrval) GetBoolValue() (boolValue bool, isBool bool) {
 	}
 }
 
-func (mv *Mlrval) GetArray() []Mlrval {
+func (mv *Mlrval) GetArray() []*Mlrval {
 	if mv.IsArray() {
 		return mv.arrayval
 	} else {
@@ -105,7 +105,7 @@ func (mv *Mlrval) AcquireStringValue() string {
 	return mv.printrep
 }
 
-func (mv *Mlrval) AcquireIntValue() int {
+func (mv *Mlrval) AcquireIntValue() int64 {
 	lib.InternalCodingErrorIf(mv.mvtype != MT_INT)
 	return mv.intval
 }
@@ -120,7 +120,7 @@ func (mv *Mlrval) AcquireBoolValue() bool {
 	return mv.boolval
 }
 
-func (mv *Mlrval) AcquireArrayValue() []Mlrval {
+func (mv *Mlrval) AcquireArrayValue() []*Mlrval {
 	lib.InternalCodingErrorIf(mv.mvtype != MT_ARRAY)
 	return mv.arrayval
 }

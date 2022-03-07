@@ -67,8 +67,8 @@ In this example I am using version 6.1.0 to 6.2.0; of course that will change fo
 
 * Update version found in `mlr --version` and `man mlr`:
 
-    * Edit `internal/pkpg/version/version.go` from `6.1.0-dev` to `6.2.0`.
-    * Edit version in `docs/mkdocs.yml` from `6.1.0` to `6.2.0`.
+    * Edit `internal/pkg/version/version.go` from `6.1.0-dev` to `6.2.0`.
+    * Edit `miller.spec`: `Version`, and `changelog` entry
     * Run `make dev` in the Miller repo base directory
     * The ordering in this makefile rule is important: the first build creates `mlr`; the second runs `mlr` to create `manpage.txt`; the third includes `manpage.txt` into one of its outputs.
     * Commit and push.
@@ -77,15 +77,15 @@ In this example I am using version 6.1.0 to 6.2.0; of course that will change fo
 
     * `make release_tarball`
     * This creates `miller-6.2.0.tar.gz` which we'll upload to GitHub, the URL of which will be in our `miller.spec`
-    * Get `mlr.{arch}` binaries from latest successful build from [https://github.com/johnkerl/miller/actions](https://github.com/johnkerl/miller/actions), or, build them on buildboxes.
     * Prepare the source RPM following [README-RPM.md](https://github.com/johnkerl/miller/blob/main/README-RPM.md).
 
 * Create the Github release tag:
 
     * Don't forget the `v` in `v6.2.0`
     * Write the release notes
-    * Attach the release tarball, binaries, and SRPM. Double-check assets were successfully uploaded.
-    * Publish the release
+    * Get binaries from latest successful build from [https://github.com/johnkerl/miller/actions](https://github.com/johnkerl/miller/actions), or, build them on buildboxes. Note that thanks to [PR 822](https://github.com/johnkerl/miller/pull/822) which introduces [goreleaser](https://github.com/johnkerl/miller/blob/main/.goreleaser.yml) there are versions for many platforms auto-built and auto-attached to the GitHub release (below). The only exception is for Windows: goreleaser makes a `.tar.gz` file but it's nice to attach a `.zip` from GitHub actions for the benefit of Windows users.
+    * Attach the release tarball, Windows `.zip`, and SRPM. Double-check assets were successfully uploaded.
+    * Publish the release. Note that gorelease will create and attach the rest of the binaries.
 
 * Check the release-specific docs:
 
@@ -95,6 +95,7 @@ In this example I am using version 6.1.0 to 6.2.0; of course that will change fo
 
     * Submit `brew` pull request; notify any other distros which don't appear to have autoupdated since the previous release (notes below)
     * Similarly for `macports`: [https://github.com/macports/macports-ports/blob/master/textproc/miller/Portfile](https://github.com/macports/macports-ports/blob/master/textproc/miller/Portfile)
+    * See also [README-versions.md](https://github.com/johnkerl/miller/blob/main/README-versions.md) -- distros usually catch up over time but some contacts/pings never hurt to kick-start processes after owners move on from a project they started.
     * Social-media updates.
 
 <pre class="pre-non-highlight-non-pair">
@@ -119,10 +120,9 @@ git push -u origin miller-6.1.0
 * Afterwork:
 
     * Edit `internal/pkg/version/version.go` to change version from `6.2.0` to `6.2.0-dev`.
-    * `cd go`
-    * `./build`
+    * `make dev`
     * Commit and push.
 
 ## Misc. development notes
 
-I use terminal width 120 and tabwidth 4.
+I use terminal width 120 and tabwidth 4. Miller documents use the Oxford comma: not _red, yellow and green_, but rather _red, yellow, and green_.
