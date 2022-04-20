@@ -26,6 +26,42 @@ RELEASES
 FEATURES
 
 ----------------------------------------------------------------
+STRICT MODE
+
+? re silent zero-pass for-loops on non-collections:
+
+i theme is handling of 'absent'
+
+? what about handling of 'error' ?
+
+* improve wording:
+  mlr: couldn't assign variable int function return value from value absent (absent)
+
+* need $?x and @?x in the grammar & CST
+
+* flags:
+  o mlr -z and mlr put -z
+  o note put has -w (warn) and -W (fatal)
+    - then strict mode includes -W?
+
+* tests:
+  mlr --csv --from $exv put -z 'x = 1'
+  mlr --csv --from $exv put -z 'var x = a'
+  mlr --csv --from $exv put -z 'var x = $nonesuch'
+  mlr --csv --from $exv put -z 'var x = $["asdf"]'
+  mlr --csv --from $exv put -z 'var x = $[nonesuch]'
+  mlr --csv --from $exv put -z 'var x = $[[999]]'
+  mlr --csv --from $exv put -z 'var x = $[[[999]]]'
+  mlr --csv --from $exv put -z 'begin { var m = $* }'
+  mlr --csv --from $exv put -z 'var x = @nonesuch'
+  mlr --csv --from $exv put -z 'var x = @["nonesuch"]'
+  mlr --csv --from $exv put -z 'func f(): int {}; $x = f()'
+  mlr --csv --from $exv put -z 'func f() {}; $x = f()'
+  mlr --csv --from $exv put -z 'func f() {return nonesuch}; $x = f()'
+  mlr --csv --from $exv put -z '$env = ENV[nonesuch]'
+  mlr --csv --from $exv put -z '$env = ENV["nonesuch"]'
+
+----------------------------------------------------------------
 EXTENDED FIELD ACCESSORS
 
 * extract/simplify getter logic outside of full CST/runtime/etc
@@ -93,16 +129,6 @@ inference:
 * inf/nan (unquoted) -> DSL
   o webdocs as in #933 description
 * for data files: --symbol-true yes --symbol-false off --symbol-infinity inf --symbol-not-available N/A
-
-----------------------------------------------------------------
-strict-mode ideas
-* localvar:
-  o LHS: just require typedecl (even just var)
-  o RHS: like put -w, but with turning warnings into errors
-* oosvar:
-  o abend unless @?x -- ?
-* srec:
-  o abend unless $?x -- ?
 
 ----------------------------------------------------------------
 ! sysdate, sysdate_local; datediff ...
@@ -178,7 +204,6 @@ strict-mode ideas
 ================================================================
 UX
 
-* ?xyz and ??xyz in repl, for :help and :help find respectively
 ? NF?
 
 ! bnf fix for '[[' ']]' etc -- make it a nesting of singles. since otherwise no '[[3,4]]' literals :(
@@ -197,9 +222,6 @@ UX
 ? fmtnum(98, "%3d%%") -- ? workaround: fmtnum(98, "%3d") . "%"
 ? main-level (verb-level?) flag for "," -> X in verbs -- in case commas in field names
 ? trace-mode ?
-? re silent zero-pass for-loops on non-collections:
-  o intended as a heterogenity feature ...
-  o consider a --errors or --strict mode; something
 ? $0 as raw-record string -- ? would make mlr grep simpler and more natural ...
 
 ================================================================

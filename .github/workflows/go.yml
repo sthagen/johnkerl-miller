@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Set up Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: 1.15
 
@@ -36,7 +36,7 @@ jobs:
       if: matrix.os == 'windows-latest'
       run: mkdir -p bin/${{matrix.os}} && cp mlr.exe bin/${{matrix.os}}
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       with:
         name: mlr-${{matrix.os}}
         path: bin/${{matrix.os}}/*
