@@ -103,7 +103,10 @@ type TWriterOptions struct {
 	// JSON Lines output: --jlistwrap off, --jvstack off
 	WrapJSONOutputInOuterList bool // --jlistwrap
 	JSONOutputMultiline       bool // --jvstack
+	JVQuoteAll                bool // --jvquoteall
 	// Not using miller/types enum to avoid package cycle
+
+	CSVQuoteAll bool // --quote-all
 
 	// When we read things like
 	//

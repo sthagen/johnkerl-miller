@@ -121,6 +121,7 @@ These are flags which are applicable to CSV format.
 * `--implicit-csv-header or --headerless-csv-input or --hi or --implicit-tsv-header`: Use 1,2,3,... as field labels, rather than from line 1 of input files. Tip: combine with `label` to recreate missing headers.
 * `--lazy-quotes`: Accepts quotes appearing in unquoted fields, and non-doubled quotes appearing in quoted fields.
 * `--no-implicit-csv-header or --no-implicit-tsv-header`: Opposite of `--implicit-csv-header`. This is the default anyway -- the main use is for the flags to `mlr join` if you have main file(s) which are headerless but you want to join in on a file which does have a CSV/TSV header. Then you could use `mlr --csv --implicit-csv-header join --no-implicit-csv-header -l your-join-in-with-header.csv ... your-headerless.csv`.
+* `--quote-all`: Force double-quoting of CSV fields.
 * `-N`: Keystroke-saver for `--implicit-csv-header --headerless-csv-output`.
 
 ## File-format flags
@@ -219,6 +220,19 @@ Additionally:
 * `-p` is a keystroke-saver for `--nidx --fs space --repifs`.
 * `-T` is a keystroke-saver for `--nidx --fs tab`.
 
+## JSON-only flags
+
+These are flags which are applicable to JSON output format.
+
+
+**Flags:**
+
+* `--jlistwrap or --jl`: Wrap JSON output in outermost `[ ]`. This is the default for JSON output format.
+* `--jvquoteall`: Force all JSON values -- recursively into lists and object -- to string.
+* `--jvstack`: Put one key-value pair per line for JSON output (multi-line output). This is the default for JSON output format.
+* `--no-jlistwrap`: Wrap JSON output in outermost `[ ]`. This is the default for JSON Lines output format.
+* `--no-jvstack`: Put objects/arrays all on one line for JSON output. This is the default for JSON Lines output format.
+
 ## Legacy flags
 
 These are flags which don't do anything in the current Miller version.
@@ -228,20 +242,14 @@ They are accepted as no-op flags in order to keep old scripts from breaking.
 **Flags:**
 
 * `--jknquoteint`: Type information from JSON input files is now preserved throughout the processing stream.
-* `--jlistwrap or --jl`: Wrap JSON output in outermost `[ ]`. This is the default for JSON output format.
 * `--jquoteall`: Type information from JSON input files is now preserved throughout the processing stream.
 * `--json-fatal-arrays-on-input`: Miller now supports arrays as of version 6.
 * `--json-map-arrays-on-input`: Miller now supports arrays as of version 6.
 * `--json-skip-arrays-on-input`: Miller now supports arrays as of version 6.
 * `--jsonx`: The `--jvstack` flag is now default true in Miller 6.
-* `--jvquoteall`: Type information from JSON input files is now preserved throughout the processing stream.
-* `--jvstack`: Put one key-value pair per line for JSON output (multi-line output). This is the default for JSON output format.
 * `--mmap`: Miller no longer uses memory-mapping to access data files.
-* `--no-jlistwrap`: Wrap JSON output in outermost `[ ]`. This is the default for JSON Lines output format.
-* `--no-jvstack`: Put objects/arrays all on one line for JSON output. This is the default for JSON Lines output format.
 * `--no-mmap`: Miller no longer uses memory-mapping to access data files.
 * `--ojsonx`: The `--jvstack` flag is now default true in Miller 6.
-* `--quote-all`: Ignored as of version 6. Types are inferred/retained through the processing flow now.
 * `--quote-minimal`: Ignored as of version 6. Types are inferred/retained through the processing flow now.
 * `--quote-none`: Ignored as of version 6. Types are inferred/retained through the processing flow now.
 * `--quote-numeric`: Ignored as of version 6. Types are inferred/retained through the processing flow now.
@@ -350,7 +358,7 @@ those can be joined with a "-", like "red-bold", "bold-170", "bold-underline", e
 
 ## PPRINT-only flags
 
-These are flags which are applicable to PPRINT output format.
+These are flags which are applicable to PPRINT format.
 
 
 **Flags:**
