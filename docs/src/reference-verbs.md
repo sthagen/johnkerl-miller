@@ -2097,8 +2097,8 @@ shape    color  count
 square   red    1874
 triangle red    1560
 circle   red    1207
-square   yellow 589
 square   blue   589
+square   yellow 589
 </pre>
 
 <pre class="pre-highlight-in-pair">
@@ -2109,8 +2109,8 @@ shape    color  someothername
 square   red    1874
 triangle red    1560
 circle   red    1207
-square   yellow 589
 square   blue   589
+square   yellow 589
 </pre>
 
 <pre class="pre-highlight-in-pair">
@@ -2121,8 +2121,8 @@ shape    color
 square   red
 triangle red
 circle   red
-square   yellow
 square   blue
+square   yellow
 </pre>
 
 See also [least-frequent](reference-verbs.md#least-frequent).
@@ -2558,7 +2558,7 @@ Wide-to-long options:
   -r {input field regex} -o {key-field name,value-field name}
   These pivot/reshape the input data such that the input fields are removed
   and separate records are emitted for each key/value pair.
-  Note: if you have multiplep regexes, please specify them using multiple -r,
+  Note: if you have multiple regexes, please specify them using multiple -r,
   since regexes can contain commas within them.
   Note: this works with tail -f and produces output records for each input
   record seen.
@@ -3398,7 +3398,7 @@ Options:
              As of Miller 6 this happens automatically, but the flag is accepted
              as a no-op for backward compatibility with Miller 5 and below.
 -d {x,y,z}   Weights for EWMA. 1 means current sample gets all weight (no
-             smoothing), near under under 1 is light smoothing, near over 0 is
+             smoothing), near under 1 is light smoothing, near over 0 is
              heavy smoothing. Multiple weights may be specified, e.g.
              "mlr step -a ewma -f sys_load -d 0.01,0.1,0.9". Default if omitted
              is "-d 0.5".
@@ -3557,7 +3557,7 @@ All summarizers:
   uof             upper outer fence: p75 + 3.0 * iqr
 
 Default summarizers:
-  field_type count mean min median max null_count distinct_count
+  field_type count mean min max null_count distinct_count
 
 Notes:
 * min, p25, median, p75, and max work for strings as well as numbers
@@ -3575,12 +3575,12 @@ Options:
 <b>mlr --ofmt %.3f --from data/medium --opprint summary</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-field_name field_type count null_count distinct_count mean     min   median max
-a          string     10000 0          5              -        eks   pan    zee
-b          string     10000 0          5              -        eks   pan    zee
-i          int        10000 0          10000          5000.500 1     5001   10000
-x          float      10000 0          10000          0.499    0.000 0.501  1.000
-y          float      10000 0          10000          0.506    0.000 0.506  1.000
+field_name field_type count null_count distinct_count mean     min   max
+a          string     10000 0          5              -        eks   zee
+b          string     10000 0          5              -        eks   zee
+i          int        10000 0          10000          5000.500 1     10000
+x          float      10000 0          10000          0.499    0.000 1.000
+y          float      10000 0          10000          0.506    0.000 1.000
 </pre>
 
 <pre class="pre-highlight-in-pair">
@@ -3600,7 +3600,7 @@ var            -      -      8334166.666666667  0.08426974433144456    0.0846112
 skewness       -      -      0                  -0.0006899591185521965 -0.017849760120133784
 minlen         3      3      1                  15                     13
 maxlen         3      3      5                  22                     22
-min            eks    eks    1                  4.509679127584487e-05  8.818962627266114e-05
+min            eks    eks    1                  0.00004509679127584487 0.00008818962627266114
 p25            hat    hat    2501               0.24667037823231752    0.25213670524015686
 median         pan    pan    5001               0.5011592202840128     0.5060212582772865
 p75            wye    wye    7501               0.7481860062358446     0.7640028449996572

@@ -95,13 +95,11 @@ Regular expressions are those supported by the [Go regexp package](https://pkg.g
 <pre class="pre-non-highlight-in-pair">
 package syntax // import "regexp/syntax"
 
-Package syntax parses regular expressions into parse trees and compiles
-parse trees into programs. Most clients of regular expressions will use the
-facilities of package regexp (such as Compile and Match) instead of this
-package.
+Package syntax parses regular expressions into parse trees and compiles parse
+trees into programs. Most clients of regular expressions will use the facilities
+of package regexp (such as Compile and Match) instead of this package.
 
-
-Syntax
+# Syntax
 
 The regular expression syntax understood by this package when parsing with
 the Perl flag is as follows. Parts of the syntax can be disabled by passing
@@ -141,9 +139,9 @@ Repetitions:
     x{n,}?         n or more x, prefer fewer
     x{n}?          exactly n x
 
-Implementation restriction: The counting forms x{n,m}, x{n,}, and x{n}
-reject forms that create a minimum or maximum repetition count above 1000.
-Unlimited repetitions are not subject to this restriction.
+Implementation restriction: The counting forms x{n,m}, x{n,}, and x{n} reject
+forms that create a minimum or maximum repetition count above 1000. Unlimited
+repetitions are not subject to this restriction.
 
 Grouping:
 
@@ -229,8 +227,7 @@ ASCII character classes:
     [[:word:]]     word characters (== [0-9A-Za-z_])
     [[:xdigit:]]   hex digit (== [0-9A-Fa-f])
 
-Unicode character classes are those in unicode.Categories and
-unicode.Scripts.
+Unicode character classes are those in unicode.Categories and unicode.Scripts.
 
 func IsWordChar(r rune) bool
 type EmptyOp uint8
