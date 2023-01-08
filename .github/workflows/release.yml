@@ -23,13 +23,13 @@ jobs:
         id: go
 
       - name: Check out code into the Go module directory
-        uses: actions/checkout@755da8c3cf115ac066823e79a1e1788f8940201b
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
         with:
           fetch-depth: 0
 
       # https://github.com/marketplace/actions/cache
       - name: Cache Go modules
-        uses: actions/cache@c1a5de879eb890d062a85ee0252d6036480b1fe2
+        uses: actions/cache@4723a57e26efda3a62cbde1812113b730952852d
         with:
           path: |
             ~/.cache/go-build
