@@ -29,7 +29,7 @@ jobs:
 
       # https://github.com/marketplace/actions/cache
       - name: Cache Go modules
-        uses: actions/cache@58c146cc91c5b9e778e71775dfe9bf1442ad9a12
+        uses: actions/cache@6998d139ddd3e68c71e9e398d8e40b71a2f39812
         with:
           path: |
             ~/.cache/go-build
@@ -40,7 +40,7 @@ jobs:
 
       # https://goreleaser.com/ci/actions/
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@8f67e590f2d095516493f017008adc464e63adb1
+        uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b
         #if: startsWith(github.ref, 'refs/tags/v')
         with:
           version: latest
