@@ -50,7 +50,7 @@ MILLER(1)                                                            MILLER(1)
        insertion-ordered hash map.  This encompasses a variety of data
        formats, including but not limited to the familiar CSV, TSV, and JSON.
        (Miller can handle positionally-indexed data as a special case.) This
-       manpage documents mlr 6.6.0-dev.
+       manpage documents mlr 6.7.0-dev.
 
 1mEXAMPLES0m
        mlr --icsv --opprint cat example.csv
@@ -191,13 +191,14 @@ MILLER(1)                                                            MILLER(1)
 
 1mVERB LIST0m
        altkv bar bootstrap cat check clean-whitespace count-distinct count
-       count-similar cut decimate fill-down fill-empty filter flatten format-values
-       fraction gap grep group-by group-like having-fields head histogram json-parse
-       json-stringify join label latin1-to-utf8 least-frequent merge-fields
-       most-frequent nest nothing put regularize remove-empty-columns rename reorder
-       repeat reshape sample sec2gmtdate sec2gmt seqgen shuffle skip-trivial-records
-       sort sort-within-records split stats1 stats2 step summary tac tail tee
-       template top utf8-to-latin1 unflatten uniq unspace unsparsify
+       count-similar cut decimate downcase fill-down fill-empty filter flatten
+       format-values fraction gap grep group-by group-like having-fields head
+       histogram json-parse json-stringify join label latin1-to-utf8 least-frequent
+       merge-fields most-frequent nest nothing put regularize remove-empty-columns
+       rename reorder repeat reshape sample sec2gmtdate sec2gmt seqgen shuffle
+       skip-trivial-records sort sort-within-records split stats1 stats2 step summary
+       tac tail tee template top utf8-to-latin1 unflatten uniq unspace unsparsify
+       upcase
 
 1mFUNCTION LIST0m
        abs acos acosh any append apply arrayify asin asinh asserting_absent
@@ -213,17 +214,17 @@ MILLER(1)                                                            MILLER(1)
        invqnorm is_absent is_array is_bool is_boolean is_empty is_empty_map is_error
        is_float is_int is_map is_nan is_nonempty_map is_not_array is_not_empty
        is_not_map is_not_null is_null is_numeric is_present is_string joink joinkv
-       joinv json_parse json_stringify latin1_to_utf8 leafcount length localtime2gmt
-       localtime2sec log log10 log1p logifit lstrip madd mapdiff mapexcept mapselect
-       mapsum max md5 mexp min mmul msub os pow qnorm reduce regextract
-       regextract_or_else round roundm rstrip sec2dhms sec2gmt sec2gmtdate sec2hms
-       sec2localdate sec2localtime select sgn sha1 sha256 sha512 sin sinh sort splita
-       splitax splitkv splitkvx splitnv splitnvx sqrt ssub strftime strftime_local
-       string strip strlen strptime strptime_local sub substr substr0 substr1 system
-       systime systimeint tan tanh tolower toupper truncate typeof unflatten unformat
-       unformatx uptime urand urand32 urandelement urandint urandrange utf8_to_latin1
-       version ! != !=~ % & && * ** + - . .* .+ .- ./ / // &lt; &lt;&lt; &lt;= &lt;=&gt; == =~ &gt; &gt;= &gt;&gt;
-       &gt;&gt;&gt; ?: ?? ??? ^ ^^ | || ~
+       joinv json_parse json_stringify latin1_to_utf8 leafcount leftpad length
+       localtime2gmt localtime2sec log log10 log1p logifit lstrip madd mapdiff
+       mapexcept mapselect mapsum max md5 mexp min mmul msub os pow qnorm reduce
+       regextract regextract_or_else rightpad round roundm rstrip sec2dhms sec2gmt
+       sec2gmtdate sec2hms sec2localdate sec2localtime select sgn sha1 sha256 sha512
+       sin sinh sort splita splitax splitkv splitkvx splitnv splitnvx sqrt ssub
+       strftime strftime_local string strip strlen strptime strptime_local sub substr
+       substr0 substr1 system systime systimeint tan tanh tolower toupper truncate
+       typeof unflatten unformat unformatx uptime urand urand32 urandelement urandint
+       urandrange utf8_to_latin1 version ! != !=~ % & && * ** + - . .* .+ .- ./ / //
+       &lt; &lt;&lt; &lt;= &lt;=&gt; == =~ &gt; &gt;= &gt;&gt; &gt;&gt;&gt; ?: ?? ??? ^ ^^ | || ~
 
 1mCOMMENTS-IN-DATA FLAGS0m
        Miller lets you put comments in your data, such as
@@ -557,6 +558,9 @@ MILLER(1)                                                            MILLER(1)
                                 floating-point numbers. If not specified, default
                                 formatting is used. See also the `fmtnum` function
                                 and the `format-values` verb.
+       --ofmte {n}              Use --ofmte 6 as shorthand for --ofmt %.6e, etc.
+       --ofmtf {n}              Use --ofmtf 6 as shorthand for --ofmt %.6f, etc.
+       --ofmtg {n}              Use --ofmtg 6 as shorthand for --ofmt %.6g, etc.
        --records-per-batch {n}  This is an internal parameter for maximum number of
                                 records in a batch size. Normally this does not need
                                 to be modified.
@@ -997,6 +1001,14 @@ MILLER(1)                                                            MILLER(1)
         -e Decimate by printing last of every n (default).
         -g {a,b,c} Optional group-by-field names for decimate counts, e.g. a,b,c.
         -n {n} Decimation factor (default 10).
+       -h|--help Show this message.
+
+   1mdowncase0m
+       Usage: mlr downcase [options]
+       Lowercases strings in record keys and/or values.
+       Options:
+       -k        Downcase only keys, not keys and values.
+       -v        Downcase only values, not keys and values.
        -h|--help Show this message.
 
    1mfill-down0m
@@ -1447,8 +1459,9 @@ MILLER(1)                                                            MILLER(1)
          been lost.
        * The combination "--implode --values --across-records" is non-streaming:
          no output records are produced until all input records have been read. In
-         particular, this means it won't work in tail -f contexts. But all other flag
-         combinations result in streaming (tail -f friendly) data processing.
+         particular, this means it won't work in `tail -f` contexts. But all other flag
+         combinations result in streaming (`tail -f` friendly) data processing.
+         If input is coming from `tail -f`, be sure to use `--records-per-batch 1`.
        * It's up to you to ensure that the nested-fs is distinct from your data's IFS:
          e.g. by default the former is semicolon and the latter is comma.
        See also mlr reshape.
@@ -1630,7 +1643,8 @@ MILLER(1)                                                            MILLER(1)
          Note: if you have multiple regexes, please specify them using multiple -r,
          since regexes can contain commas within them.
          Note: this works with tail -f and produces output records for each input
-         record seen.
+         record seen.  If input is coming from `tail -f`, be sure to use
+         `--records-per-batch 1`.
        Long-to-wide options:
          -s {key-field name,value-field name}
          These pivot/reshape the input data to undo the wide-to-long operation.
@@ -1855,9 +1869,10 @@ MILLER(1)                                                            MILLER(1)
 
        -i             Use interpolated percentiles, like R's type=7; default like type=1.
                       Not sensical for string-valued fields.\n");
-       -s             Print iterative stats. Useful in tail -f contexts (in which
+       -s             Print iterative stats. Useful in tail -f contexts, in which
                       case please avoid pprint-format output since end of input
-                      stream will never be seen).
+                      stream will never be seen. Likewise, if input is coming from `tail -f`
+                      be sure to use `--records-per-batch 1`.
        -h|--help      Show this message.
        Example: mlr stats1 -a min,p10,p50,p90,max -f value -g size,shape
        Example: mlr stats1 -a count,mode -f size
@@ -1893,9 +1908,10 @@ MILLER(1)                                                            MILLER(1)
                       There must be an even number of names.
        -g {e,f,g}     Optional group-by-field names.
        -v             Print additional output for linreg-pca.
-       -s             Print iterative stats. Useful in tail -f contexts (in which
+       -s             Print iterative stats. Useful in tail -f contexts, in which
                       case please avoid pprint-format output since end of input
-                      stream will never be seen).
+                      stream will never be seen. Likewise, if input is coming from
+                      `tail -f`, be sure to use `--records-per-batch 1`.
        --fit          Rather than printing regression parameters, applies them to
                       the input data to compute new fit fields. All input records are
                       held in memory until end of input stream. Has effect only for
@@ -2103,6 +2119,14 @@ MILLER(1)                                                            MILLER(1)
        Example: if the input is two records, one being 'a=1,b=2' and the other
        being 'b=3,c=4', then the output is the two records 'a=1,b=2,c=' and
        'a=,b=3,c=4'.
+
+   1mupcase0m
+       Usage: mlr upcase [options]
+       Uppercases strings in record keys and/or values.
+       Options:
+       -k        Upcase only keys, not keys and values.
+       -v        Upcase only values, not keys and values.
+       -h|--help Show this message.
 
 1mFUNCTIONS FOR FILTER/PUT0m
    1mabs0m
@@ -2459,6 +2483,13 @@ MILLER(1)                                                            MILLER(1)
    1mleafcount0m
         (class=collections #args=1) Counts total number of terminal values in map/array. For single-level map/array, same as length.
 
+   1mleftpad0m
+        (class=string #args=3) Left-pads first argument to at most the specified length (second, integer argument) using specified pad value (third, string argument). If the first argument is not a string, it will be stringified first.
+       Examples:
+       leftpad("abcdefg", 10 , "*") gives "***abcdefg".
+       leftpad("abcdefg", 10 , "XY") gives "XYabcdefg".
+       leftpad("1234567", 10 , "0") gives "0001234567".
+
    1mlength0m
         (class=collections #args=1) Counts number of top-level entries in array/map. Scalars have length 1.
 
@@ -2548,6 +2579,13 @@ MILLER(1)                                                            MILLER(1)
        Examples:
        regextract_or_else("index ab09 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "ab09"
        regextract_or_else("index a999 file", "[a-z][a-z][0-9][0-9]", "nonesuch") gives "nonesuch"
+
+   1mrightpad0m
+        (class=string #args=3) Right-pads first argument to at most the specified length (second, integer argument) using specified pad value (third, string argument). If the first argument is not a string, it will be stringified first.
+       Examples:
+       rightpad("abcdefg", 10 , "*") gives "abcdefg***".
+       rightpad("abcdefg", 10 , "XY") gives "abcdefgXY".
+       rightpad("1234567", 10 , "0") gives "1234567000".
 
    1mround0m
         (class=math #args=1) Round to nearest integer.
@@ -3297,5 +3335,5 @@ MILLER(1)                                                            MILLER(1)
 
 
 
-                                  2023-01-28                         MILLER(1)
+                                  2023-03-04                         MILLER(1)
 </pre>

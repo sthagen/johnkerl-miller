@@ -824,6 +824,20 @@ Options:
 -h|--help Show this message.
 </pre>
 
+## downcase
+
+<pre class="pre-highlight-in-pair">
+<b>mlr downcase --help</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr downcase [options]
+Lowercases strings in record keys and/or values.
+Options:
+-k        Downcase only keys, not keys and values.
+-v        Downcase only values, not keys and values.
+-h|--help Show this message.
+</pre>
+
 ## fill-down
 
 <pre class="pre-highlight-in-pair">
@@ -2175,8 +2189,9 @@ Notes:
   been lost.
 * The combination "--implode --values --across-records" is non-streaming:
   no output records are produced until all input records have been read. In
-  particular, this means it won't work in tail -f contexts. But all other flag
-  combinations result in streaming (tail -f friendly) data processing.
+  particular, this means it won't work in `tail -f` contexts. But all other flag
+  combinations result in streaming (`tail -f` friendly) data processing.
+  If input is coming from `tail -f`, be sure to use `--records-per-batch 1`.
 * It's up to you to ensure that the nested-fs is distinct from your data's IFS:
   e.g. by default the former is semicolon and the latter is comma.
 See also mlr reshape.
@@ -2264,7 +2279,8 @@ More example put expressions:
     '$new_field = $index**2; $qn = $quantity * $new_field'
   Regex-replacement:
     '$name = sub($name, "http.*com"i, "")'
-    'if ($a =~ "([a-z]+)_([0-9]+)") { $b = "left_\1"; $c = "right_\2" }'
+  Regex-capture:
+	'if ($a =~ "([a-z]+)_([0-9]+)") { $b = "left_\1"; $c = "right_\2" }'
   Built-in variables:
     '$filename = FILENAME'
   Aggregations (use mlr put -q):
@@ -2560,7 +2576,8 @@ Wide-to-long options:
   Note: if you have multiple regexes, please specify them using multiple -r,
   since regexes can contain commas within them.
   Note: this works with tail -f and produces output records for each input
-  record seen.
+  record seen.  If input is coming from `tail -f`, be sure to use
+  `--records-per-batch 1`.
 Long-to-wide options:
   -s {key-field name,value-field name}
   These pivot/reshape the input data to undo the wide-to-long operation.
@@ -3117,9 +3134,10 @@ Options:
 
 -i             Use interpolated percentiles, like R's type=7; default like type=1.
                Not sensical for string-valued fields.\n");
--s             Print iterative stats. Useful in tail -f contexts (in which
+-s             Print iterative stats. Useful in tail -f contexts, in which
                case please avoid pprint-format output since end of input
-               stream will never be seen).
+               stream will never be seen. Likewise, if input is coming from `tail -f`
+               be sure to use `--records-per-batch 1`.
 -h|--help      Show this message.
 Example: mlr stats1 -a min,p10,p50,p90,max -f value -g size,shape
 Example: mlr stats1 -a count,mode -f size
@@ -3234,9 +3252,10 @@ accumulated across the input record stream.
                There must be an even number of names.
 -g {e,f,g}     Optional group-by-field names.
 -v             Print additional output for linreg-pca.
--s             Print iterative stats. Useful in tail -f contexts (in which
+-s             Print iterative stats. Useful in tail -f contexts, in which
                case please avoid pprint-format output since end of input
-               stream will never be seen).
+               stream will never be seen. Likewise, if input is coming from
+               `tail -f`, be sure to use `--records-per-batch 1`.
 --fit          Rather than printing regression parameters, applies them to
                the input data to compute new fit fields. All input records are
                held in memory until end of input stream. Has effect only for
@@ -4266,3 +4285,16 @@ a b v u w x
 - - 1 - 2 -
 </pre>
 
+## upcase
+
+<pre class="pre-highlight-in-pair">
+<b>mlr upcase --help</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr upcase [options]
+Uppercases strings in record keys and/or values.
+Options:
+-k        Upcase only keys, not keys and values.
+-v        Upcase only values, not keys and values.
+-h|--help Show this message.
+</pre>
