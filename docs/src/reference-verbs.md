@@ -233,6 +233,45 @@ orange 0.4802164827586204  290
 green  0.5129018241860459  1075
 </pre>
 
+## case
+
+<pre class="pre-highlight-in-pair">
+<b>mlr case --help</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr case [options]
+Uppercases strings in record keys and/or values.
+Options:
+-k  Case only keys, not keys and values.
+-v  Case only values, not keys and values.
+-f  {a,b,c} Specify which field names to case (default: all)
+-u  Convert to uppercase
+-l  Convert to lowercase
+-s  Convert to sentence case (capitalize first letter)
+-t  Convert to title case (capitalize words)
+-h|--help Show this message.
+</pre>
+
+<pre class="pre-highlight-non-pair">
+<b>mlr --from test/input/cases.csv --icsv --ojson case -u</b>
+</pre>
+
+<pre class="pre-highlight-non-pair">
+<b>mlr --from test/input/cases.csv --icsv --ojson case -u -k</b>
+</pre>
+
+<pre class="pre-highlight-non-pair">
+<b>mlr --from test/input/cases.csv --icsv --ojson case -u -v</b>
+</pre>
+
+<pre class="pre-highlight-non-pair">
+<b>mlr --from test/input/cases.csv --icsv --ojson case -k -t then case -v -s</b>
+</pre>
+
+<pre class="pre-highlight-non-pair">
+<b>mlr --from test/input/cases.csv --icsv --ojson case -u -f apple,ball then case -l -f cat,dog</b>
+</pre>
+
 ## cat
 
 Most useful for format conversions (see [File Formats](file-formats.md)) and concatenating multiple same-schema CSV files to have the same header:
@@ -824,20 +863,6 @@ Options:
 -h|--help Show this message.
 </pre>
 
-## downcase
-
-<pre class="pre-highlight-in-pair">
-<b>mlr downcase --help</b>
-</pre>
-<pre class="pre-non-highlight-in-pair">
-Usage: mlr downcase [options]
-Lowercases strings in record keys and/or values.
-Options:
--k        Downcase only keys, not keys and values.
--v        Downcase only values, not keys and values.
--h|--help Show this message.
-</pre>
-
 ## fill-down
 
 <pre class="pre-highlight-in-pair">
@@ -1325,14 +1350,15 @@ Passes through records which match the regular expression.
 Options:
 -i  Use case-insensitive search.
 -v  Invert: pass through records which do not match the regex.
+-a  Only grep for values, not keys and values.
 -h|--help Show this message.
 Note that "mlr filter" is more powerful, but requires you to know field names.
-By contrast, "mlr grep" allows you to regex-match the entire record. It does
-this by formatting each record in memory as DKVP, using command-line-specified
-ORS/OFS/OPS, and matching the resulting line against the regex specified
-here. In particular, the regex is not applied to the input stream: if you
-have CSV with header line "x,y,z" and data line "1,2,3" then the regex will
-be matched, not against either of these lines, but against the DKVP line
+By contrast, "mlr grep" allows you to regex-match the entire record. It does this
+by formatting each record in memory as DKVP (or NIDX, if -a is supplied), using
+OFS "," and OPS "=", and matching the resulting line against the regex specified
+here. In particular, the regex is not applied to the input stream: if you have
+CSV with header line "x,y,z" and data line "1,2,3" then the regex will be
+matched, not against either of these lines, but against the DKVP line
 "x=1,y=2,z=3".  Furthermore, not all the options to system grep are supported,
 and this command is intended to be merely a keystroke-saver. To get all the
 features of system grep, you can do
@@ -4286,18 +4312,4 @@ a b v u w x
 - 2 - 1 - -
 1 - 2 - - 3
 - - 1 - 2 -
-</pre>
-
-## upcase
-
-<pre class="pre-highlight-in-pair">
-<b>mlr upcase --help</b>
-</pre>
-<pre class="pre-non-highlight-in-pair">
-Usage: mlr upcase [options]
-Uppercases strings in record keys and/or values.
-Options:
--k        Upcase only keys, not keys and values.
--v        Upcase only values, not keys and values.
--h|--help Show this message.
 </pre>

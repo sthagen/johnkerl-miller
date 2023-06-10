@@ -17,12 +17,13 @@ Quick links:
 # Documents for releases
 
 If your `mlr version` says something like `mlr 6.0.0-dev`, with the `-dev` suffix, you're likely building from source, or you've obtained a recent artifact from GitHub Actions -- 
-the page [https://miller.readthedocs.io](https://miller.readthedocs.io) contains information for the latest contributions to the [Miller repository](https://github.com/johnkerl/miller).
+the page [https://miller.readthedocs.io/en/main](https://miller.readthedocs.io/en/main) contains information for the latest contributions to the [Miller repository](https://github.com/johnkerl/miller).
 
 If your `mlr version` says something like `Miller v5.10.2` or `mlr 6.0.0`, without the `-dev` suffix, you're likely using a Miller executable from a package manager -- please see below for the documentation for Miller as of the release you're using.
 
 | Release | Docs                                                                | Release notes |
 |---------|---------------------------------------------------------------------|---------------|
+6.8.0     | [Miller 6.8.0](https://miller.readthedocs.io/en/6.8.0)              | [New case verb, index DSL function, and more](https://github.com/johnkerl/miller/releases/tag/v6.8.0) |
 6.7.0     | [Miller 6.7.0](https://miller.readthedocs.io/en/6.7.0)              | [New leftpad/rightpad DSL functions, unspace verb, and more](https://github.com/johnkerl/miller/releases/tag/v6.7.0) |
 6.6.0     | [Miller 6.6.0](https://miller.readthedocs.io/en/6.6.0)              | [Bugfixes and unspace verb](https://github.com/johnkerl/miller/releases/tag/v6.6.0) |
 6.5.0     | [Miller 6.5.0](https://miller.readthedocs.io/en/6.5.0)              | [Bugfixes and memory-reduction optimizations](https://github.com/johnkerl/miller/releases/tag/v6.5.0) |

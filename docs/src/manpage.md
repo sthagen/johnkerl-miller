@@ -50,7 +50,7 @@ MILLER(1)                                                            MILLER(1)
        insertion-ordered hash map.  This encompasses a variety of data
        formats, including but not limited to the familiar CSV, TSV, and JSON.
        (Miller can handle positionally-indexed data as a special case.) This
-       manpage documents mlr 6.7.0-dev.
+       manpage documents mlr 6.8.0-dev.
 
 1mEXAMPLES0m
        mlr --icsv --opprint cat example.csv
@@ -141,6 +141,7 @@ MILLER(1)                                                            MILLER(1)
          mlr help file-formats
        Flags:
          mlr help flags
+         mlr help flag
          mlr help list-separator-aliases
          mlr help list-separator-regex-aliases
          mlr help comments-in-data-flags
@@ -173,6 +174,7 @@ MILLER(1)                                                            MILLER(1)
          mlr help keyword
        Other:
          mlr help auxents
+         mlr help terminals
          mlr help mlrrc
          mlr help output-colorization
          mlr help type-arithmetic-info
@@ -190,15 +192,14 @@ MILLER(1)                                                            MILLER(1)
        for all things with "map" in their names.
 
 1mVERB LIST0m
-       altkv bar bootstrap cat check clean-whitespace count-distinct count
-       count-similar cut decimate downcase fill-down fill-empty filter flatten
-       format-values fraction gap grep group-by group-like having-fields head
-       histogram json-parse json-stringify join label latin1-to-utf8 least-frequent
-       merge-fields most-frequent nest nothing put regularize remove-empty-columns
-       rename reorder repeat reshape sample sec2gmtdate sec2gmt seqgen shuffle
-       skip-trivial-records sort sort-within-records split stats1 stats2 step summary
-       tac tail tee template top utf8-to-latin1 unflatten uniq unspace unsparsify
-       upcase
+       altkv bar bootstrap case cat check clean-whitespace count-distinct count
+       count-similar cut decimate fill-down fill-empty filter flatten format-values
+       fraction gap grep group-by group-like having-fields head histogram json-parse
+       json-stringify join label latin1-to-utf8 least-frequent merge-fields
+       most-frequent nest nothing put regularize remove-empty-columns rename reorder
+       repeat reshape sample sec2gmtdate sec2gmt seqgen shuffle skip-trivial-records
+       sort sort-within-records split stats1 stats2 step summary tac tail tee
+       template top utf8-to-latin1 unflatten uniq unspace unsparsify
 
 1mFUNCTION LIST0m
        abs acos acosh any append apply arrayify asin asinh asserting_absent
@@ -801,16 +802,12 @@ MILLER(1)                                                            MILLER(1)
        --rs {string}            Specify RS for input and output.
 
 1mAUXILIARY COMMANDS0m
-       Available subcommands:
-         aux-list
-         hex
-         lecat
-         termcvt
-         unhex
-         help
-         regtest
-         repl
-         version
+       Available entries:
+         mlr aux-list
+         mlr hex
+         mlr lecat
+         mlr termcvt
+         mlr unhex
        For more information, please invoke mlr {subcommand} --help.
 
 1mMLRRC0m
@@ -911,6 +908,19 @@ MILLER(1)                                                            MILLER(1)
            Must be non-negative.
        -h|--help Show this message.
 
+   1mcase0m
+       Usage: mlr case [options]
+       Uppercases strings in record keys and/or values.
+       Options:
+       -k  Case only keys, not keys and values.
+       -v  Case only values, not keys and values.
+       -f  {a,b,c} Specify which field names to case (default: all)
+       -u  Convert to uppercase
+       -l  Convert to lowercase
+       -s  Convert to sentence case (capitalize first letter)
+       -t  Convert to title case (capitalize words)
+       -h|--help Show this message.
+
    1mcat0m
        Usage: mlr cat [options]
        Passes input records directly to output. Most useful for format conversion.
@@ -1006,14 +1016,6 @@ MILLER(1)                                                            MILLER(1)
         -e Decimate by printing last of every n (default).
         -g {a,b,c} Optional group-by-field names for decimate counts, e.g. a,b,c.
         -n {n} Decimation factor (default 10).
-       -h|--help Show this message.
-
-   1mdowncase0m
-       Usage: mlr downcase [options]
-       Lowercases strings in record keys and/or values.
-       Options:
-       -k        Downcase only keys, not keys and values.
-       -v        Downcase only values, not keys and values.
        -h|--help Show this message.
 
    1mfill-down0m
@@ -1203,14 +1205,15 @@ MILLER(1)                                                            MILLER(1)
        Options:
        -i  Use case-insensitive search.
        -v  Invert: pass through records which do not match the regex.
+       -a  Only grep for values, not keys and values.
        -h|--help Show this message.
        Note that "mlr filter" is more powerful, but requires you to know field names.
-       By contrast, "mlr grep" allows you to regex-match the entire record. It does
-       this by formatting each record in memory as DKVP, using command-line-specified
-       ORS/OFS/OPS, and matching the resulting line against the regex specified
-       here. In particular, the regex is not applied to the input stream: if you
-       have CSV with header line "x,y,z" and data line "1,2,3" then the regex will
-       be matched, not against either of these lines, but against the DKVP line
+       By contrast, "mlr grep" allows you to regex-match the entire record. It does this
+       by formatting each record in memory as DKVP (or NIDX, if -a is supplied), using
+       OFS "," and OPS "=", and matching the resulting line against the regex specified
+       here. In particular, the regex is not applied to the input stream: if you have
+       CSV with header line "x,y,z" and data line "1,2,3" then the regex will be
+       matched, not against either of these lines, but against the DKVP line
        "x=1,y=2,z=3".  Furthermore, not all the options to system grep are supported,
        and this command is intended to be merely a keystroke-saver. To get all the
        features of system grep, you can do
@@ -2127,14 +2130,6 @@ MILLER(1)                                                            MILLER(1)
        Example: if the input is two records, one being 'a=1,b=2' and the other
        being 'b=3,c=4', then the output is the two records 'a=1,b=2,c=' and
        'a=,b=3,c=4'.
-
-   1mupcase0m
-       Usage: mlr upcase [options]
-       Uppercases strings in record keys and/or values.
-       Options:
-       -k        Upcase only keys, not keys and values.
-       -v        Upcase only values, not keys and values.
-       -h|--help Show this message.
 
 1mFUNCTIONS FOR FILTER/PUT0m
    1mabs0m
@@ -3359,5 +3354,5 @@ MILLER(1)                                                            MILLER(1)
 
 
 
-                                  2023-05-13                         MILLER(1)
+                                  2023-06-06                         MILLER(1)
 </pre>

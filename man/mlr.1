@@ -2,12 +2,12 @@
 .\"     Title: mlr
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: ./mkman.rb
-.\"      Date: 2023-05-13
+.\"      Date: 2023-06-06
 .\"    Manual: \ \&
 .\"    Source: \ \&
 .\"  Language: English
 .\"
-.TH "MILLER" "1" "2023-05-13" "\ \&" "\ \&"
+.TH "MILLER" "1" "2023-06-06" "\ \&" "\ \&"
 .\" -----------------------------------------------------------------
 .\" * Portability definitions
 .\" ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -47,7 +47,7 @@ on integer-indexed fields: if the natural data structure for the latter is the
 array, then Miller's natural data structure is the insertion-ordered hash map.
 This encompasses a variety of data formats, including but not limited to the
 familiar CSV, TSV, and JSON.  (Miller can handle positionally-indexed data as
-a special case.) This manpage documents mlr 6.7.0-dev.
+a special case.) This manpage documents mlr 6.8.0-dev.
 .SH "EXAMPLES"
 .sp
 
@@ -155,6 +155,7 @@ Essentials:
   mlr help file-formats
 Flags:
   mlr help flags
+  mlr help flag
   mlr help list-separator-aliases
   mlr help list-separator-regex-aliases
   mlr help comments-in-data-flags
@@ -187,6 +188,7 @@ Keywords:
   mlr help keyword
 Other:
   mlr help auxents
+  mlr help terminals
   mlr help mlrrc
   mlr help output-colorization
   mlr help type-arithmetic-info
@@ -210,15 +212,14 @@ for all things with "map" in their names.
 .RS 0
 .\}
 .nf
-altkv bar bootstrap cat check clean-whitespace count-distinct count
-count-similar cut decimate downcase fill-down fill-empty filter flatten
-format-values fraction gap grep group-by group-like having-fields head
-histogram json-parse json-stringify join label latin1-to-utf8 least-frequent
-merge-fields most-frequent nest nothing put regularize remove-empty-columns
-rename reorder repeat reshape sample sec2gmtdate sec2gmt seqgen shuffle
-skip-trivial-records sort sort-within-records split stats1 stats2 step summary
-tac tail tee template top utf8-to-latin1 unflatten uniq unspace unsparsify
-upcase
+altkv bar bootstrap case cat check clean-whitespace count-distinct count
+count-similar cut decimate fill-down fill-empty filter flatten format-values
+fraction gap grep group-by group-like having-fields head histogram json-parse
+json-stringify join label latin1-to-utf8 least-frequent merge-fields
+most-frequent nest nothing put regularize remove-empty-columns rename reorder
+repeat reshape sample sec2gmtdate sec2gmt seqgen shuffle skip-trivial-records
+sort sort-within-records split stats1 stats2 step summary tac tail tee
+template top utf8-to-latin1 unflatten uniq unspace unsparsify
 .fi
 .if n \{\
 .RE
@@ -937,16 +938,12 @@ Notes about all other separators:
 .RS 0
 .\}
 .nf
-Available subcommands:
-  aux-list
-  hex
-  lecat
-  termcvt
-  unhex
-  help
-  regtest
-  repl
-  version
+Available entries:
+  mlr aux-list
+  mlr hex
+  mlr lecat
+  mlr termcvt
+  mlr unhex
 For more information, please invoke mlr {subcommand} --help.
 .fi
 .if n \{\
@@ -1077,6 +1074,25 @@ See also mlr sample and mlr shuffle.
 Options:
  -n Number of samples to output. Defaults to number of input records.
     Must be non-negative.
+-h|--help Show this message.
+.fi
+.if n \{\
+.RE
+.SS "case"
+.if n \{\
+.RS 0
+.\}
+.nf
+Usage: mlr case [options]
+Uppercases strings in record keys and/or values.
+Options:
+-k  Case only keys, not keys and values.
+-v  Case only values, not keys and values.
+-f  {a,b,c} Specify which field names to case (default: all)
+-u  Convert to uppercase
+-l  Convert to lowercase
+-s  Convert to sentence case (capitalize first letter)
+-t  Convert to title case (capitalize words)
 -h|--help Show this message.
 .fi
 .if n \{\
@@ -1222,20 +1238,6 @@ Options:
  -e Decimate by printing last of every n (default).
  -g {a,b,c} Optional group-by-field names for decimate counts, e.g. a,b,c.
  -n {n} Decimation factor (default 10).
--h|--help Show this message.
-.fi
-.if n \{\
-.RE
-.SS "downcase"
-.if n \{\
-.RS 0
-.\}
-.nf
-Usage: mlr downcase [options]
-Lowercases strings in record keys and/or values.
-Options:
--k        Downcase only keys, not keys and values.
--v        Downcase only values, not keys and values.
 -h|--help Show this message.
 .fi
 .if n \{\
@@ -1473,14 +1475,15 @@ Passes through records which match the regular expression.
 Options:
 -i  Use case-insensitive search.
 -v  Invert: pass through records which do not match the regex.
+-a  Only grep for values, not keys and values.
 -h|--help Show this message.
 Note that "mlr filter" is more powerful, but requires you to know field names.
-By contrast, "mlr grep" allows you to regex-match the entire record. It does
-this by formatting each record in memory as DKVP, using command-line-specified
-ORS/OFS/OPS, and matching the resulting line against the regex specified
-here. In particular, the regex is not applied to the input stream: if you
-have CSV with header line "x,y,z" and data line "1,2,3" then the regex will
-be matched, not against either of these lines, but against the DKVP line
+By contrast, "mlr grep" allows you to regex-match the entire record. It does this
+by formatting each record in memory as DKVP (or NIDX, if -a is supplied), using
+OFS "," and OPS "=", and matching the resulting line against the regex specified
+here. In particular, the regex is not applied to the input stream: if you have
+CSV with header line "x,y,z" and data line "1,2,3" then the regex will be
+matched, not against either of these lines, but against the DKVP line
 "x=1,y=2,z=3".  Furthermore, not all the options to system grep are supported,
 and this command is intended to be merely a keystroke-saver. To get all the
 features of system grep, you can do
@@ -2667,20 +2670,6 @@ Options:
 Example: if the input is two records, one being 'a=1,b=2' and the other
 being 'b=3,c=4', then the output is the two records 'a=1,b=2,c=' and
 \(cqa=,b=3,c=4'.
-.fi
-.if n \{\
-.RE
-.SS "upcase"
-.if n \{\
-.RS 0
-.\}
-.nf
-Usage: mlr upcase [options]
-Uppercases strings in record keys and/or values.
-Options:
--k        Upcase only keys, not keys and values.
--v        Upcase only values, not keys and values.
--h|--help Show this message.
 .fi
 .if n \{\
 .RE
