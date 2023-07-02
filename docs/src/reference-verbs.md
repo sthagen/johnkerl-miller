@@ -376,8 +376,11 @@ n a   b   i x        y
 </pre>
 <pre class="pre-non-highlight-in-pair">
 Usage: mlr check [options]
-Consumes records without printing any output.
+Consumes records without printing any output,
 Useful for doing a well-formatted check on input data.
+with the exception that warnings are printed to stderr.
+Current checks are:
+* If any key is the empty string
 Options:
 -h|--help Show this message.
 </pre>
