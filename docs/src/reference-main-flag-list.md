@@ -72,7 +72,7 @@ Notes:
 Miller offers a few different ways to handle reading data files
 	which have been compressed.
 
-* Decompression done within the Miller process itself: `--bz2in` `--gzin` `--zin`
+* Decompression done within the Miller process itself: `--bz2in` `--gzin` `--zin``--zstdin`
 * Decompression done outside the Miller process: `--prepipe` `--prepipex`
 
 Using `--prepipe` and `--prepipex` you can specify an action to be
@@ -95,7 +95,7 @@ compression (or other) utilities, simply pipe the output:
 
 Lastly, note that if `--prepipe` or `--prepipex` is specified, it replaces any
 decisions that might have been made based on the file suffix. Likewise,
-`--gzin`/`--bz2in`/`--zin` are ignored if `--prepipe` is also specified.
+`--gzin`/`--bz2in`/`--zin``--zin` are ignored if `--prepipe` is also specified.
 
 
 **Flags:**
@@ -106,8 +106,10 @@ decisions that might have been made based on the file suffix. Likewise,
 * `--prepipe-bz2`: Same as  `--prepipe bz2`, except this is allowed in `.mlrrc`.
 * `--prepipe-gunzip`: Same as  `--prepipe gunzip`, except this is allowed in `.mlrrc`.
 * `--prepipe-zcat`: Same as  `--prepipe zcat`, except this is allowed in `.mlrrc`.
+* `--prepipe-zstdcat`: Same as  `--prepipe zstdcat`, except this is allowed in `.mlrrc`.
 * `--prepipex {decompression command}`: Like `--prepipe` with one exception: doesn't insert `<` between command and filename at runtime. Useful for some commands like `unzip -qc` which don't read standard input.  Allowed at the command line, but not in `.mlrrc` to avoid unexpected code execution.
 * `--zin`: Uncompress zlib within the Miller process. Done by default if file ends in `.z`.
+* `--zstdin`: Uncompress zstd within the Miller process. Done by default if file ends in `.zstd`.
 
 ## CSV/TSV-only flags
 
@@ -281,11 +283,13 @@ These are flags which don't fit into any other category.
 * `--ofmtf {n}`: Use --ofmtf 6 as shorthand for --ofmt %.6f, etc.
 * `--ofmtg {n}`: Use --ofmtg 6 as shorthand for --ofmt %.6g, etc.
 * `--records-per-batch {n}`: This is an internal parameter for maximum number of records in a batch size. Normally this does not need to be modified, except when input is from `tail -f`. See also https://miller.readthedocs.io/en/latest/reference-main-flag-list/.
+* `--s-no-comment-strip {file name}`: Take command-line flags from file name, like -s, but with no comment-stripping. For more information please see https://miller.readthedocs.io/en/latest/scripting/.
 * `--seed {n}`: with `n` of the form `12345678` or `0xcafefeed`. For `put`/`filter` `urand`, `urandint`, and `urand32`.
 * `--tz {timezone}`: Specify timezone, overriding `$TZ` environment variable (if any).
 * `-I`: Process files in-place. For each file name on the command line, output is written to a temp file in the same directory, which is then renamed over the original. Each file is processed in isolation: if the output format is CSV, CSV headers will be present in each output file, statistics are only over each file's own records; and so on.
 * `-n`: Process no input files, nor standard input either. Useful for `mlr put` with `begin`/`end` statements only. (Same as `--from /dev/null`.) Also useful in `mlr -n put -v '...'` for analyzing abstract syntax trees (if that's your thing).
 * `-s {file name}`: Take command-line flags from file name. For more information please see https://miller.readthedocs.io/en/latest/scripting/.
+* `-x`: If any record has an error value in it, report it and stop the process. The default is to print the field value as `(error)` and continue.
 
 ## Output-colorization flags
 

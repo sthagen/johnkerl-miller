@@ -1447,6 +1447,55 @@ record_count resource
 150          /path/to/second/file
 </pre>
 
+## gsub
+
+<pre class="pre-highlight-in-pair">
+<b>mlr gsub -h</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr gsub [options]
+Replaces old string with new string in specified field(s), with regex support
+for the old string and handling multiple matches, like the `gsub` DSL function.
+See also the `sub` and `ssub` verbs.
+Options:
+-f {a,b,c}  Field names to convert.
+-h|--help   Show this message.
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv cat --filename then sub -f color,shape l X</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+filename    color  shape    flag  k  index quantity rate
+example.csv yeXlow triangXe true  1  11    43.6498  9.8870
+example.csv red    square   true  2  15    79.2778  0.0130
+example.csv red    circXe   true  3  16    13.8103  2.9010
+example.csv red    square   false 4  48    77.5542  7.4670
+example.csv purpXe triangXe false 5  51    81.2290  8.5910
+example.csv red    square   false 6  64    77.1991  9.5310
+example.csv purpXe triangXe false 7  65    80.1405  5.8240
+example.csv yeXlow circXe   true  8  73    63.9785  4.2370
+example.csv yeXlow circXe   true  9  87    63.5058  8.3350
+example.csv purpXe square   false 10 91    72.3735  8.2430
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv cat --filename then gsub -f color,shape l X</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+filename    color  shape    flag  k  index quantity rate
+example.csv yeXXow triangXe true  1  11    43.6498  9.8870
+example.csv red    square   true  2  15    79.2778  0.0130
+example.csv red    circXe   true  3  16    13.8103  2.9010
+example.csv red    square   false 4  48    77.5542  7.4670
+example.csv purpXe triangXe false 5  51    81.2290  8.5910
+example.csv red    square   false 6  64    77.1991  9.5310
+example.csv purpXe triangXe false 7  65    80.1405  5.8240
+example.csv yeXXow circXe   true  8  73    63.9785  4.2370
+example.csv yeXXow circXe   true  9  87    63.5058  8.3350
+example.csv purpXe square   false 10 91    72.3735  8.2430
+</pre>
+
 ## having-fields
 
 <pre class="pre-highlight-in-pair">
@@ -3090,6 +3139,8 @@ Exactly one  of -m, -n, or -g must be supplied.
 --suffix {s} Specify filename suffix; default is from mlr output format, e.g. "csv".
 -a           Append to existing file(s), if any, rather than overwriting.
 -v           Send records along to downstream verbs as well as splitting to files.
+-e           Do NOT URL-escape names of output files.
+-j {J}       Use string J to join filename parts; default "_".
 -h|--help    Show this message.
 Any of the output-format command-line flags (see mlr -h). For example, using
   mlr --icsv --from myfile.csv split --ojson -n 1000
@@ -3118,6 +3169,54 @@ then there will be split_yellow_triangle.csv, split_yellow_square.csv, etc.
   mlr --csv --from myfile.csv split -g color,shape
 
 See also the "tee" DSL function which lets you do more ad-hoc customization.
+</pre>
+
+## ssub
+
+<pre class="pre-highlight-in-pair">
+<b>mlr ssub -h</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr ssub [options]
+Replaces old string with new string in specified field(s), without regex support for
+the old string, like the `ssub` DSL function. See also the `gsub` and `sub` verbs.
+Options:
+-f {a,b,c}  Field names to convert.
+-h|--help   Show this message.
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv cat --filename then sub -f filename . o</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+filename    color  shape    flag  k  index quantity rate
+oxample.csv yellow triangle true  1  11    43.6498  9.8870
+oxample.csv red    square   true  2  15    79.2778  0.0130
+oxample.csv red    circle   true  3  16    13.8103  2.9010
+oxample.csv red    square   false 4  48    77.5542  7.4670
+oxample.csv purple triangle false 5  51    81.2290  8.5910
+oxample.csv red    square   false 6  64    77.1991  9.5310
+oxample.csv purple triangle false 7  65    80.1405  5.8240
+oxample.csv yellow circle   true  8  73    63.9785  4.2370
+oxample.csv yellow circle   true  9  87    63.5058  8.3350
+oxample.csv purple square   false 10 91    72.3735  8.2430
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv cat --filename then ssub -f filename . o</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+filename    color  shape    flag  k  index quantity rate
+exampleocsv yellow triangle true  1  11    43.6498  9.8870
+exampleocsv red    square   true  2  15    79.2778  0.0130
+exampleocsv red    circle   true  3  16    13.8103  2.9010
+exampleocsv red    square   false 4  48    77.5542  7.4670
+exampleocsv purple triangle false 5  51    81.2290  8.5910
+exampleocsv red    square   false 6  64    77.1991  9.5310
+exampleocsv purple triangle false 7  65    80.1405  5.8240
+exampleocsv yellow circle   true  8  73    63.9785  4.2370
+exampleocsv yellow circle   true  9  87    63.5058  8.3350
+exampleocsv purple square   false 10 91    72.3735  8.2430
 </pre>
 
 ## stats1
@@ -3574,6 +3673,55 @@ $ each 10 uptime | mlr -p step -a delta -f 11
 
 </pre>
 
+## sub
+
+<pre class="pre-highlight-in-pair">
+<b>mlr sub -h</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr sub [options]
+Replaces old string with new string in specified field(s), with regex support
+for the old string and not handling multiple matches, like the `sub` DSL function.
+See also the `gsub` and `ssub` verbs.
+Options:
+-f {a,b,c}  Field names to convert.
+-h|--help   Show this message.
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv cat --filename then sub -f color,shape l X</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+filename    color  shape    flag  k  index quantity rate
+example.csv yeXlow triangXe true  1  11    43.6498  9.8870
+example.csv red    square   true  2  15    79.2778  0.0130
+example.csv red    circXe   true  3  16    13.8103  2.9010
+example.csv red    square   false 4  48    77.5542  7.4670
+example.csv purpXe triangXe false 5  51    81.2290  8.5910
+example.csv red    square   false 6  64    77.1991  9.5310
+example.csv purpXe triangXe false 7  65    80.1405  5.8240
+example.csv yeXlow circXe   true  8  73    63.9785  4.2370
+example.csv yeXlow circXe   true  9  87    63.5058  8.3350
+example.csv purpXe square   false 10 91    72.3735  8.2430
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv cat --filename then gsub -f color,shape l X</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+filename    color  shape    flag  k  index quantity rate
+example.csv yeXXow triangXe true  1  11    43.6498  9.8870
+example.csv red    square   true  2  15    79.2778  0.0130
+example.csv red    circXe   true  3  16    13.8103  2.9010
+example.csv red    square   false 4  48    77.5542  7.4670
+example.csv purpXe triangXe false 5  51    81.2290  8.5910
+example.csv red    square   false 6  64    77.1991  9.5310
+example.csv purpXe triangXe false 7  65    80.1405  5.8240
+example.csv yeXXow circXe   true  8  73    63.9785  4.2370
+example.csv yeXXow circXe   true  9  87    63.5058  8.3350
+example.csv purpXe square   false 10 91    72.3735  8.2430
+</pre>
+
 ## summary
 
 <pre class="pre-highlight-in-pair">
@@ -3659,8 +3807,8 @@ max            zee    zee    10000              0.999952670371898      0.9999648
 iqr            -      -      5000               0.5015156280035271     0.5118661397595003
 lof            -      -      -12499             -1.2578765057782637    -1.2834617140383442
 lif            -      -      -4999              -0.5056030637729731    -0.5156625043990937
-uif            -      -      10001              0.9989438202376082     1.0199359148794074
-uof            -      -      17501              1.751217262242899      1.787735124518658
+uif            -      -      15001              1.5004594482411353     1.5318020546389077
+uof            -      -      22501              2.252732890246426      2.2996012642781585
 </pre>
 
 <pre class="pre-highlight-in-pair">
