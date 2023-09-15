@@ -1,0 +1,58 @@
+# Miller as a library
+
+Very initially and experimentally, as of Miller 6.9.1, Go developers will be able to access Miller source
+code --- moved from `internal/pkg/` to `pkg/` --- within their own Go projects.
+
+Caveat emptor: Miller's backward-compatibility guarantees are at the CLI level; API is not guaranteed stable.
+For this reason, please be careful with your version pins.
+
+I'm happy to discuss this new area further at the [discussions page](https://github.com/johnkerl/miller/discussions).
+
+## Setup
+
+```
+$ mkdir use-mlr
+
+$ cd cd use-mlr
+
+$ go mod init github.com/johnkerl/miller-library-example
+go: creating new go.mod: module github.com/johnkerl/miller-library-example
+
+# One of:
+$ go get github.com/johnkerl/miller
+$ go get github.com/johnkerl/miller@0f27a39a9f92d4c633dd29d99ad203e95a484dd3
+# Etc.
+
+$ go mod tidy
+```
+
+## One example use
+
+GENMD-INCLUDE-ESCAPED(miller-as-library/main1.go)
+
+```
+$ go build main1.go
+$ ./main1
+1152921504606846976
+```
+
+Or simply:
+```
+$ go run main1.go
+1152921504606846976
+```
+
+## Another example use
+
+GENMD-INCLUDE-ESCAPED(miller-as-library/main2.go)
+
+GENMD-INCLUDE-ESCAPED(data/hostnames.csv)
+
+```
+$ go build main2.go
+{"a": "pan", "b": "pan", "i": 1, "x": 0.3467901443380824, "y": 0.7268028627434533, "i2": 1}
+{"a": "eks", "b": "pan", "i": 2, "x": 0.7586799647899636, "y": 0.5221511083334797, "i2": 4}
+{"a": "wye", "b": "wye", "i": 3, "x": 0.20460330576630303, "y": 0.33831852551664776, "i2": 9}
+{"a": "eks", "b": "wye", "i": 4, "x": 0.38139939387114097, "y": 0.13418874328430463, "i2": 16}
+{"a": "wye", "b": "pan", "i": 5, "x": 0.5732889198020006, "y": 0.8636244699032729, "i2": 25}$ ./main2 data/small.csv
+```
