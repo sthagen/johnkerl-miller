@@ -494,10 +494,21 @@ var PPRINTOnlyFlagSection = FlagSection{
 		},
 
 		{
-			name: "--barred",
-			help: "Prints a border around PPRINT output (not available for input).",
+			name:     "--barred",
+			altNames: []string{"--barred-output"},
+			help:     "Prints a border around PPRINT output.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.BarredPprintOutput = true
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--barred-input",
+			help: "When used in conjunction with --pprint, accepts barred input.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.BarredPprintInput = true
+				options.ReaderOptions.IFS = "|"
 				*pargi += 1
 			},
 		},
@@ -751,6 +762,9 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
 				options.ReaderOptions.InputFileFormat = args[*pargi+1]
+				if options.ReaderOptions.InputFileFormat == "md" {
+					options.ReaderOptions.InputFileFormat = "markdown" // alias
+				}
 				*pargi += 2
 			},
 		},
@@ -812,6 +826,9 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
 				options.WriterOptions.OutputFileFormat = args[*pargi+1]
+				if options.WriterOptions.OutputFileFormat == "md" {
+					options.WriterOptions.OutputFileFormat = "markdown" // alias
+				}
 				*pargi += 2
 			},
 		},
@@ -885,8 +902,19 @@ var FileFormatFlagSection = FlagSection{
 		},
 
 		{
-			name: "--omd",
-			help: "Use markdown-tabular format for output data.",
+			name:     "--imd",
+			altNames: []string{"--imarkdown"},
+			help:     "Use markdown-tabular format for input data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				*pargi += 1
+			},
+		},
+
+		{
+			name:     "--omd",
+			altNames: []string{"--omarkdown"},
+			help:     "Use markdown-tabular format for output data.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.OutputFileFormat = "markdown"
 				*pargi += 1
@@ -1140,19 +1168,19 @@ var FileFormatFlagSection = FlagSection{
 func FormatConversionKeystrokeSaverPrintInfo() {
 	fmt.Println(`As keystroke-savers for format-conversion you may use the following.
 The letters c, t, j, l, d, n, x, p, and m refer to formats CSV, TSV, DKVP, NIDX,
-JSON, JSON Lines, XTAB, PPRINT, and markdown, respectively. Note that markdown
-format is available for output only.
+JSON, JSON Lines, XTAB, PPRINT, and markdown, respectively.
 
-| In\out | CSV   | TSV   | JSON   | JSONL  | DKVP   | NIDX   | XTAB   | PPRINT | Markdown |
-+--------+-------+-------+--------+--------+--------+--------+--------+----------+
-| CSV    |       | --c2t | --c2j  | --c2l  | --c2d  | --c2n  | --c2x  | --c2p  | --c2m    |
-| TSV    | --t2c |       | --t2j  | --t2l  | --t2d  | --t2n  | --t2x  | --t2p  | --t2m    |
-| JSON   | --j2c | --j2t |        | --j2l  | --j2d  | --j2n  | --j2x  | --j2p  | --j2m    |
-| JSONL  | --l2c | --l2t |        |        | --l2d  | --l2n  | --l2x  | --l2p  | --l2m    |
-| DKVP   | --d2c | --d2t | --d2j  | --d2l  |        | --d2n  | --d2x  | --d2p  | --d2m    |
-| NIDX   | --n2c | --n2t | --n2j  | --n2l  | --n2d  |        | --n2x  | --n2p  | --n2m    |
-| XTAB   | --x2c | --x2t | --x2j  | --x2l  | --x2d  | --x2n  |        | --x2p  | --x2m    |
-| PPRINT | --p2c | --p2t | --p2j  | --p2l  | --p2d  | --p2n  | --p2x  |        | --p2m    |`)
+| In\out   | CSV   | TSV   | JSON   | JSONL  | DKVP   | NIDX   | XTAB   | PPRINT | Markdown |
++----------+-------+-------+--------+--------+--------+--------+--------+--------+----------|
+| CSV      |       | --c2t | --c2j  | --c2l  | --c2d  | --c2n  | --c2x  | --c2p  | --c2m    |
+| TSV      | --t2c |       | --t2j  | --t2l  | --t2d  | --t2n  | --t2x  | --t2p  | --t2m    |
+| JSON     | --j2c | --j2t |        | --j2l  | --j2d  | --j2n  | --j2x  | --j2p  | --j2m    |
+| JSONL    | --l2c | --l2t |        |        | --l2d  | --l2n  | --l2x  | --l2p  | --l2m    |
+| DKVP     | --d2c | --d2t | --d2j  | --d2l  |        | --d2n  | --d2x  | --d2p  | --d2m    |
+| NIDX     | --n2c | --n2t | --n2j  | --n2l  | --n2d  |        | --n2x  | --n2p  | --n2m    |
+| XTAB     | --x2c | --x2t | --x2j  | --x2l  | --x2d  | --x2n  |        | --x2p  | --x2m    |
+| PPRINT   | --p2c | --p2t | --p2j  | --p2l  | --p2d  | --p2n  | --p2x  |        | --p2m    |
+| Markdown | --m2c | --m2t | --m2j  | --m2l  | --m2d  | --m2n  | --m2x  | --m2p  |          |`)
 }
 
 func init() { FormatConversionKeystrokeSaverFlagSection.Sort() }
@@ -1278,6 +1306,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			},
 		},
 		{
+			name: "--c2m",
+			help: "Use CSV for input, markdown-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "csv"
+				options.WriterOptions.OutputFileFormat = "markdown"
+				*pargi += 1
+			},
+		},
+		{
 			name: "--c2b",
 			help: "Use CSV for input, PPRINT with `--barred` for output.",
 			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
@@ -1394,6 +1434,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "tsv"
 				options.WriterOptions.OutputFileFormat = "pprint"
+				*pargi += 1
+			},
+		},
+		{
+			name: "--t2m",
+			help: "Use TSV for input, markdown tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "tsv"
+				options.WriterOptions.OutputFileFormat = "markdown"
 				*pargi += 1
 			},
 		},
@@ -1517,6 +1569,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			},
 		},
 		{
+			name: "--d2m",
+			help: "Use DKVP for input, markdown tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "dkvp"
+				options.WriterOptions.OutputFileFormat = "markdown"
+				*pargi += 1
+			},
+		},
+		{
 			name: "--d2b",
 			help: "Use DKVP for input, PPRINT with `--barred` for output.",
 			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
@@ -1628,6 +1692,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "nidx"
 				options.WriterOptions.OutputFileFormat = "pprint"
+				*pargi += 1
+			},
+		},
+		{
+			name: "--n2m",
+			help: "Use NIDX for input, markdown tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "nidx"
+				options.WriterOptions.OutputFileFormat = "markdown"
 				*pargi += 1
 			},
 		},
@@ -1746,6 +1822,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			},
 		},
 		{
+			name: "--j2m",
+			help: "Use JSON for input, markdown-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "json"
+				options.WriterOptions.OutputFileFormat = "markdown"
+				*pargi += 1
+			},
+		},
+		{
 			name: "--j2b",
 			help: "Use JSON for input, PPRINT with --barred for output.",
 			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
@@ -1853,6 +1941,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.ReaderOptions.InputFileFormat = "json"
 				options.WriterOptions.OutputFileFormat = "pprint"
+				*pargi += 1
+			},
+		},
+		{
+			name: "--l2m",
+			help: "Use JSON Lines for input, markdown-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "json"
+				options.WriterOptions.OutputFileFormat = "markdown"
 				*pargi += 1
 			},
 		},
@@ -2013,6 +2113,115 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 		},
 
 		{
+			name: "--m2c",
+			help: "Use markdown-tabular for input, CSV for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "csv"
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2t",
+			help: "Use markdown-tabular for input, TSV for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "tsv"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2d",
+			help: "Use markdown-tabular for input, DKVP for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "dkvp"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2n",
+			help: "Use markdown-tabular for input, NIDX for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "nidx"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2j",
+			help: "Use markdown-tabular for input, JSON for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "json"
+				options.WriterOptions.WrapJSONOutputInOuterList = true
+				options.WriterOptions.JSONOutputMultiline = true
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2l",
+			help: "Use markdown-tabular for input, JSON Lines for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "json"
+				options.WriterOptions.WrapJSONOutputInOuterList = false
+				options.WriterOptions.JSONOutputMultiline = false
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2x",
+			help: "Use markdown-tabular for input, XTAB for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "xtab"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+			},
+		},
+		{
+			name: "--m2p",
+			help: "Use markdown-tabular for input, PPRINT for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "pprint"
+				*pargi += 1
+			},
+		},
+
+		{
 			name: "--x2c",
 			help: "Use XTAB for input, CSV for output.",
 			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
@@ -2102,6 +2311,18 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			},
 		},
 		{
+			name: "--x2m",
+			help: "Use XTAB for input, markdown-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "xtab"
+				options.WriterOptions.OutputFileFormat = "markdown"
+				*pargi += 1
+			},
+		},
+		{
 			name: "--x2b",
 			help: "Use XTAB for input, PPRINT with `--barred` for output.",
 			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
@@ -2148,7 +2369,7 @@ var CSVTSVOnlyFlagSection = FlagSection{
 			altNames: []string{"--no-implicit-tsv-header"},
 			help:     "Opposite of `--implicit-csv-header`. This is the default anyway -- the main use is for the flags to `mlr join` if you have main file(s) which are headerless but you want to join in on a file which does have a CSV/TSV header. Then you could use `mlr --csv --implicit-csv-header join --no-implicit-csv-header -l your-join-in-with-header.csv ... your-headerless.csv`.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				options.ReaderOptions.UseImplicitCSVHeader = false
+				options.ReaderOptions.UseImplicitHeader = false
 				*pargi += 1
 			},
 		},
@@ -2168,7 +2389,7 @@ var CSVTSVOnlyFlagSection = FlagSection{
 			altNames: []string{"--headerless-csv-input", "--hi", "--implicit-tsv-header"},
 			help:     "Use 1,2,3,... as field labels, rather than from line 1 of input files. Tip: combine with `label` to recreate missing headers.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				options.ReaderOptions.UseImplicitCSVHeader = true
+				options.ReaderOptions.UseImplicitHeader = true
 				*pargi += 1
 			},
 		},
@@ -2178,7 +2399,7 @@ var CSVTSVOnlyFlagSection = FlagSection{
 			altNames: []string{"--ho", "--headerless-tsv-output"},
 			help:     "Print only CSV/TSV data lines; do not print CSV/TSV header lines.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				options.WriterOptions.HeaderlessCSVOutput = true
+				options.WriterOptions.HeaderlessOutput = true
 				*pargi += 1
 			},
 		},
@@ -2187,8 +2408,8 @@ var CSVTSVOnlyFlagSection = FlagSection{
 			name: "-N",
 			help: "Keystroke-saver for `--implicit-csv-header --headerless-csv-output`.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
-				options.ReaderOptions.UseImplicitCSVHeader = true
-				options.WriterOptions.HeaderlessCSVOutput = true
+				options.ReaderOptions.UseImplicitHeader = true
+				options.WriterOptions.HeaderlessOutput = true
 				*pargi += 1
 			},
 		},

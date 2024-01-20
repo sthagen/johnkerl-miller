@@ -70,27 +70,7 @@ func NewRecordReaderCSVLite(
 		useVoidRep: false,
 		voidRep:    "",
 	}
-	if reader.readerOptions.UseImplicitCSVHeader {
-		reader.recordBatchGetter = getRecordBatchImplicitCSVHeader
-	} else {
-		reader.recordBatchGetter = getRecordBatchExplicitCSVHeader
-	}
-	return reader, nil
-}
-
-func NewRecordReaderPPRINT(
-	readerOptions *cli.TReaderOptions,
-	recordsPerBatch int64,
-) (*RecordReaderCSVLite, error) {
-	reader := &RecordReaderCSVLite{
-		readerOptions:   readerOptions,
-		recordsPerBatch: recordsPerBatch,
-		fieldSplitter:   newFieldSplitter(readerOptions),
-
-		useVoidRep: true,
-		voidRep:    "-",
-	}
-	if reader.readerOptions.UseImplicitCSVHeader {
+	if reader.readerOptions.UseImplicitHeader {
 		reader.recordBatchGetter = getRecordBatchImplicitCSVHeader
 	} else {
 		reader.recordBatchGetter = getRecordBatchExplicitCSVHeader
