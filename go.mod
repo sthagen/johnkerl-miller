@@ -1,4 +1,4 @@
-module github.com/johnkerl/miller
+module github.com/johnkerl/miller/v6
 
 // The repo is 'miller' and the executable is 'mlr', going back many years and
 // predating the Go port.
@@ -7,14 +7,14 @@ module github.com/johnkerl/miller
 // executable would be 'miller' not 'mlr'.
 //
 // So we have cmd/mlr/main.go:
-// * go build   github.com/johnkerl/miller/cmd/mlr
-// * go install github.com/johnkerl/miller/cmd/mlr
+// * go build   github.com/johnkerl/miller/v6/cmd/mlr
+// * go install github.com/johnkerl/miller/v6/cmd/mlr
 
 // go get github.com/johnkerl/lumin@v1.0.0
 // Local development:
 // replace github.com/johnkerl/lumin => /Users/kerl/git/johnkerl/lumin
 
-go 1.19
+go 1.21
 
 require (
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
