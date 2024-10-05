@@ -48,7 +48,7 @@ This is simply a copy of what you should see on running `man mlr` at a command p
        insertion-ordered hash map.  This encompasses a variety of data
        formats, including but not limited to the familiar CSV, TSV, and JSON.
        (Miller can handle positionally-indexed data as a special case.) This
-       manpage documents mlr 6.12.0-dev.
+       manpage documents mlr 6.13.0-dev.
 
 1mEXAMPLES0m
        mlr --icsv --opprint cat example.csv
@@ -1644,9 +1644,9 @@ This is simply a copy of what you should see on running `man mlr` at a command p
                   first-match replacement.
        -h|--help Show this message.
        Examples:
-       mlr rename old_name,new_name'
-       mlr rename old_name_1,new_name_1,old_name_2,new_name_2'
-       mlr rename -r 'Date_[0-9]+,Date,'  Rename all such fields to be "Date"
+       mlr rename old_name,new_name
+       mlr rename old_name_1,new_name_1,old_name_2,new_name_2
+       mlr rename -r 'Date_[0-9]+,Date'  Rename all such fields to be "Date"
        mlr rename -r '"Date_[0-9]+",Date' Same
        mlr rename -r 'Date_([0-9]+).*,\1' Rename all such fields to be of the form 20151015
        mlr rename -r '"name"i,Name'       Rename "name", "Name", "NAME", etc. to "Name"
@@ -3731,5 +3731,5 @@ This is simply a copy of what you should see on running `man mlr` at a command p
        MIME Type for Comma-Separated Values (CSV) Files, the Miller docsite
        https://miller.readthedocs.io
 
-                                  2024-10-02                         4mMILLER24m(1)
+                                  2024-10-05                         4mMILLER24m(1)
 </pre>
