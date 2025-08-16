@@ -48,7 +48,7 @@ This is simply a copy of what you should see on running `man mlr` at a command p
        insertion-ordered hash map.  This encompasses a variety of data
        formats, including but not limited to the familiar CSV, TSV, and JSON.
        (Miller can handle positionally-indexed data as a special case.) This
-       manpage documents mlr 6.15.0.
+       manpage documents mlr 6.15.0-dev.
 
 1mEXAMPLES0m
        mlr --icsv --opprint cat example.csv
@@ -255,12 +255,14 @@ This is simply a copy of what you should see on running `man mlr` at a command p
                                 within the input.
        --pass-comments-with {string}
                                 Immediately print commented lines within input, with
-                                specified prefix.
+                                specified prefix. For CSV input format, the prefix
+                                must be a single character.
        --skip-comments          Ignore commented lines (prefixed by `#`) within the
                                 input.
        --skip-comments-with {string}
                                 Ignore commented lines within input, with specified
-                                prefix.
+                                prefix. For CSV input format, the prefix must be a
+                                single character.
 
 1mCOMPRESSED-DATA FLAGS0m
        Miller offers a few different ways to handle reading data files
@@ -3757,5 +3759,5 @@ This is simply a copy of what you should see on running `man mlr` at a command p
        MIME Type for Comma-Separated Values (CSV) Files, the Miller docsite
        https://miller.readthedocs.io
 
-                                  2025-08-14                         4mMILLER24m(1)
+                                  2025-08-15                         4mMILLER24m(1)
 </pre>
