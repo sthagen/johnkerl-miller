@@ -1,6 +1,6 @@
-name: miller 
+name: miller
 adopt-info: miller
-summary: Miller is like awk, sed, cut, join and sort 
+summary: Miller is like awk, sed, cut, join and sort
 description: |
   Miller is like awk, sed, cut, join, and sort for data formats such as CSV, TSV, JSON, JSON Lines, and positionally-indexed.
 
@@ -37,14 +37,14 @@ apps:
     plugs:
       - home
 
-parts: 
+parts:
   miller:
     source: https://github.com/johnkerl/miller
     source-type: git
     plugin: make
     build-snaps:
       - go
-      
+
     override-pull: |
       craftctl default
       craftctl set version="$(git describe --tags | sed 's/^v//' | cut -d "-" -f1)"
