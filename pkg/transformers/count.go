@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -117,8 +116,8 @@ type TransformerCount struct {
 	// * Map keys are strings "foo,bar" and "baz,quux".
 	// * groupedCounts maps "foo,bar" to 1 and "baz,quux" to 1.
 	// * groupByValues maps "foo,bar" to ["foo", "bar"] and "baz,quux" to ["baz", "quux"].
-	groupedCounts  *lib.OrderedMap
-	groupingValues *lib.OrderedMap
+	groupedCounts  *lib.OrderedMap[int64]
+	groupingValues *lib.OrderedMap[[]*mlrval.Mlrval]
 }
 
 func NewTransformerCount(
@@ -133,8 +132,8 @@ func NewTransformerCount(
 		outputFieldName:   outputFieldName,
 
 		ungroupedCount: 0,
-		groupedCounts:  lib.NewOrderedMap(),
-		groupingValues: lib.NewOrderedMap(),
+		groupedCounts:  lib.NewOrderedMap[int64](),
+		groupingValues: lib.NewOrderedMap[[]*mlrval.Mlrval](),
 	}
 
 	if groupByFieldNames == nil {
@@ -150,7 +149,7 @@ func NewTransformerCount(
 
 func (tr *TransformerCount) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -161,7 +160,7 @@ func (tr *TransformerCount) Transform(
 // ----------------------------------------------------------------
 func (tr *TransformerCount) countUngrouped(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -170,16 +169,16 @@ func (tr *TransformerCount) countUngrouped(
 	} else {
 		newrec := mlrval.NewMlrmapAsRecord()
 		newrec.PutCopy(tr.outputFieldName, mlrval.FromInt(tr.ungroupedCount))
-		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &inrecAndContext.Context))
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(newrec, &inrecAndContext.Context))
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerCount) countGrouped(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -200,7 +199,7 @@ func (tr *TransformerCount) countGrouped(
 		} else {
 			tr.groupedCounts.Put(
 				groupingKey,
-				tr.groupedCounts.Get(groupingKey).(int64)+1,
+				tr.groupedCounts.Get(groupingKey)+1,
 			)
 		}
 
@@ -210,7 +209,7 @@ func (tr *TransformerCount) countGrouped(
 			newrec.PutCopy(tr.outputFieldName, mlrval.FromInt(tr.groupedCounts.FieldCount))
 
 			outrecAndContext := types.NewRecordAndContext(newrec, &inrecAndContext.Context)
-			outputRecordsAndContexts.PushBack(outrecAndContext)
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, outrecAndContext)
 
 		} else {
 			for outer := tr.groupedCounts.Head; outer != nil; outer = outer.Next {
@@ -224,21 +223,21 @@ func (tr *TransformerCount) countGrouped(
 				// * Grouping values for key is ["foo", "bar"]
 				// Here we populate a record with "a=foo,b=bar".
 
-				groupingValuesForKey := tr.groupingValues.Get(groupingKey).([]*mlrval.Mlrval)
+				groupingValuesForKey := tr.groupingValues.Get(groupingKey)
 				i := 0
 				for _, groupingValueForKey := range groupingValuesForKey {
 					newrec.PutCopy(tr.groupByFieldNames[i], groupingValueForKey)
 					i++
 				}
 
-				countForGroup := outer.Value.(int64)
+				countForGroup := outer.Value
 				newrec.PutCopy(tr.outputFieldName, mlrval.FromInt(countForGroup))
 
 				outrecAndContext := types.NewRecordAndContext(newrec, &inrecAndContext.Context)
-				outputRecordsAndContexts.PushBack(outrecAndContext)
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, outrecAndContext)
 			}
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }

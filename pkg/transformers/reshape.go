@@ -28,7 +28,6 @@ package transformers
 // 15 2009-01-05     Z  0.09719105
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -233,7 +232,7 @@ type TransformerReshape struct {
 	// for long-to-wide:
 	splitOutKeyFieldName            string
 	splitOutValueFieldName          string
-	otherKeysToOtherValuesToBuckets *lib.OrderedMap
+	otherKeysToOtherValuesToBuckets *lib.OrderedMap[*lib.OrderedMap[*tReshapeBucket]]
 
 	recordTransformerFunc RecordTransformerFunc
 }
@@ -255,7 +254,7 @@ func NewTransformerReshape(
 
 		splitOutKeyFieldName:            splitOutKeyFieldName,
 		splitOutValueFieldName:          splitOutValueFieldName,
-		otherKeysToOtherValuesToBuckets: lib.NewOrderedMap(),
+		otherKeysToOtherValuesToBuckets: lib.NewOrderedMap[*lib.OrderedMap[*tReshapeBucket]](),
 	}
 
 	if inputFieldRegexStrings != nil {
@@ -292,7 +291,7 @@ func NewTransformerReshape(
 
 func (tr *TransformerReshape) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -303,7 +302,7 @@ func (tr *TransformerReshape) Transform(
 // ----------------------------------------------------------------
 func (tr *TransformerReshape) wideToLongNoRegex(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -324,25 +323,25 @@ func (tr *TransformerReshape) wideToLongNoRegex(
 		}
 
 		if pairs.IsEmpty() {
-			outputRecordsAndContexts.PushBack(inrecAndContext)
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 		} else {
 			for pf := pairs.Head; pf != nil; pf = pf.Next {
 				outrec := inrec.Copy()
 				outrec.PutReference(tr.outputKeyFieldName, mlrval.FromString(pf.Key))
 				outrec.PutReference(tr.outputValueFieldName, pf.Value)
-				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
 	} else {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // emit end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerReshape) wideToLongRegex(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -366,25 +365,25 @@ func (tr *TransformerReshape) wideToLongRegex(
 		}
 
 		if pairs.IsEmpty() {
-			outputRecordsAndContexts.PushBack(inrecAndContext)
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 		} else {
 			for pf := pairs.Head; pf != nil; pf = pf.Next {
 				outrec := inrec.Copy()
 				outrec.PutReference(tr.outputKeyFieldName, mlrval.FromString(pf.Key))
 				outrec.PutReference(tr.outputValueFieldName, pf.Value)
-				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
 	} else {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // emit end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerReshape) longToWide(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -394,7 +393,7 @@ func (tr *TransformerReshape) longToWide(
 		splitOutKeyFieldValue := inrec.Get(tr.splitOutKeyFieldName)
 		splitOutValueFieldValue := inrec.Get(tr.splitOutValueFieldName)
 		if splitOutKeyFieldValue == nil || splitOutValueFieldValue == nil {
-			outputRecordsAndContexts.PushBack(inrecAndContext)
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 			return
 		}
 
@@ -403,24 +402,22 @@ func (tr *TransformerReshape) longToWide(
 
 		// Don't unset tr.fieldName in the record, so we can implode in-place at the end.
 		otherKeysJoined := inrec.GetKeysJoined()
-		var otherValuesToBuckets *lib.OrderedMap = nil
+		var otherValuesToBuckets *lib.OrderedMap[*tReshapeBucket] = nil
 
 		iOtherValuesToBuckets := tr.otherKeysToOtherValuesToBuckets.Get(otherKeysJoined)
 		if iOtherValuesToBuckets == nil {
-			otherValuesToBuckets = lib.NewOrderedMap()
+			otherValuesToBuckets = lib.NewOrderedMap[*tReshapeBucket]()
 			tr.otherKeysToOtherValuesToBuckets.Put(otherKeysJoined, otherValuesToBuckets)
 		} else {
-			otherValuesToBuckets = iOtherValuesToBuckets.(*lib.OrderedMap)
+			otherValuesToBuckets = iOtherValuesToBuckets
 		}
 
 		otherValuesJoined := inrec.GetValuesJoined()
 		var bucket *tReshapeBucket = nil
-		iBucket := otherValuesToBuckets.Get(otherValuesJoined)
-		if iBucket == nil {
+		bucket = otherValuesToBuckets.Get(otherValuesJoined)
+		if bucket == nil {
 			bucket = newReshapeBucket(inrec)
 			otherValuesToBuckets.Put(otherValuesJoined, bucket)
-		} else {
-			bucket = iBucket.(*tReshapeBucket)
 		}
 
 		bucket.pairs.PutCopy(splitOutKeyFieldValue.String(), splitOutValueFieldValue)
@@ -428,9 +425,9 @@ func (tr *TransformerReshape) longToWide(
 	} else {
 
 		for pe := tr.otherKeysToOtherValuesToBuckets.Head; pe != nil; pe = pe.Next {
-			otherValuesToBuckets := pe.Value.(*lib.OrderedMap)
+			otherValuesToBuckets := pe.Value
 			for pf := otherValuesToBuckets.Head; pf != nil; pf = pf.Next {
-				bucket := pf.Value.(*tReshapeBucket)
+				bucket := pf.Value
 				outrec := bucket.representative
 				bucket.representative = nil // ownership transfer
 
@@ -438,11 +435,11 @@ func (tr *TransformerReshape) longToWide(
 					outrec.PutReference(pg.Key, pg.Value)
 				}
 
-				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // emit end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // emit end-of-stream marker
 	}
 }
 

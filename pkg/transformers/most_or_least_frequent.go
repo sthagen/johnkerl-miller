@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"sort"
@@ -171,7 +170,7 @@ type TransformerMostOrLeastFrequent struct {
 	showCounts        bool
 	outputFieldName   string
 	descending        bool
-	countsByGroup     *lib.OrderedMap // map[string]int
+	countsByGroup     *lib.OrderedMap[int64] // map[string]int
 	valuesForGroup    map[string][]*mlrval.Mlrval
 }
 
@@ -194,7 +193,7 @@ func NewTransformerMostOrLeastFrequent(
 		showCounts:        showCounts,
 		outputFieldName:   outputFieldName,
 		descending:        descending,
-		countsByGroup:     lib.NewOrderedMap(),
+		countsByGroup:     lib.NewOrderedMap[int64](),
 		valuesForGroup:    make(map[string][]*mlrval.Mlrval),
 	}
 
@@ -205,7 +204,7 @@ func NewTransformerMostOrLeastFrequent(
 
 func (tr *TransformerMostOrLeastFrequent) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -217,11 +216,11 @@ func (tr *TransformerMostOrLeastFrequent) Transform(
 			return
 		}
 
-		iCount := tr.countsByGroup.Get(groupingKey)
-		if iCount == nil {
+		iCount, ok := tr.countsByGroup.GetWithCheck(groupingKey)
+		if !ok {
 			tr.countsByGroup.Put(groupingKey, int64(1))
 		} else {
-			tr.countsByGroup.Put(groupingKey, iCount.(int64)+1)
+			tr.countsByGroup.Put(groupingKey, iCount+1)
 		}
 		if tr.valuesForGroup[groupingKey] == nil {
 			selectedValues, _ := inrec.GetSelectedValues(tr.groupByFieldNames)
@@ -240,7 +239,7 @@ func (tr *TransformerMostOrLeastFrequent) Transform(
 		i := 0
 		for pe := tr.countsByGroup.Head; pe != nil; pe = pe.Next {
 			groupingKey := pe.Key
-			count := pe.Value.(int64)
+			count := pe.Value
 			sortPairs[i].groupingKey = groupingKey
 			sortPairs[i].count = count
 			i++
@@ -280,9 +279,9 @@ func (tr *TransformerMostOrLeastFrequent) Transform(
 			if tr.showCounts {
 				outrec.PutReference(tr.outputFieldName, mlrval.FromInt(sortPairs[i].count))
 			}
-			outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // End-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // End-of-stream marker
 	}
 }

@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -134,8 +133,8 @@ type tRegexAndReplacement struct {
 }
 
 type TransformerRename struct {
-	oldToNewNames          *lib.OrderedMap
-	regexesAndReplacements *list.List
+	oldToNewNames          *lib.OrderedMap[string]
+	regexesAndReplacements []*tRegexAndReplacement
 	doGsub                 bool
 	recordTransformerFunc  RecordTransformerFunc
 }
@@ -149,7 +148,7 @@ func NewTransformerRename(
 		return nil, fmt.Errorf("mlr rename: names string must have even length")
 	}
 
-	oldToNewNames := lib.NewOrderedMap()
+	oldToNewNames := lib.NewOrderedMap[string]()
 	n := len(names)
 	for i := 0; i < n; i += 2 {
 		oldName := names[i]
@@ -164,18 +163,18 @@ func NewTransformerRename(
 		tr.doGsub = false
 		tr.recordTransformerFunc = tr.transformWithoutRegexes
 	} else {
-		tr.regexesAndReplacements = list.New()
+		tr.regexesAndReplacements = make([]*tRegexAndReplacement, 0)
 		for pe := oldToNewNames.Head; pe != nil; pe = pe.Next {
 			regexString := pe.Key
 			regex := lib.CompileMillerRegexOrDie(regexString)
-			replacement := pe.Value.(string)
+			replacement := pe.Value
 			_, replacementCaptureMatrix := lib.ReplacementHasCaptures(replacement)
 			regexAndReplacement := tRegexAndReplacement{
 				regex:                    regex,
 				replacement:              replacement,
 				replacementCaptureMatrix: replacementCaptureMatrix,
 			}
-			tr.regexesAndReplacements.PushBack(&regexAndReplacement)
+			tr.regexesAndReplacements = append(tr.regexesAndReplacements, &regexAndReplacement)
 		}
 		tr.doGsub = doGsub
 		tr.recordTransformerFunc = tr.transformWithRegexes
@@ -188,7 +187,7 @@ func NewTransformerRename(
 
 func (tr *TransformerRename) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -199,7 +198,7 @@ func (tr *TransformerRename) Transform(
 // ----------------------------------------------------------------
 func (tr *TransformerRename) transformWithoutRegexes(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -208,27 +207,26 @@ func (tr *TransformerRename) transformWithoutRegexes(
 
 		for pe := inrec.Head; pe != nil; pe = pe.Next {
 			if tr.oldToNewNames.Has(pe.Key) {
-				newName := tr.oldToNewNames.Get(pe.Key).(string)
+				newName := tr.oldToNewNames.Get(pe.Key)
 				inrec.Rename(pe.Key, newName)
 			}
 
 		}
 	}
-	outputRecordsAndContexts.PushBack(inrecAndContext) // including end-of-stream marker
+	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // including end-of-stream marker
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerRename) transformWithRegexes(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 
-		for pr := tr.regexesAndReplacements.Front(); pr != nil; pr = pr.Next() {
-			regexAndReplacement := pr.Value.(*tRegexAndReplacement)
+		for _, regexAndReplacement := range tr.regexesAndReplacements {
 			regex := regexAndReplacement.regex
 			replacement := regexAndReplacement.replacement
 			replacementCaptureMatrix := regexAndReplacement.replacementCaptureMatrix
@@ -249,8 +247,8 @@ func (tr *TransformerRename) transformWithRegexes(
 			}
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext)
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	} else {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // including end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // including end-of-stream marker
 	}
 }

@@ -42,7 +42,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"sort"
@@ -313,11 +312,11 @@ type TransformerSort struct {
 	doMoveToHead      bool
 
 	// -- State
-	// Map from string to *list.List:
-	recordListsByGroup *lib.OrderedMap
+	// Map from string to record slices:
+	recordListsByGroup *lib.OrderedMap[*[]*types.RecordAndContext]
 	// Map from string to []*lib.Mlrval:
-	groupHeads *lib.OrderedMap
-	spillGroup *list.List // e.g. sort by field "a" -- this is for records lacking a field named "a"
+	groupHeads *lib.OrderedMap[[]*mlrval.Mlrval]
+	spillGroup []*types.RecordAndContext // e.g. sort by field "a" -- this is for records lacking a field named "a"
 }
 
 func NewTransformerSort(
@@ -331,9 +330,9 @@ func NewTransformerSort(
 		comparatorFuncs:   comparatorFuncs,
 		doMoveToHead:      doMoveToHead,
 
-		recordListsByGroup: lib.NewOrderedMap(),
-		groupHeads:         lib.NewOrderedMap(),
-		spillGroup:         list.New(),
+		recordListsByGroup: lib.NewOrderedMap[*[]*types.RecordAndContext](),
+		groupHeads:         lib.NewOrderedMap[[]*mlrval.Mlrval](),
+		spillGroup:         make([]*types.RecordAndContext, 0),
 	}
 
 	return tr, nil
@@ -347,7 +346,7 @@ type GroupingKeysAndMlrvals struct {
 
 func (tr *TransformerSort) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -366,18 +365,19 @@ func (tr *TransformerSort) Transform(
 			tr.groupByFieldNames,
 		)
 		if !ok {
-			tr.spillGroup.PushBack(inrecAndContext)
+			tr.spillGroup = append(tr.spillGroup, inrecAndContext)
 			return
 		}
 
 		recordListForGroup := tr.recordListsByGroup.Get(groupingKey)
 		if recordListForGroup == nil {
-			recordListForGroup = list.New()
+			records := make([]*types.RecordAndContext, 0)
+			recordListForGroup = &records
 			tr.recordListsByGroup.Put(groupingKey, recordListForGroup)
 			tr.groupHeads.Put(groupingKey, selectedValues)
 		}
 
-		recordListForGroup.(*list.List).PushBack(inrecAndContext)
+		*recordListForGroup = append(*recordListForGroup, inrecAndContext)
 
 	} else { // End of record stream
 
@@ -415,29 +415,28 @@ func (tr *TransformerSort) Transform(
 
 		// Now output the groups
 		for _, groupingKeyAndMlrvals := range groupingKeysAndMlrvals {
-			iRecordsInGroup := tr.recordListsByGroup.Get(groupingKeyAndMlrvals.groupingKey)
-			recordsInGroup := iRecordsInGroup.(*list.List)
-			for iRecord := recordsInGroup.Front(); iRecord != nil; iRecord = iRecord.Next() {
-				outputRecordsAndContexts.PushBack(iRecord.Value.(*types.RecordAndContext))
+			recordsInGroup := tr.recordListsByGroup.Get(groupingKeyAndMlrvals.groupingKey)
+			for _, recordAndContext := range *recordsInGroup {
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, recordAndContext)
 			}
 		}
 
-		for iRecord := tr.spillGroup.Front(); iRecord != nil; iRecord = iRecord.Next() {
-			outputRecordsAndContexts.PushBack(iRecord.Value.(*types.RecordAndContext))
+		for _, recordAndContext := range tr.spillGroup {
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, recordAndContext)
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
-func groupHeadsToArray(groupHeads *lib.OrderedMap) []GroupingKeysAndMlrvals {
+func groupHeadsToArray(groupHeads *lib.OrderedMap[[]*mlrval.Mlrval]) []GroupingKeysAndMlrvals {
 	retval := make([]GroupingKeysAndMlrvals, groupHeads.FieldCount)
 
 	i := 0
 	for entry := groupHeads.Head; entry != nil; entry = entry.Next {
 		retval[i] = GroupingKeysAndMlrvals{
 			groupingKey: entry.Key,
-			mlrvals:     entry.Value.([]*mlrval.Mlrval),
+			mlrvals:     entry.Value,
 		}
 		i++
 	}

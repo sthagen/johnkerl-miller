@@ -2,7 +2,6 @@ package types
 
 import (
 	"bytes"
-	"container/list"
 	"strconv"
 
 	"github.com/johnkerl/miller/v6/pkg/mlrval"
@@ -84,10 +83,9 @@ func NewEndOfStreamMarker(context *Context) *RecordAndContext {
 
 // TODO: comment
 // For the record-readers to update their initial context as each new record is read.
-func NewEndOfStreamMarkerList(context *Context) *list.List {
-	ell := list.New()
-	ell.PushBack(NewEndOfStreamMarker(context))
-	return ell
+func NewEndOfStreamMarkerList(context *Context) []*RecordAndContext {
+	recordsAndContexts := []*RecordAndContext{NewEndOfStreamMarker(context)}
+	return recordsAndContexts
 }
 
 // ----------------------------------------------------------------
@@ -100,7 +98,6 @@ type Context struct {
 	NR  int64
 	FNR int64
 
-	// XXX 1513
 	JSONHadBrackets bool
 }
 
@@ -143,11 +140,6 @@ func (context *Context) UpdateForStartOfFile(filename string) {
 func (context *Context) UpdateForInputRecord() {
 	context.NR++
 	context.FNR++
-}
-
-func (context *Context) Copy() *Context {
-	other := *context
-	return &other
 }
 
 func (context *Context) GetStatusString() string {

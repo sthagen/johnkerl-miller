@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -109,7 +108,7 @@ type sampleBucketType struct {
 type TransformerSample struct {
 	groupByFieldNames []string
 	sampleCount       int64
-	bucketsByGroup    *lib.OrderedMap
+	bucketsByGroup    *lib.OrderedMap[*sampleBucketType]
 }
 
 func NewTransformerSample(
@@ -119,7 +118,7 @@ func NewTransformerSample(
 	tr := &TransformerSample{
 		sampleCount:       sampleCount,
 		groupByFieldNames: groupByFieldNames,
-		bucketsByGroup:    lib.NewOrderedMap(),
+		bucketsByGroup:    lib.NewOrderedMap[*sampleBucketType](),
 	}
 	return tr, nil
 }
@@ -128,7 +127,7 @@ func NewTransformerSample(
 
 func (tr *TransformerSample) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -143,21 +142,21 @@ func (tr *TransformerSample) Transform(
 				sampleBucket = newSampleBucket(tr.sampleCount)
 				tr.bucketsByGroup.Put(groupingKey, sampleBucket)
 			}
-			sampleBucket.(*sampleBucketType).handleRecord(inrecAndContext, inrecAndContext.Context.NR)
+			sampleBucket.handleRecord(inrecAndContext, inrecAndContext.Context.NR)
 		} // else, specified keys aren't present in this record, so ignore it
 
 	} else { // end of record stream
 
 		for pe := tr.bucketsByGroup.Head; pe != nil; pe = pe.Next {
-			sampleBucket := pe.Value.(*sampleBucketType)
+			sampleBucket := pe.Value
 			for i := int64(0); i < sampleBucket.nused; i++ {
-				outputRecordsAndContexts.PushBack(sampleBucket.recordsAndContexts[i])
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, sampleBucket.recordsAndContexts[i])
 
 			}
 		}
 
 		// Emit the stream-terminating null record
-		outputRecordsAndContexts.PushBack(inrecAndContext)
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	}
 }
 

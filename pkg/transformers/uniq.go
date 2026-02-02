@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -294,13 +293,13 @@ type TransformerUniq struct {
 	// unlashedCountValues:
 	//   "a" => "1" => 1
 	//   "a" => "4" => 4
-	uniqifiedRecordCounts *lib.OrderedMap // record-as-string -> counts
-	uniqifiedRecords      *lib.OrderedMap // record-as-string -> records
-	keysByGroup           *lib.OrderedMap // XXX COMMENT ME
-	countsByGroup         *lib.OrderedMap // grouping key -> count
-	valuesByGroup         *lib.OrderedMap // grouping key -> array of values
-	unlashedCounts        *lib.OrderedMap // field name -> string field value -> count
-	unlashedCountValues   *lib.OrderedMap // field name -> string field value -> typed field value
+	uniqifiedRecordCounts *lib.OrderedMap[int64]                           // record-as-string -> counts
+	uniqifiedRecords      *lib.OrderedMap[*types.RecordAndContext]         // record-as-string -> records
+	keysByGroup           *lib.OrderedMap[[]string]                        // XXX COMMENT ME
+	countsByGroup         *lib.OrderedMap[int64]                           // grouping key -> count
+	valuesByGroup         *lib.OrderedMap[[]*mlrval.Mlrval]                // grouping key -> array of values
+	unlashedCounts        *lib.OrderedMap[*lib.OrderedMap[int64]]          // field name -> string field value -> count
+	unlashedCountValues   *lib.OrderedMap[*lib.OrderedMap[*mlrval.Mlrval]] // field name -> string field value -> typed field value
 
 	recordTransformerFunc RecordTransformerFunc
 }
@@ -323,13 +322,13 @@ func NewTransformerUniq(
 		showCounts:       showCounts,
 		outputFieldName:  outputFieldName,
 
-		uniqifiedRecordCounts: lib.NewOrderedMap(),
-		uniqifiedRecords:      lib.NewOrderedMap(),
-		keysByGroup:           lib.NewOrderedMap(),
-		countsByGroup:         lib.NewOrderedMap(),
-		valuesByGroup:         lib.NewOrderedMap(),
-		unlashedCounts:        lib.NewOrderedMap(),
-		unlashedCountValues:   lib.NewOrderedMap(),
+		uniqifiedRecordCounts: lib.NewOrderedMap[int64](),
+		uniqifiedRecords:      lib.NewOrderedMap[*types.RecordAndContext](),
+		keysByGroup:           lib.NewOrderedMap[[]string](),
+		countsByGroup:         lib.NewOrderedMap[int64](),
+		valuesByGroup:         lib.NewOrderedMap[[]*mlrval.Mlrval](),
+		unlashedCounts:        lib.NewOrderedMap[*lib.OrderedMap[int64]](),
+		unlashedCountValues:   lib.NewOrderedMap[*lib.OrderedMap[*mlrval.Mlrval]](),
 	}
 
 	if uniqifyEntireRecords {
@@ -367,7 +366,7 @@ func (tr *TransformerUniq) getFieldNamesForGrouping(
 
 func (tr *TransformerUniq) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -380,7 +379,7 @@ func (tr *TransformerUniq) Transform(
 // non-streaming, with output at end of stream.
 func (tr *TransformerUniq) transformUniqifyEntireRecordsShowCounts(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -393,20 +392,20 @@ func (tr *TransformerUniq) transformUniqifyEntireRecordsShowCounts(
 			tr.uniqifiedRecordCounts.Put(recordAsString, int64(1))
 			tr.uniqifiedRecords.Put(recordAsString, inrecAndContext.Copy())
 		} else { // have seen before
-			tr.uniqifiedRecordCounts.Put(recordAsString, icount.(int64)+1)
+			tr.uniqifiedRecordCounts.Put(recordAsString, icount+1)
 		}
 
 	} else { // end of record stream
 
 		for pe := tr.uniqifiedRecords.Head; pe != nil; pe = pe.Next {
-			outrecAndContext := pe.Value.(*types.RecordAndContext)
+			outrecAndContext := pe.Value
 			icount := tr.uniqifiedRecordCounts.Get(pe.Key)
-			mcount := mlrval.FromInt(icount.(int64))
+			mcount := mlrval.FromInt(icount)
 			outrecAndContext.Record.PrependReference(tr.outputFieldName, mcount)
-			outputRecordsAndContexts.PushBack(outrecAndContext)
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, outrecAndContext)
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 
 }
@@ -416,7 +415,7 @@ func (tr *TransformerUniq) transformUniqifyEntireRecordsShowCounts(
 // of stream.
 func (tr *TransformerUniq) transformUniqifyEntireRecordsShowNumDistinctOnly(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -433,9 +432,9 @@ func (tr *TransformerUniq) transformUniqifyEntireRecordsShowNumDistinctOnly(
 			tr.outputFieldName,
 			mlrval.FromInt(tr.uniqifiedRecordCounts.FieldCount),
 		)
-		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
@@ -443,7 +442,7 @@ func (tr *TransformerUniq) transformUniqifyEntireRecordsShowNumDistinctOnly(
 // Print each unique record only once (on first occurrence).
 func (tr *TransformerUniq) transformUniqifyEntireRecords(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -453,19 +452,19 @@ func (tr *TransformerUniq) transformUniqifyEntireRecords(
 		recordAsString := inrec.String()
 		if !tr.uniqifiedRecordCounts.Has(recordAsString) {
 			tr.uniqifiedRecordCounts.Put(recordAsString, int64(1))
-			outputRecordsAndContexts.PushBack(inrecAndContext)
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 		}
 
 	} else { // end of record stream
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerUniq) transformUnlashed(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -473,14 +472,14 @@ func (tr *TransformerUniq) transformUnlashed(
 		inrec := inrecAndContext.Record
 
 		for _, fieldName := range tr.getFieldNamesForGrouping(inrec) {
-			var countsForFieldName *lib.OrderedMap = nil
+			var countsForFieldName *lib.OrderedMap[int64] = nil
 			iCountsForFieldName, present := tr.unlashedCounts.GetWithCheck(fieldName)
 			if !present {
-				countsForFieldName = lib.NewOrderedMap()
+				countsForFieldName = lib.NewOrderedMap[int64]()
 				tr.unlashedCounts.Put(fieldName, countsForFieldName)
-				tr.unlashedCountValues.Put(fieldName, lib.NewOrderedMap())
+				tr.unlashedCountValues.Put(fieldName, lib.NewOrderedMap[*mlrval.Mlrval]())
 			} else {
-				countsForFieldName = iCountsForFieldName.(*lib.OrderedMap)
+				countsForFieldName = iCountsForFieldName
 			}
 
 			fieldValue := inrec.Get(fieldName)
@@ -488,9 +487,9 @@ func (tr *TransformerUniq) transformUnlashed(
 				fieldValueString := fieldValue.String()
 				if !countsForFieldName.Has(fieldValueString) {
 					countsForFieldName.Put(fieldValueString, int64(1))
-					tr.unlashedCountValues.Get(fieldName).(*lib.OrderedMap).Put(fieldValueString, fieldValue.Copy())
+					tr.unlashedCountValues.Get(fieldName).Put(fieldValueString, fieldValue.Copy())
 				} else {
-					countsForFieldName.Put(fieldValueString, countsForFieldName.Get(fieldValueString).(int64)+1)
+					countsForFieldName.Put(fieldValueString, countsForFieldName.Get(fieldValueString)+1)
 				}
 			}
 		}
@@ -499,28 +498,28 @@ func (tr *TransformerUniq) transformUnlashed(
 
 		for pe := tr.unlashedCounts.Head; pe != nil; pe = pe.Next {
 			fieldName := pe.Key
-			countsForFieldName := pe.Value.(*lib.OrderedMap)
+			countsForFieldName := pe.Value
 			for pf := countsForFieldName.Head; pf != nil; pf = pf.Next {
 				fieldValueString := pf.Key
 				outrec := mlrval.NewMlrmapAsRecord()
 				outrec.PutReference("field", mlrval.FromString(fieldName))
 				outrec.PutCopy(
 					"value",
-					tr.unlashedCountValues.Get(fieldName).(*lib.OrderedMap).Get(fieldValueString).(*mlrval.Mlrval),
+					tr.unlashedCountValues.Get(fieldName).Get(fieldValueString),
 				)
-				outrec.PutReference("count", mlrval.FromInt(pf.Value.(int64)))
-				outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+				outrec.PutReference("count", mlrval.FromInt(pf.Value))
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 			}
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerUniq) transformNumDistinctOnly(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -533,7 +532,7 @@ func (tr *TransformerUniq) transformNumDistinctOnly(
 			if !present {
 				tr.countsByGroup.Put(groupingKey, int64(1))
 			} else {
-				tr.countsByGroup.Put(groupingKey, iCount.(int64)+1)
+				tr.countsByGroup.Put(groupingKey, iCount+1)
 			}
 		}
 
@@ -543,16 +542,16 @@ func (tr *TransformerUniq) transformNumDistinctOnly(
 			"count",
 			mlrval.FromInt(tr.countsByGroup.FieldCount),
 		)
-		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerUniq) transformWithCounts(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -569,15 +568,15 @@ func (tr *TransformerUniq) transformWithCounts(
 				tr.valuesByGroup.Put(groupingKey, selectedValues)
 				tr.keysByGroup.Put(groupingKey, fieldNamesForGrouping)
 			} else {
-				tr.countsByGroup.Put(groupingKey, iCount.(int64)+1)
+				tr.countsByGroup.Put(groupingKey, iCount+1)
 			}
 		}
 
 	} else { // end of record stream
 		for pa := tr.countsByGroup.Head; pa != nil; pa = pa.Next {
 			outrec := mlrval.NewMlrmapAsRecord()
-			valuesForGroup := tr.valuesByGroup.Get(pa.Key).([]*mlrval.Mlrval)
-			keysForGroup := tr.keysByGroup.Get(pa.Key).([]string)
+			valuesForGroup := tr.valuesByGroup.Get(pa.Key)
+			keysForGroup := tr.keysByGroup.Get(pa.Key)
 
 			for i, fieldNameForGrouping := range keysForGroup {
 				outrec.PutCopy(
@@ -589,20 +588,20 @@ func (tr *TransformerUniq) transformWithCounts(
 			if tr.showCounts {
 				outrec.PutReference(
 					tr.outputFieldName,
-					mlrval.FromInt(pa.Value.(int64)),
+					mlrval.FromInt(pa.Value),
 				)
 			}
-			outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 		}
 
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerUniq) transformWithoutCounts(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -627,13 +626,13 @@ func (tr *TransformerUniq) transformWithoutCounts(
 				)
 			}
 
-			outputRecordsAndContexts.PushBack(types.NewRecordAndContext(outrec, &inrecAndContext.Context))
+			*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(outrec, &inrecAndContext.Context))
 
 		} else {
-			tr.countsByGroup.Put(groupingKey, iCount.(int64)+1)
+			tr.countsByGroup.Put(groupingKey, iCount+1)
 		}
 
 	} else { // end of record stream
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }

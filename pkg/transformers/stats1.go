@@ -2,7 +2,6 @@ package transformers
 
 import (
 	"bytes"
-	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -226,7 +225,7 @@ type TransformerStats1 struct {
 	// the groupByFieldNameList. If the group-by field names are regexed, this
 	// is the union of all the group-by field names encountered in the input,
 	// over all records.
-	groupByFieldNamesForOutput *lib.OrderedMap
+	groupByFieldNamesForOutput *lib.OrderedMap[bool]
 
 	valueFieldRegexes   []*regexp.Regexp
 	groupByFieldRegexes []*regexp.Regexp
@@ -248,10 +247,10 @@ type TransformerStats1 struct {
 	// This would be
 	//   namedAccumulators map[string]map[string]map[string]Stats1NamedAccumulator
 	// except we need maps that preserve insertion order.
-	namedAccumulators *lib.OrderedMap
+	namedAccumulators *lib.OrderedMap[*lib.OrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]]]
 
 	// map[string]OrderedMap[string]*mlrval.Mlrval
-	groupingKeysToGroupByFieldValues map[string]*lib.OrderedMap
+	groupingKeysToGroupByFieldValues map[string]*lib.OrderedMap[*mlrval.Mlrval]
 }
 
 // Given: accumulate count,sum on values x,y group by a,b.
@@ -320,7 +319,7 @@ func NewTransformerStats1(
 		accumulatorNameList:        accumulatorNameList,
 		valueFieldNameList:         valueFieldNameList,
 		groupByFieldNameList:       groupByFieldNameList,
-		groupByFieldNamesForOutput: lib.NewOrderedMap(),
+		groupByFieldNamesForOutput: lib.NewOrderedMap[bool](),
 
 		doRegexValueFieldNames:       doRegexValueFieldNames,
 		doRegexGroupByFieldNames:     doRegexGroupByFieldNames,
@@ -330,8 +329,8 @@ func NewTransformerStats1(
 		doInterpolatedPercentiles:        doInterpolatedPercentiles,
 		doIterativeStats:                 doIterativeStats,
 		accumulatorFactory:               utils.NewStats1AccumulatorFactory(),
-		namedAccumulators:                lib.NewOrderedMap(),
-		groupingKeysToGroupByFieldValues: make(map[string]*lib.OrderedMap),
+		namedAccumulators:                lib.NewOrderedMap[*lib.OrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]]](),
+		groupingKeysToGroupByFieldValues: make(map[string]*lib.OrderedMap[*mlrval.Mlrval]),
 	}
 
 	if doRegexGroupByFieldNames {
@@ -353,7 +352,7 @@ func NewTransformerStats1(
 // the end-of-stream marker.
 func (tr *TransformerStats1) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -367,19 +366,19 @@ func (tr *TransformerStats1) Transform(
 
 func (tr *TransformerStats1) handleInputRecord(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 ) {
 	inrec := inrecAndContext.Record
 
 	// E.g. if grouping by "a" and "b", and the current record has a=circle, b=blue,
 	// then groupingKey is the string "circle,blue".
 	var groupingKey string
-	var groupByFieldValues *lib.OrderedMap // OrderedMap[string]*mlrval.Mlrval
+	var groupByFieldValues *lib.OrderedMap[*mlrval.Mlrval] // OrderedMap[string]*mlrval.Mlrval
 	var ok bool
 	if tr.doRegexGroupByFieldNames {
 		groupingKey, groupByFieldValues, ok = tr.getGroupByFieldNamesWithRegexes(inrec)
 	} else {
-		groupingKey, groupByFieldValues, ok = tr.getGroupByFieldNamesWithoutRegexes(inrec)
+		groupingKey, ok = tr.getGroupingKeyWithoutRegexes(inrec)
 	}
 	if !ok {
 		return
@@ -387,28 +386,36 @@ func (tr *TransformerStats1) handleInputRecord(
 
 	level2 := tr.namedAccumulators.Get(groupingKey)
 	if level2 == nil {
-		level2 = lib.NewOrderedMap()
+		level2 = lib.NewOrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]]()
 		tr.namedAccumulators.Put(groupingKey, level2)
 		// E.g. if grouping by "color" and "shape", and the current record has
 		// color=blue, shape=circle, then groupByFieldValues is the map
 		// {"color": "blue", "shape": "circle"}.
+		if !tr.doRegexGroupByFieldNames {
+			groupByFieldValues, ok = tr.buildGroupByFieldValuesWithoutRegexes(inrec)
+			if !ok {
+				return
+			}
+		}
 		tr.groupingKeysToGroupByFieldValues[groupingKey] = groupByFieldValues
+	} else if tr.doIterativeStats && !tr.doRegexGroupByFieldNames {
+		groupByFieldValues = tr.groupingKeysToGroupByFieldValues[groupingKey]
 	}
 
 	if tr.doRegexValueFieldNames {
-		tr.ingestWithValueFieldRegexes(inrec, groupingKey, level2.(*lib.OrderedMap))
+		tr.ingestWithValueFieldRegexes(inrec, groupingKey, level2)
 	} else {
-		tr.ingestWithoutValueFieldRegexes(inrec, groupingKey, level2.(*lib.OrderedMap))
+		tr.ingestWithoutValueFieldRegexes(inrec, groupingKey, level2)
 	}
 
 	if tr.doIterativeStats {
 		tr.emitIntoOutputRecord(
 			inrecAndContext.Record,
 			groupByFieldValues,
-			level2.(*lib.OrderedMap),
+			level2,
 			inrec,
 		)
-		outputRecordsAndContexts.PushBack(inrecAndContext)
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	}
 }
 
@@ -416,23 +423,30 @@ func (tr *TransformerStats1) handleInputRecord(
 // b=blue, then groupingKey is the string "circle,blue".  For grouping without
 // regexed group-by field names, the group-by field names/values are the same
 // on every record.
-func (tr *TransformerStats1) getGroupByFieldNamesWithoutRegexes(
+func (tr *TransformerStats1) getGroupingKeyWithoutRegexes(
 	inrec *mlrval.Mlrmap,
 ) (
 	groupingKey string,
-	groupByFieldValues *lib.OrderedMap, // OrderedMap[string]*mlrval.Mlrval,
 	ok bool,
 ) {
-	var groupByFieldValuesArray []*mlrval.Mlrval
-	groupingKey, groupByFieldValuesArray, ok = inrec.GetSelectedValuesAndJoined(tr.groupByFieldNameList)
+	return inrec.GetSelectedValuesJoined(tr.groupByFieldNameList)
+}
+
+func (tr *TransformerStats1) buildGroupByFieldValuesWithoutRegexes(
+	inrec *mlrval.Mlrmap,
+) (
+	groupByFieldValues *lib.OrderedMap[*mlrval.Mlrval], // OrderedMap[string]*mlrval.Mlrval,
+	ok bool,
+) {
+	groupByFieldValuesArray, ok := inrec.GetSelectedValues(tr.groupByFieldNameList)
 	if !ok {
-		return groupingKey, nil, false
+		return nil, false
 	}
-	groupByFieldValues = lib.NewOrderedMap()
+	groupByFieldValues = lib.NewOrderedMap[*mlrval.Mlrval]()
 	for i, groupByFieldValue := range groupByFieldValuesArray {
 		groupByFieldValues.Put(tr.groupByFieldNameList[i], groupByFieldValue)
 	}
-	return groupingKey, groupByFieldValues, ok
+	return groupByFieldValues, true
 }
 
 // E.g. if grouping by "a" and "b", and the current record has a=circle,
@@ -443,12 +457,12 @@ func (tr *TransformerStats1) getGroupByFieldNamesWithRegexes(
 	inrec *mlrval.Mlrmap,
 ) (
 	groupingKey string,
-	groupByFieldValues *lib.OrderedMap, // OrderedMap[string]*mlrval.Mlrval,
+	groupByFieldValues *lib.OrderedMap[*mlrval.Mlrval], // OrderedMap[string]*mlrval.Mlrval,
 	ok bool,
 ) {
 
 	var buffer bytes.Buffer
-	groupByFieldValues = lib.NewOrderedMap()
+	groupByFieldValues = lib.NewOrderedMap[*mlrval.Mlrval]()
 	for pe := inrec.Head; pe != nil; pe = pe.Next {
 		groupByFieldName := pe.Key
 		if !tr.matchGroupByFieldName(groupByFieldName) {
@@ -474,7 +488,7 @@ func (tr *TransformerStats1) getGroupByFieldNamesWithRegexes(
 func (tr *TransformerStats1) ingestWithoutValueFieldRegexes(
 	inrec *mlrval.Mlrmap,
 	groupingKey string,
-	level2 *lib.OrderedMap,
+	level2 *lib.OrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]],
 ) {
 	for _, valueFieldName := range tr.valueFieldNameList {
 		valueFieldValue := inrec.Get(valueFieldName)
@@ -483,11 +497,11 @@ func (tr *TransformerStats1) ingestWithoutValueFieldRegexes(
 		}
 		level3 := level2.Get(valueFieldName)
 		if level3 == nil {
-			level3 = lib.NewOrderedMap()
+			level3 = lib.NewOrderedMap[*utils.Stats1NamedAccumulator]()
 			level2.Put(valueFieldName, level3)
 		}
 		for _, accumulatorName := range tr.accumulatorNameList {
-			namedAccumulator := level3.(*lib.OrderedMap).Get(accumulatorName)
+			namedAccumulator := level3.Get(accumulatorName)
 			if namedAccumulator == nil {
 				namedAccumulator = tr.accumulatorFactory.MakeNamedAccumulator(
 					accumulatorName,
@@ -495,7 +509,7 @@ func (tr *TransformerStats1) ingestWithoutValueFieldRegexes(
 					valueFieldName,
 					tr.doInterpolatedPercentiles,
 				)
-				level3.(*lib.OrderedMap).Put(accumulatorName, namedAccumulator)
+				level3.Put(accumulatorName, namedAccumulator)
 			}
 			if valueFieldValue.IsVoid() {
 				// The accumulator has been initialized with default values;
@@ -505,7 +519,7 @@ func (tr *TransformerStats1) ingestWithoutValueFieldRegexes(
 					continue
 				}
 			}
-			namedAccumulator.(*utils.Stats1NamedAccumulator).Ingest(valueFieldValue)
+			namedAccumulator.Ingest(valueFieldValue)
 		}
 	}
 }
@@ -513,7 +527,7 @@ func (tr *TransformerStats1) ingestWithoutValueFieldRegexes(
 func (tr *TransformerStats1) ingestWithValueFieldRegexes(
 	inrec *mlrval.Mlrmap,
 	groupingKey string,
-	level2 *lib.OrderedMap,
+	level2 *lib.OrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]],
 ) {
 	for pe := inrec.Head; pe != nil; pe = pe.Next {
 		valueFieldName := pe.Key
@@ -528,11 +542,11 @@ func (tr *TransformerStats1) ingestWithValueFieldRegexes(
 		}
 		level3 := level2.Get(valueFieldName)
 		if level3 == nil {
-			level3 = lib.NewOrderedMap()
+			level3 = lib.NewOrderedMap[*utils.Stats1NamedAccumulator]()
 			level2.Put(valueFieldName, level3)
 		}
 		for _, accumulatorName := range tr.accumulatorNameList {
-			namedAccumulator := level3.(*lib.OrderedMap).Get(accumulatorName)
+			namedAccumulator := level3.Get(accumulatorName)
 			if namedAccumulator == nil {
 				namedAccumulator = tr.accumulatorFactory.MakeNamedAccumulator(
 					accumulatorName,
@@ -540,7 +554,7 @@ func (tr *TransformerStats1) ingestWithValueFieldRegexes(
 					valueFieldName,
 					tr.doInterpolatedPercentiles,
 				)
-				level3.(*lib.OrderedMap).Put(accumulatorName, namedAccumulator)
+				level3.Put(accumulatorName, namedAccumulator)
 			}
 			if valueFieldValue.IsVoid() {
 				// The accumulator has been initialized with default values;
@@ -548,7 +562,7 @@ func (tr *TransformerStats1) ingestWithValueFieldRegexes(
 				// we would be failing to construct the accumulator.)
 				continue
 			}
-			namedAccumulator.(*utils.Stats1NamedAccumulator).Ingest(valueFieldValue)
+			namedAccumulator.Ingest(valueFieldValue)
 		}
 	}
 }
@@ -581,16 +595,16 @@ func (tr *TransformerStats1) matchValueFieldName(
 
 func (tr *TransformerStats1) handleEndOfRecordStream(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 ) {
 	if tr.doIterativeStats {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 		return
 	}
 
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
 		groupingKey := pa.Key
-		level2 := pa.Value.(*lib.OrderedMap)
+		level2 := pa.Value
 		groupByFieldValues := tr.groupingKeysToGroupByFieldValues[groupingKey]
 
 		newrec := mlrval.NewMlrmapAsRecord()
@@ -602,16 +616,16 @@ func (tr *TransformerStats1) handleEndOfRecordStream(
 			newrec,
 		)
 
-		outputRecordsAndContexts.PushBack(types.NewRecordAndContext(newrec, &inrecAndContext.Context))
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewRecordAndContext(newrec, &inrecAndContext.Context))
 	}
 
-	outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 }
 
 func (tr *TransformerStats1) emitIntoOutputRecord(
 	inrec *mlrval.Mlrmap,
-	groupByFieldValues *lib.OrderedMap, // OrderedMap[string]*mlrval.Mlrval,
-	level2accumulators *lib.OrderedMap,
+	groupByFieldValues *lib.OrderedMap[*mlrval.Mlrval], // OrderedMap[string]*mlrval.Mlrval,
+	level2accumulators *lib.OrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]],
 	outrec *mlrval.Mlrmap,
 ) {
 
@@ -619,14 +633,14 @@ func (tr *TransformerStats1) emitIntoOutputRecord(
 		groupByFieldName := pa.Key
 		iValue := groupByFieldValues.Get(groupByFieldName)
 		if iValue != nil {
-			outrec.PutCopy(groupByFieldName, iValue.(*mlrval.Mlrval))
+			outrec.PutCopy(groupByFieldName, iValue)
 		}
 	}
 
 	for pb := level2accumulators.Head; pb != nil; pb = pb.Next {
-		level3 := pb.Value.(*lib.OrderedMap)
+		level3 := pb.Value
 		for pc := level3.Head; pc != nil; pc = pc.Next {
-			namedAccumulator := pc.Value.(*utils.Stats1NamedAccumulator)
+			namedAccumulator := pc.Value
 			key, value := namedAccumulator.Emit()
 			outrec.PutCopy(key, value)
 		}

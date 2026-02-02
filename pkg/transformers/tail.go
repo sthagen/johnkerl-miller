@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"strings"
@@ -109,8 +108,8 @@ type TransformerTail struct {
 	groupByFieldNames []string
 
 	// state
-	// map from string to *list.List
-	recordListsByGroup *lib.OrderedMap
+	// map from string to record slices
+	recordListsByGroup *lib.OrderedMap[*[]*types.RecordAndContext]
 }
 
 func NewTransformerTail(
@@ -122,7 +121,7 @@ func NewTransformerTail(
 		tailCount:         tailCount,
 		groupByFieldNames: groupByFieldNames,
 
-		recordListsByGroup: lib.NewOrderedMap(),
+		recordListsByGroup: lib.NewOrderedMap[*[]*types.RecordAndContext](),
 	}
 
 	return tr, nil
@@ -132,7 +131,7 @@ func NewTransformerTail(
 
 func (tr *TransformerTail) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -145,25 +144,25 @@ func (tr *TransformerTail) Transform(
 			return
 		}
 
-		irecordListForGroup := tr.recordListsByGroup.Get(groupingKey)
-		if irecordListForGroup == nil { // first time
-			irecordListForGroup = list.New()
-			tr.recordListsByGroup.Put(groupingKey, irecordListForGroup)
+		recordListForGroup := tr.recordListsByGroup.Get(groupingKey)
+		if recordListForGroup == nil { // first time
+			records := make([]*types.RecordAndContext, 0)
+			recordListForGroup = &records
+			tr.recordListsByGroup.Put(groupingKey, recordListForGroup)
 		}
-		recordListForGroup := irecordListForGroup.(*list.List)
 
-		recordListForGroup.PushBack(inrecAndContext)
-		for int64(recordListForGroup.Len()) > tr.tailCount {
-			recordListForGroup.Remove(recordListForGroup.Front())
+		*recordListForGroup = append(*recordListForGroup, inrecAndContext)
+		for int64(len(*recordListForGroup)) > tr.tailCount {
+			*recordListForGroup = (*recordListForGroup)[1:]
 		}
 
 	} else {
 		for outer := tr.recordListsByGroup.Head; outer != nil; outer = outer.Next {
-			recordListForGroup := outer.Value.(*list.List)
-			for inner := recordListForGroup.Front(); inner != nil; inner = inner.Next() {
-				outputRecordsAndContexts.PushBack(inner.Value.(*types.RecordAndContext))
+			recordListForGroup := outer.Value
+			for _, recordAndContext := range *recordListForGroup {
+				*outputRecordsAndContexts = append(*outputRecordsAndContexts, recordAndContext)
 			}
 		}
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
 }

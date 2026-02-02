@@ -1,7 +1,6 @@
 package transformers
 
 import (
-	"container/list"
 	"fmt"
 	"os"
 	"regexp"
@@ -237,7 +236,7 @@ type TransformerMergeFields struct {
 	valueFieldNameRegexes []*regexp.Regexp
 
 	// Ordered map from accumulator name to accumulator
-	namedAccumulators *lib.OrderedMap
+	namedAccumulators *lib.OrderedMap[*utils.Stats1NamedAccumulator]
 
 	recordTransformerFunc RecordTransformerFunc
 }
@@ -267,7 +266,7 @@ func NewTransformerMergeFields(
 		doInterpolatedPercentiles: doInterpolatedPercentiles,
 		keepInputFields:           keepInputFields,
 		accumulatorFactory:        utils.NewStats1AccumulatorFactory(),
-		namedAccumulators:         lib.NewOrderedMap(),
+		namedAccumulators:         lib.NewOrderedMap[*utils.Stats1NamedAccumulator](),
 	}
 
 	tr.valueFieldNameRegexes = make([]*regexp.Regexp, len(valueFieldNameList))
@@ -312,7 +311,7 @@ func NewTransformerMergeFields(
 
 func (tr *TransformerMergeFields) Transform(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
@@ -323,19 +322,19 @@ func (tr *TransformerMergeFields) Transform(
 // ----------------------------------------------------------------
 func (tr *TransformerMergeFields) transformByNameList(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
 	if inrecAndContext.EndOfStream {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 		return
 	}
 
 	inrec := inrecAndContext.Record
 
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-		accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+		accumulator := pa.Value
 		accumulator.Reset() // re-use from one record to the next
 	}
 
@@ -353,7 +352,7 @@ func (tr *TransformerMergeFields) transformByNameList(
 		}
 
 		for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-			accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+			accumulator := pa.Value
 			accumulator.Ingest(mvalue)
 		}
 
@@ -363,30 +362,30 @@ func (tr *TransformerMergeFields) transformByNameList(
 	}
 
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-		accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+		accumulator := pa.Value
 		key, value := accumulator.Emit()
 		inrec.PutReference(key, value)
 	}
 
-	outputRecordsAndContexts.PushBack(inrecAndContext)
+	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 }
 
 // ----------------------------------------------------------------
 func (tr *TransformerMergeFields) transformByNameRegex(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
 	if inrecAndContext.EndOfStream {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 		return
 	}
 
 	inrec := inrecAndContext.Record
 
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-		accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+		accumulator := pa.Value
 		accumulator.Reset() // re-use from one record to the next
 	}
 
@@ -424,7 +423,7 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 		}
 
 		for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-			accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+			accumulator := pa.Value
 			accumulator.Ingest(mvalue)
 		}
 
@@ -438,12 +437,12 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 	}
 
 	for pa := tr.namedAccumulators.Head; pa != nil; pa = pa.Next {
-		accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+		accumulator := pa.Value
 		key, value := accumulator.Emit()
 		inrec.PutReference(key, value)
 	}
 
-	outputRecordsAndContexts.PushBack(inrecAndContext)
+	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 }
 
 // ----------------------------------------------------------------
@@ -455,12 +454,12 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 
 func (tr *TransformerMergeFields) transformByCollapsing(
 	inrecAndContext *types.RecordAndContext,
-	outputRecordsAndContexts *list.List, // list of *types.RecordAndContext
+	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
 ) {
 	if inrecAndContext.EndOfStream {
-		outputRecordsAndContexts.PushBack(inrecAndContext) // end-of-stream marker
+		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 		return
 	}
 
@@ -468,7 +467,7 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 	tr.accumulatorFactory.Reset() // discard cached percentile-keepers
 
 	// Ordered map from short name to accumulator name to accumulator
-	collapseAccumulators := lib.NewOrderedMap()
+	collapseAccumulators := lib.NewOrderedMap[*lib.OrderedMap[*utils.Stats1NamedAccumulator]]()
 
 	for pe := inrec.Head; pe != nil; /* increment inside loop */ {
 		valueFieldName := pe.Key
@@ -494,10 +493,10 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 			continue
 		}
 
-		var namedAccumulators *lib.OrderedMap
+		var namedAccumulators *lib.OrderedMap[*utils.Stats1NamedAccumulator]
 		iNamedAccumulators := collapseAccumulators.Get(shortName)
 		if iNamedAccumulators == nil {
-			namedAccumulators = lib.NewOrderedMap()
+			namedAccumulators = lib.NewOrderedMap[*utils.Stats1NamedAccumulator]()
 			for _, accumulatorName := range tr.accumulatorNameList {
 				accumulator := tr.accumulatorFactory.MakeNamedAccumulator(
 					accumulatorName,
@@ -509,7 +508,7 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 			}
 			collapseAccumulators.Put(shortName, namedAccumulators)
 		} else {
-			namedAccumulators = iNamedAccumulators.(*lib.OrderedMap)
+			namedAccumulators = iNamedAccumulators
 		}
 
 		// The accumulator has been initialized with default values; continue
@@ -527,7 +526,7 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 		}
 
 		for pa := namedAccumulators.Head; pa != nil; pa = pa.Next {
-			accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+			accumulator := pa.Value
 			accumulator.Ingest(mvalue)
 		}
 
@@ -541,13 +540,13 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 	}
 
 	for ps := collapseAccumulators.Head; ps != nil; ps = ps.Next {
-		namedAccumulators := ps.Value.(*lib.OrderedMap)
+		namedAccumulators := ps.Value
 		for pa := namedAccumulators.Head; pa != nil; pa = pa.Next {
-			accumulator := pa.Value.(*utils.Stats1NamedAccumulator)
+			accumulator := pa.Value
 			key, value := accumulator.Emit()
 			inrec.PutReference(key, value)
 		}
 	}
 
-	outputRecordsAndContexts.PushBack(inrecAndContext)
+	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 }
