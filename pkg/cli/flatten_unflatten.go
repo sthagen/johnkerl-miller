@@ -56,12 +56,12 @@ package cli
 // * Overriding these: if the last verb the user has explicitly provided is
 //   flatten, don't undo that by putting an unflatten right after.
 //
-// ================================================================
 
 func DecideFinalFlatten(writerOptions *TWriterOptions) bool {
 	ofmt := writerOptions.OutputFileFormat
 	if writerOptions.AutoFlatten {
-		if ofmt != "json" {
+		// Preserve nested/array structure for formats that support it.
+		if ofmt != "json" && ofmt != "jsonl" && ofmt != "dcf" {
 			return true
 		}
 	}

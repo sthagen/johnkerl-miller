@@ -94,7 +94,6 @@ func FinalizeWriterOptions(writerOptions *TWriterOptions) error {
 	return nil
 }
 
-// ================================================================
 var FLAG_TABLE = FlagTable{
 	sections: []*FlagSection{
 		&LegacyFlagSection,
@@ -788,6 +787,15 @@ var FileFormatFlagSection = FlagSection{
 		},
 
 		{
+			name: "--idcf",
+			help: "Use Debian control file (DCF) format for input data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "dcf"
+				*pargi += 1
+			},
+		},
+
+		{
 			name: "--inidx",
 			help: "Use NIDX format for input data.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
@@ -1022,6 +1030,15 @@ var FileFormatFlagSection = FlagSection{
 		},
 
 		{
+			name: "--odcf",
+			help: "Use Debian control file (DCF) format for output data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.WriterOptions.OutputFileFormat = "dcf"
+				*pargi += 1
+			},
+		},
+
+		{
 			name: "--onidx",
 			help: "Use NIDX format for output data.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
@@ -1201,6 +1218,16 @@ var FileFormatFlagSection = FlagSection{
 		},
 
 		{
+			name: "--dcf",
+			help: "Use Debian control file (DCF) format for input and output data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.ReaderOptions.InputFileFormat = "dcf"
+				options.WriterOptions.OutputFileFormat = "dcf"
+				*pargi += 1
+			},
+		},
+
+		{
 			name:     "--nidx",
 			help:     "Use NIDX format for input and output data.",
 			altNames: []string{"--n2n"},
@@ -1252,7 +1279,7 @@ var FileFormatFlagSection = FlagSection{
 func FormatConversionKeystrokeSaverPrintInfo() {
 	fmt.Println(`As keystroke-savers for format-conversion you may use the following.
 The letters c, t, j, l, d, n, x, p, m, and y refer to formats CSV, TSV, JSON, JSON Lines,
-DKVP, NIDX, XTAB, PPRINT, markdown, and YAML, respectively.
+DKVP, NIDX, XTAB, PPRINT, markdown, and YAML, respectively. DCF is also supported (use --dcf for DCF in and out).
 
 | In\out   | CSV      | TSV      | JSON     | JSONL | DKVP  | NIDX  | XTAB  | PPRINT | Markdown | YAML   |
 +----------+----------+----------+----------+-------+-------+-------+-------+--------+----------+--------+
