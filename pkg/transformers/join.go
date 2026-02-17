@@ -22,7 +22,6 @@ var JoinSetup = TransformerSetup{
 	IgnoresInput: false,
 }
 
-// ----------------------------------------------------------------
 // Most transformers have option-variables as individual locals within the
 // transformerXYZParseCLI function, which are passed as individual arguments to
 // the NewTransformerXYZ function. For join, things are a bit more complex
@@ -137,7 +136,7 @@ func transformerJoinParseCLI(
 	args []string,
 	mainOptions *cli.TOptions, // Options for the right-files
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 
 	// Skip the verb name from the current spot in the mlr command line
 	argi := *pargi
@@ -152,6 +151,7 @@ func transformerJoinParseCLI(
 		opts.joinFlagOptions = *mainOptions // struct copy
 	}
 
+	var err error
 	for argi < argc /* variable increment: 1 or 2 depending on flag */ {
 		opt := args[argi]
 		if !strings.HasPrefix(opt, "-") {
@@ -164,36 +164,63 @@ func transformerJoinParseCLI(
 
 		if opt == "-h" || opt == "--help" {
 			transformerJoinUsage(os.Stdout)
-			os.Exit(0)
+			return nil, cli.ErrHelpRequested
 
 		} else if opt == "--prepipe" {
-			opts.prepipe = cli.VerbGetStringArgOrDie(verb, opt, args, &argi, argc)
+			opts.prepipe, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 			opts.prepipeIsRaw = false
 
 		} else if opt == "--prepipex" {
-			opts.prepipe = cli.VerbGetStringArgOrDie(verb, opt, args, &argi, argc)
+			opts.prepipe, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 			opts.prepipeIsRaw = true
 
 		} else if opt == "-f" {
-			opts.leftFileName = cli.VerbGetStringArgOrDie(verb, opt, args, &argi, argc)
+			opts.leftFileName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "-j" {
-			opts.outputJoinFieldNames = cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
+			opts.outputJoinFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "-l" {
-			opts.leftJoinFieldNames = cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
+			opts.leftJoinFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "--lk" || opt == "--left-keep-field-names" {
-			opts.leftKeepFieldNames = cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
+			opts.leftKeepFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "-r" {
-			opts.rightJoinFieldNames = cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
+			opts.rightJoinFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "--lp" {
-			opts.leftPrefix = cli.VerbGetStringArgOrDie(verb, opt, args, &argi, argc)
+			opts.leftPrefix, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "--rp" {
-			opts.rightPrefix = cli.VerbGetStringArgOrDie(verb, opt, args, &argi, argc)
+			opts.rightPrefix, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else if opt == "--np" {
 			opts.emitPairables = false
@@ -220,8 +247,7 @@ func transformerJoinParseCLI(
 				// Nothing else to handle here.
 				argi = largi
 			} else {
-				transformerJoinUsage(os.Stderr)
-				os.Exit(1)
+				return nil, cli.VerbErrorf(verb, "input format option not recognized")
 			}
 		}
 	}
@@ -229,25 +255,15 @@ func transformerJoinParseCLI(
 	cli.FinalizeReaderOptions(&opts.joinFlagOptions.ReaderOptions)
 
 	if opts.leftFileName == "" {
-		fmt.Fprintf(os.Stderr, "%s %s: need left file name\n", "mlr", verb)
-		transformerJoinUsage(os.Stderr)
-		os.Exit(1)
-		return nil
+		return nil, cli.VerbErrorf(verb, "need left file name")
 	}
 
 	if !opts.emitPairables && !opts.emitLeftUnpairables && !opts.emitRightUnpairables {
-		fmt.Fprintf(os.Stderr, "%s %s: all emit flags are unset; no output is possible.\n",
-			"mlr", verb)
-		transformerJoinUsage(os.Stderr)
-		os.Exit(1)
-		return nil
+		return nil, cli.VerbErrorf(verb, "all emit flags are unset; no output is possible")
 	}
 
 	if opts.outputJoinFieldNames == nil {
-		fmt.Fprintf(os.Stderr, "%s %s: need output field names\n", "mlr", verb)
-		transformerJoinUsage(os.Stderr)
-		os.Exit(1)
-		return nil
+		return nil, cli.VerbErrorf(verb, "need output field names")
 	}
 
 	if opts.leftJoinFieldNames == nil {
@@ -261,24 +277,20 @@ func transformerJoinParseCLI(
 	rlen := len(opts.rightJoinFieldNames)
 	olen := len(opts.outputJoinFieldNames)
 	if llen != rlen || llen != olen {
-		fmt.Fprintf(os.Stderr,
-			"%s %s: must have equal left,right,output field-name lists; got lengths %d,%d,%d.\n",
-			"mlr", verb, llen, rlen, olen)
-		os.Exit(1)
+		return nil, cli.VerbErrorf(verb, "left, right, and output field lists must have same length")
 	}
 
 	*pargi = argi
 	if !doConstruct { // All transformers must do this for main command-line parsing
-		return nil
+		return nil, nil
 	}
 
 	transformer, err := NewTransformerJoin(opts)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	return transformer
+	return transformer, nil
 }
 
 type TransformerJoin struct {
@@ -327,7 +339,7 @@ func NewTransformerJoin(
 	if opts.allowUnsortedInput {
 		// Half-streaming (default) case: ingest entire left file first.
 
-		tr.leftUnpairableRecordsAndContexts = make([]*types.RecordAndContext, 0)
+		tr.leftUnpairableRecordsAndContexts = []*types.RecordAndContext{}
 		tr.leftBucketsByJoinFieldValues = lib.NewOrderedMap[*utils.JoinBucket]()
 		tr.recordTransformerFunc = tr.transformHalfStreaming
 
@@ -351,7 +363,6 @@ func NewTransformerJoin(
 	return tr, nil
 }
 
-
 func (tr *TransformerJoin) Transform(
 	inrecAndContext *types.RecordAndContext,
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
@@ -363,7 +374,6 @@ func (tr *TransformerJoin) Transform(
 		inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
-// ----------------------------------------------------------------
 // This is for the half-streaming case. We ingest the entire left file,
 // matching each right record against those.
 func (tr *TransformerJoin) transformHalfStreaming(
@@ -461,7 +471,6 @@ func (tr *TransformerJoin) transformDoublyStreaming(
 	}
 }
 
-// ----------------------------------------------------------------
 // This is for the half-streaming case. We ingest the entire left file,
 // matching each right record against those.
 //
@@ -474,9 +483,9 @@ func (tr *TransformerJoin) ingestLeftFile() {
 	// Instantiate the record-reader
 	// TODO: perhaps increase recordsPerBatch, and/or refactor
 	recordReader, err := input.Create(readerOpts, 1)
-	if recordReader == nil {
-		fmt.Fprintf(os.Stderr, "mlr join: %v\n", err)
-		os.Exit(1)
+	if err != nil {
+		// TODO: propagate error to caller
+		return
 	}
 
 	// Set the initial context for the left-file.
@@ -505,8 +514,9 @@ func (tr *TransformerJoin) ingestLeftFile() {
 		select {
 
 		case err := <-errorChannel:
-			fmt.Fprintln(os.Stderr, "mlr", ": ", err)
-			os.Exit(1)
+			// TODO: propagate error to caller
+			_ = err
+			return
 
 		case leftrecsAndContexts := <-readerChannel:
 			// TODO: temp for batch-reader refactor
@@ -543,7 +553,6 @@ func (tr *TransformerJoin) ingestLeftFile() {
 	}
 }
 
-// ----------------------------------------------------------------
 // This helper method is used by the half-streaming/unsorted join, as well as
 // the doubly-streaming/sorted join.
 
@@ -604,7 +613,6 @@ func (tr *TransformerJoin) formAndEmitPairs(
 	////fmt.Println("-- pairs end") // VERBOSE
 }
 
-// ----------------------------------------------------------------
 // There are two kinds of left non-pair records: (a) those lacking the
 // specified join-keys -- can't possibly pair with anything on the right; (b)
 // those having the join-keys but not matching with a record on the right.

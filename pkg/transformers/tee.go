@@ -42,7 +42,7 @@ func transformerTeeParseCLI(
 	args []string,
 	mainOptions *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 
 	// Skip the verb name from the current spot in the mlr command line
 	argi := *pargi
@@ -72,7 +72,7 @@ func transformerTeeParseCLI(
 
 		if opt == "-h" || opt == "--help" {
 			transformerTeeUsage(os.Stdout)
-			os.Exit(0)
+			return nil, cli.ErrHelpRequested
 
 		} else if opt == "-a" {
 			appending = true
@@ -92,7 +92,6 @@ func transformerTeeParseCLI(
 				// Nothing else to handle here.
 				argi = largi
 			} else {
-				transformerTeeUsage(os.Stderr)
 				os.Exit(1)
 			}
 		}
@@ -102,15 +101,14 @@ func transformerTeeParseCLI(
 
 	// Get the filename/command from the command line, after the flags
 	if argi >= argc {
-		transformerTeeUsage(os.Stderr)
-		os.Exit(1)
+		return nil, cli.VerbErrorf(verbNameTee, "filename or command required")
 	}
 	filenameOrCommand = args[argi]
 	argi++
 
 	*pargi = argi
 	if !doConstruct { // All transformers must do this for main command-line parsing
-		return nil
+		return nil, nil
 	}
 
 	transformer, err := NewTransformerTee(
@@ -124,7 +122,7 @@ func transformerTeeParseCLI(
 		os.Exit(1)
 	}
 
-	return transformer
+	return transformer, nil
 }
 
 type TransformerTee struct {
@@ -139,7 +137,7 @@ func NewTransformerTee(
 	recordWriterOptions *cli.TWriterOptions,
 ) (*TransformerTee, error) {
 	var fileOutputHandler *output.FileOutputHandler = nil
-	var err error = nil
+	var err error
 	filenameOrCommandForDisplay := filenameOrCommand
 	if piping {
 		fileOutputHandler, err = output.NewPipeWriteOutputHandler(filenameOrCommand, recordWriterOptions)
@@ -195,7 +193,6 @@ func (tr *TransformerTee) Transform(
 				"%s: error writing to tee \"%s\":\n",
 				"mlr", tr.filenameOrCommandForDisplay,
 			)
-			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 
@@ -208,7 +205,6 @@ func (tr *TransformerTee) Transform(
 				"%s: error closing tee \"%s\":\n",
 				"mlr", tr.filenameOrCommandForDisplay,
 			)
-			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)

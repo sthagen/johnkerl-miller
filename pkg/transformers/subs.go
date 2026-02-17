@@ -85,7 +85,7 @@ type subConstructorFunc func(
 	doRegexes bool,
 	oldText string,
 	newText string,
-) (IRecordTransformer, error)
+) (RecordTransformer, error)
 
 type fieldAcceptorFunc func(
 	fieldName string,
@@ -97,7 +97,7 @@ func transformerSubParseCLI(
 	args []string,
 	opts *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 	return transformerSubsParseCLI(pargi, argc, args, opts, doConstruct, transformerSubUsage, NewTransformerSub)
 }
 
@@ -107,7 +107,7 @@ func transformerGsubParseCLI(
 	args []string,
 	opts *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 	return transformerSubsParseCLI(pargi, argc, args, opts, doConstruct, transformerGsubUsage, NewTransformerGsub)
 }
 
@@ -117,7 +117,7 @@ func transformerSsubParseCLI(
 	args []string,
 	opts *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 	return transformerSubsParseCLI(pargi, argc, args, opts, doConstruct, transformerSsubUsage, NewTransformerSsub)
 }
 
@@ -130,7 +130,7 @@ func transformerSubsParseCLI(
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
 	usageFunc TransformerUsageFunc,
 	constructorFunc subConstructorFunc,
-) IRecordTransformer {
+) (RecordTransformer, error) {
 
 	// Skip the verb name from the current spot in the mlr command line
 	argi := *pargi
@@ -144,6 +144,7 @@ func transformerSubsParseCLI(
 	var oldText string
 	var newText string
 
+	var err error
 	for argi < argc /* variable increment: 1 or 2 depending on flag */ {
 		opt := args[argi]
 		if !strings.HasPrefix(opt, "-") {
@@ -167,7 +168,10 @@ func transformerSubsParseCLI(
 			doRegexes = true
 
 		} else if opt == "-f" {
-			fieldNames = cli.VerbGetStringArrayArgOrDie(verb, opt, args, &argi, argc)
+			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 			doAllFieldNames = false
 		} else {
 			usageFunc(os.Stderr)
@@ -192,7 +196,7 @@ func transformerSubsParseCLI(
 
 	*pargi = argi
 	if !doConstruct { // All transformers must do this for main command-line parsing
-		return nil
+		return nil, nil
 	}
 
 	transformer, err := constructorFunc(
@@ -203,11 +207,10 @@ func transformerSubsParseCLI(
 		newText,
 	)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	return transformer
+	return transformer, nil
 }
 
 type TransformerSubs struct {
@@ -225,7 +228,7 @@ func NewTransformerSub(
 	doRegexes bool,
 	oldText string,
 	newText string,
-) (IRecordTransformer, error) {
+) (RecordTransformer, error) {
 	return NewTransformerSubs(fieldNames, doAllFieldNames, doRegexes, oldText, newText, safe_sub)
 }
 
@@ -235,7 +238,7 @@ func NewTransformerGsub(
 	doRegexes bool,
 	oldText string,
 	newText string,
-) (IRecordTransformer, error) {
+) (RecordTransformer, error) {
 	return NewTransformerSubs(fieldNames, doAllFieldNames, doRegexes, oldText, newText, safe_gsub)
 }
 
@@ -245,7 +248,7 @@ func NewTransformerSsub(
 	doRegexes bool,
 	oldText string,
 	newText string,
-) (IRecordTransformer, error) {
+) (RecordTransformer, error) {
 	return NewTransformerSubs(fieldNames, doAllFieldNames, doRegexes, oldText, newText, safe_ssub)
 }
 
@@ -256,7 +259,7 @@ func NewTransformerSubs(
 	oldText string,
 	newText string,
 	subber bifs.TernaryFunc,
-) (IRecordTransformer, error) {
+) (RecordTransformer, error) {
 	tr := &TransformerSubs{
 		fieldNamesSet: lib.StringListToSet(fieldNames),
 		oldText:       mlrval.FromString(oldText),
@@ -273,8 +276,7 @@ func NewTransformerSubs(
 			// Handles "a.*b"i Miller case-insensitive-regex specification
 			regex, err := lib.CompileMillerRegex(regexString)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s %s: cannot compile regex [%s]\n", "mlr", verbNameCut, regexString)
-				os.Exit(1)
+				return nil, cli.VerbErrorf("sub", "invalid regex \"%s\": %w", regexString, err)
 			}
 			tr.regexes[i] = regex
 		}
@@ -335,25 +337,22 @@ func (tr *TransformerSubs) fieldAcceptorAll(
 func safe_sub(input1, input2, input3 *mlrval.Mlrval) *mlrval.Mlrval {
 	if input1.IsString() {
 		return bifs.BIF_sub(input1, input2, input3)
-	} else {
-		return input1
 	}
+	return input1
 }
 
 // safe_gsub implements gsub, but doesn't produce error-type on non-string input.
 func safe_gsub(input1, input2, input3 *mlrval.Mlrval) *mlrval.Mlrval {
 	if input1.IsString() {
 		return bifs.BIF_gsub(input1, input2, input3)
-	} else {
-		return input1
 	}
+	return input1
 }
 
 // safe_ssub implements ssub, but doesn't produce error-type on non-string input.
 func safe_ssub(input1, input2, input3 *mlrval.Mlrval) *mlrval.Mlrval {
 	if input1.IsString() {
 		return bifs.BIF_ssub(input1, input2, input3)
-	} else {
-		return input1
 	}
+	return input1
 }

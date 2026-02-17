@@ -41,13 +41,14 @@ func transformerBootstrapParseCLI(
 	args []string,
 	_ *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 
 	// Skip the verb name from the current spot in the mlr command line
 	argi := *pargi
 	verb := args[argi]
 	argi++
 
+	var err error
 	nout := int64(-1)
 
 	for argi < argc /* variable increment: 1 or 2 depending on flag */ {
@@ -62,29 +63,30 @@ func transformerBootstrapParseCLI(
 
 		if opt == "-h" || opt == "--help" {
 			transformerBootstrapUsage(os.Stdout)
-			os.Exit(0)
+			return nil, cli.ErrHelpRequested
 
 		} else if opt == "-n" {
-			nout = cli.VerbGetIntArgOrDie(verb, opt, args, &argi, argc)
+			nout, err = cli.VerbGetIntArg(verb, opt, args, &argi, argc)
+			if err != nil {
+				return nil, err
+			}
 
 		} else {
-			transformerBootstrapUsage(os.Stderr)
-			os.Exit(1)
+			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
 
 	*pargi = argi
 	if !doConstruct { // All transformers must do this for main command-line parsing
-		return nil
+		return nil, nil
 	}
 
 	transformer, err := NewTransformerBootstrap(nout)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	return transformer
+	return transformer, nil
 }
 
 type TransformerBootstrap struct {
@@ -94,12 +96,11 @@ type TransformerBootstrap struct {
 
 func NewTransformerBootstrap(nout int64) (*TransformerBootstrap, error) {
 	tr := &TransformerBootstrap{
-		recordsAndContexts: make([]*types.RecordAndContext, 0),
+		recordsAndContexts: []*types.RecordAndContext{},
 		nout:               nout,
 	}
 	return tr, nil
 }
-
 
 func (tr *TransformerBootstrap) Transform(
 	inrecAndContext *types.RecordAndContext,

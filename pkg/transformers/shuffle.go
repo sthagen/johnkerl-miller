@@ -37,7 +37,7 @@ func transformerShuffleParseCLI(
 	args []string,
 	_ *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
-) IRecordTransformer {
+) (RecordTransformer, error) {
 
 	// Skip the verb name from the current spot in the mlr command line
 	argi := *pargi
@@ -55,26 +55,23 @@ func transformerShuffleParseCLI(
 
 		if opt == "-h" || opt == "--help" {
 			transformerShuffleUsage(os.Stdout)
-			os.Exit(0)
+			return nil, cli.ErrHelpRequested
 
-		} else {
-			transformerShuffleUsage(os.Stderr)
-			os.Exit(1)
 		}
+		return nil, cli.VerbErrorf(verbNameShuffle, "option \"%s\" not recognized", opt)
 	}
 
 	*pargi = argi
 	if !doConstruct { // All transformers must do this for main command-line parsing
-		return nil
+		return nil, nil
 	}
 
 	transformer, err := NewTransformerShuffle()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	return transformer
+	return transformer, nil
 }
 
 type TransformerShuffle struct {
@@ -84,12 +81,11 @@ type TransformerShuffle struct {
 func NewTransformerShuffle() (*TransformerShuffle, error) {
 
 	tr := &TransformerShuffle{
-		recordsAndContexts: make([]*types.RecordAndContext, 0),
+		recordsAndContexts: []*types.RecordAndContext{},
 	}
 
 	return tr, nil
 }
-
 
 func (tr *TransformerShuffle) Transform(
 	inrecAndContext *types.RecordAndContext,
