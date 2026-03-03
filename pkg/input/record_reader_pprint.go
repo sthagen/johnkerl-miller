@@ -229,7 +229,7 @@ func (reader *RecordReaderPprintFixedSplit) getRecords(
 		} else {
 			if !reader.readerOptions.AllowRaggedCSVInput && len(reader.headerStrings) != len(fields) {
 				err := fmt.Errorf(
-					"Fixed-width header/data length mismatch %d != %d at filename %s line %d",
+					"fixed-width header/data length mismatch %d != %d at filename %s line %d",
 					len(reader.headerStrings), len(fields), filename, reader.inputLineNumber,
 				)
 				errorChannel <- err
@@ -646,12 +646,14 @@ func getRecordBatchImplicitPprintHeader(
 			}
 			if nh < nd {
 				// if header shorter than data: use 1-up itoa keys
-				key := strconv.FormatInt(i+1, 10)
-				value := mlrval.FromDeferredType(fields[i])
-				_, err := record.PutReferenceMaybeDedupe(key, value, dedupeFieldNames)
-				if err != nil {
-					errorChannel <- err
-					return
+				for i = nh; i < nd; i++ {
+					key := strconv.FormatInt(i+1, 10)
+					value := mlrval.FromDeferredType(fields[i])
+					_, err := record.PutReferenceMaybeDedupe(key, value, dedupeFieldNames)
+					if err != nil {
+						errorChannel <- err
+						return
+					}
 				}
 			}
 			if nh > nd {
