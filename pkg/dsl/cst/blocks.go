@@ -4,9 +4,10 @@
 package cst
 
 import (
-	"github.com/johnkerl/miller/v6/pkg/dsl"
 	"github.com/johnkerl/miller/v6/pkg/lib"
 	"github.com/johnkerl/miller/v6/pkg/runtime"
+
+	"github.com/johnkerl/pgpg/go/lib/pkg/asts"
 )
 
 func NewStatementBlockNode() *StatementBlockNode {
@@ -20,12 +21,12 @@ func (node *StatementBlockNode) AppendStatementNode(executable IExecutable) {
 }
 
 func (root *RootNode) BuildStatementBlockNodeFromBeginOrEnd(
-	astBeginOrEndNode *dsl.ASTNode,
+	astBeginOrEndNode *asts.ASTNode,
 ) (*StatementBlockNode, error) {
 
 	lib.InternalCodingErrorIf(
-		astBeginOrEndNode.Type != dsl.NodeTypeBeginBlock &&
-			astBeginOrEndNode.Type != dsl.NodeTypeEndBlock,
+		astBeginOrEndNode.Type != asts.NodeType(NodeTypeBeginBlock) &&
+			astBeginOrEndNode.Type != asts.NodeType(NodeTypeEndBlock),
 	)
 	lib.InternalCodingErrorIf(astBeginOrEndNode.Children == nil)
 	// TODO: change the BNF to make it always 1 in the AST
@@ -58,7 +59,13 @@ func (root *RootNode) BuildStatementBlockNodeFromBeginOrEnd(
 	//         * IntLiteral "4"
 
 	astStatementBlockNode := astBeginOrEndNode.Children[0]
-	lib.InternalCodingErrorIf(astStatementBlockNode.Type != dsl.NodeTypeStatementBlock)
+	// PGPG: BeginBlock/EndBlock have StatementBlockInBraces as child.
+	// With "parent":1,"children":[1], StatementBlockInBraces.Children[0] is the StatementBlock.
+	// Unwrap so we pass StatementBlock to BuildStatementBlockNode.
+	if astStatementBlockNode.Type == asts.NodeType(NodeTypeStatementBlockInBraces) {
+		lib.InternalCodingErrorIf(astStatementBlockNode.Children == nil || len(astStatementBlockNode.Children) < 1)
+		astStatementBlockNode = astStatementBlockNode.Children[0]
+	}
 	statementBlockNode, err := root.BuildStatementBlockNode(astStatementBlockNode)
 	if err != nil {
 		return nil, err
@@ -67,10 +74,15 @@ func (root *RootNode) BuildStatementBlockNodeFromBeginOrEnd(
 }
 
 func (root *RootNode) BuildStatementBlockNode(
-	astNode *dsl.ASTNode,
+	astNode *asts.ASTNode,
 ) (*StatementBlockNode, error) {
-
-	lib.InternalCodingErrorIf(astNode.Type != dsl.NodeTypeStatementBlock)
+	// PGPG: StatementBlockInBraces has "children":[1] so its child is StatementBlock; unwrap.
+	if astNode.Type == asts.NodeType(NodeTypeStatementBlockInBraces) &&
+		astNode.Children != nil && len(astNode.Children) == 1 &&
+		astNode.Children[0].Type == asts.NodeType(NodeTypeStatementBlock) {
+		astNode = astNode.Children[0]
+	}
+	lib.InternalCodingErrorIf(astNode.Type != asts.NodeType(NodeTypeStatementBlock))
 
 	statementBlockNode := NewStatementBlockNode()
 
