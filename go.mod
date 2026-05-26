@@ -23,13 +23,13 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/klauspost/compress v1.18.6
 	github.com/kshedden/statmodel v0.0.0-20210519035403-ee97d3e48df1
-	github.com/lestrrat-go/strftime v1.1.1
+	github.com/lestrrat-go/strftime v1.2.0
 	github.com/mattn/go-isatty v0.0.22
 	github.com/nine-lives-later/go-windows-terminal-sequences v1.0.4
 	github.com/pkg/profile v1.7.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.45.0
 	golang.org/x/term v0.43.0
 	golang.org/x/text v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
