@@ -15,11 +15,29 @@ import (
 
 const verbNameJoin = "join"
 
+var joinOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{left file name}", Type: "filename", Desc: "Left file name for join."},
+	{Flag: "-j", Arg: "{a,b,c}", Type: "csv-list", Desc: "Comma-separated join-field names for output."},
+	{Flag: "-l", Arg: "{a,b,c}", Type: "csv-list", Desc: "Comma-separated join-field names for left input file; defaults to -j values if omitted."},
+	{Flag: "-r", Arg: "{a,b,c}", Type: "csv-list", Desc: "Comma-separated join-field names for right input file(s); defaults to -j values if omitted."},
+	{Flag: "--lk", Aliases: []string{"--left-keep-field-names"}, Arg: "{a,b,c}", Type: "csv-list", Desc: "If supplied, this means keep only the specified field names from the left file. Automatically includes the join-field name(s). Helpful for when you only want a limited subset of information from the left file. Tip: you can use --lk \"\": this means the left file becomes solely a row-selector for the input files."},
+	{Flag: "--lp", Arg: "{text}", Type: "string", Desc: "Additional prefix for non-join output field names from the left file. Applies to paired and unpaired output records."},
+	{Flag: "--rp", Arg: "{text}", Type: "string", Desc: "Additional prefix for non-join output field names from the right file(s). Applies to paired and unpaired output records."},
+	{Flag: "--np", Type: "bool", Desc: "Do not emit paired records."},
+	{Flag: "--ul", Type: "bool", Desc: "Emit unpaired records from the left file."},
+	{Flag: "--ur", Type: "bool", Desc: "Emit unpaired records from the right file(s)."},
+	{Flag: "-s", Aliases: []string{"--sorted-input"}, Type: "bool", Desc: "Require sorted input: records must be sorted lexically by their join-field names, else not all records will be paired. The only likely use case for this is with a left file which is too big to fit into system memory otherwise."},
+	{Flag: "-u", Type: "bool", Desc: "Enable unsorted input. (This is the default even without -u.) In this case, the entire left file will be loaded into memory."},
+	{Flag: "--prepipe", Arg: "{command}", Type: "string", Desc: "Shell command to prepipe the left-file input through. As in main input options; see mlr --help for details. If you wish to use a prepipe command for the main input as well as here, it must be specified there as well as here."},
+	{Flag: "--prepipex", Arg: "{command}", Type: "string", Desc: "Shell command to prepipe the left-file input through (no shell quoting). As in main input options; see mlr --help for details."},
+}
+
 var JoinSetup = TransformerSetup{
 	Verb:         verbNameJoin,
 	UsageFunc:    transformerJoinUsage,
 	ParseCLIFunc: transformerJoinParseCLI,
 	IgnoresInput: false,
+	Options:      joinOptions,
 }
 
 // Most transformers have option-variables as individual locals within the
@@ -78,40 +96,12 @@ func transformerJoinUsage(
 	fmt.Fprintf(o, "at the end of the Miller argument list.\n")
 	fmt.Fprintf(o, "Functionality is essentially the same as the system \"join\" command, but for\n")
 	fmt.Fprintf(o, "record streams.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "  -f {left file name}\n")
-	fmt.Fprintf(o, "  -j {a,b,c}   Comma-separated join-field names for output\n")
-	fmt.Fprintf(o, "  -l {a,b,c}   Comma-separated join-field names for left input file;\n")
-	fmt.Fprintf(o, "               defaults to -j values if omitted.\n")
-	fmt.Fprintf(o, "  -r {a,b,c}   Comma-separated join-field names for right input file(s);\n")
-	fmt.Fprintf(o, "               defaults to -j values if omitted.\n")
-	fmt.Fprintf(o, "  --lk|--left-keep-field-names {a,b,c} If supplied, this means keep only the specified field\n")
-	fmt.Fprintf(o, "               names from the left file. Automatically includes the join-field name(s). Helpful\n")
-	fmt.Fprintf(o, "               for when you only want a limited subset of information from the left file.\n")
-	fmt.Fprintf(o, "               Tip: you can use --lk \"\": this means the left file becomes solely a row-selector\n")
-	fmt.Fprintf(o, "               for the input files.\n")
-	fmt.Fprintf(o, "  --lp {text}  Additional prefix for non-join output field names from\n")
-	fmt.Fprintf(o, "               the left file. Applies to paired and unpaired output records.\n")
-	fmt.Fprintf(o, "  --rp {text}  Additional prefix for non-join output field names from\n")
-	fmt.Fprintf(o, "               the right file(s). Applies to paired and unpaired output records.\n")
-	fmt.Fprintf(o, "  --np         Do not emit paired records\n")
-	fmt.Fprintf(o, "  --ul         Emit unpaired records from the left file\n")
-	fmt.Fprintf(o, "  --ur         Emit unpaired records from the right file(s)\n")
-	fmt.Fprintf(o, "  -s|--sorted-input  Require sorted input: records must be sorted\n")
-	fmt.Fprintf(o, "               lexically by their join-field names, else not all records will\n")
-	fmt.Fprintf(o, "               be paired. The only likely use case for this is with a left\n")
-	fmt.Fprintf(o, "               file which is too big to fit into system memory otherwise.\n")
-	fmt.Fprintf(o, "  -u           Enable unsorted input. (This is the default even without -u.)\n")
-	fmt.Fprintf(o, "               In this case, the entire left file will be loaded into memory.\n")
-	fmt.Fprintf(o, "  --prepipe {command} As in main input options; see %s --help for details.\n",
-		"mlr")
-	fmt.Fprintf(o, "               If you wish to use a prepipe command for the main input as well\n")
-	fmt.Fprintf(o, "               as here, it must be specified there as well as here.\n")
-	fmt.Fprintf(o, "  --prepipex {command} Likewise.\n")
+	WriteVerbOptions(o, joinOptions)
 	fmt.Fprintf(o, "File-format options default to those for the right file names on the Miller\n")
 	fmt.Fprintf(o, "argument list, but may be overridden for the left file as follows. Please see\n")
 	fmt.Fprintf(o, "the main \"%s --help\" for more information on syntax for these arguments:\n", "mlr")
-	fmt.Fprintf(o, "  -i {one of csv,dkvp,nidx,pprint,xtab}\n")
+	fmt.Fprintf(o, "  -i {format name} for the left-file format, e.g. 'csv' or 'json'. Or, flags\n")
+	fmt.Fprintf(o, "     like --icsv, --ijson, etc.: '--icsv' is the same as '-i csv', and so on.\n")
 	fmt.Fprintf(o, "  --irs {record-separator character}\n")
 	fmt.Fprintf(o, "  --ifs {field-separator character}\n")
 	fmt.Fprintf(o, "  --ips {pair-separator character}\n")
@@ -162,82 +152,83 @@ func transformerJoinParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerJoinUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "--prepipe" {
+		case "--prepipe":
 			opts.prepipe, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			opts.prepipeIsRaw = false
 
-		} else if opt == "--prepipex" {
+		case "--prepipex":
 			opts.prepipe, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			opts.prepipeIsRaw = true
 
-		} else if opt == "-f" {
+		case "-f":
 			opts.leftFileName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-j" {
+		case "-j":
 			opts.outputJoinFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-l" {
+		case "-l":
 			opts.leftJoinFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "--lk" || opt == "--left-keep-field-names" {
+		case "--lk", "--left-keep-field-names":
 			opts.leftKeepFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-r" {
+		case "-r":
 			opts.rightJoinFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "--lp" {
+		case "--lp":
 			opts.leftPrefix, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "--rp" {
+		case "--rp":
 			opts.rightPrefix, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "--np" {
+		case "--np":
 			opts.emitPairables = false
 
-		} else if opt == "--ul" {
+		case "--ul":
 			opts.emitLeftUnpairables = true
 
-		} else if opt == "--ur" {
+		case "--ur":
 			opts.emitRightUnpairables = true
 
-		} else if opt == "-u" {
+		case "-u":
 			opts.allowUnsortedInput = true
 
-		} else if opt == "--sorted-input" || opt == "-s" {
+		case "--sorted-input", "-s":
 			opts.allowUnsortedInput = false
 
-		} else {
+		default:
 			// This is inelegant. For error-proofing we advance argi already in our
 			// loop (so individual if-statements don't need to). However,
 			// cli.Parse expects it unadvanced.
@@ -252,7 +243,9 @@ func transformerJoinParseCLI(
 		}
 	}
 
-	cli.FinalizeReaderOptions(&opts.joinFlagOptions.ReaderOptions)
+	if err := cli.FinalizeReaderOptions(&opts.joinFlagOptions.ReaderOptions); err != nil {
+		return nil, cli.VerbErrorf(verb, "%v", err)
+	}
 
 	if opts.leftFileName == "" {
 		return nil, cli.VerbErrorf(verb, "need left file name")
@@ -498,8 +491,8 @@ func (tr *TransformerJoin) ingestLeftFile() {
 	// TODO: perhaps increase recordsPerBatch, and/or refactor
 	recordReader, err := input.Create(readerOpts, 1)
 	if err != nil {
-		// TODO: propagate error to caller
-		return
+		fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Set the initial context for the left-file.
@@ -528,9 +521,8 @@ func (tr *TransformerJoin) ingestLeftFile() {
 		select {
 
 		case err := <-errorChannel:
-			// TODO: propagate error to caller
-			_ = err
-			return
+			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
+			os.Exit(1)
 
 		case leftrecsAndContexts := <-readerChannel:
 			// TODO: temp for batch-reader refactor
@@ -539,6 +531,17 @@ func (tr *TransformerJoin) ingestLeftFile() {
 			leftrecAndContext.Record = utils.KeepLeftFieldNames(leftrecAndContext.Record, tr.leftKeepFieldNameSet)
 
 			if leftrecAndContext.EndOfStream {
+				// The record-reader may have sent an error (e.g. the left file
+				// is missing or unreadable) immediately before its end-of-stream
+				// marker. Since those are separate channels, the select can see
+				// the end-of-stream marker first -- so, check the error channel
+				// before declaring the ingest complete.
+				select {
+				case err := <-errorChannel:
+					fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
+					os.Exit(1)
+				default:
+				}
 				done = true
 				break // breaks the switch, not the for, in Golang
 			}

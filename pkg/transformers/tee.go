@@ -12,27 +12,29 @@ import (
 
 const verbNameTee = "tee"
 
+var teeOptions = []OptionSpec{
+	{Flag: "-a", Type: "bool", Desc: "Append to existing file, if any, rather than overwriting."},
+	{Flag: "-p", Type: "bool", Desc: "Treat filename as a pipe-to command."},
+}
+
 var TeeSetup = TransformerSetup{
 	Verb:         verbNameTee,
 	UsageFunc:    transformerTeeUsage,
 	ParseCLIFunc: transformerTeeParseCLI,
 	IgnoresInput: false,
+	Options:      teeOptions,
 }
 
 func transformerTeeUsage(
 	o *os.File,
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options] {filename}\n", "mlr", verbNameTee)
-	fmt.Fprintf(o, "Options:\n")
+	WriteVerbOptions(o, teeOptions)
 	fmt.Fprintf(o,
-		`-a    Append to existing file, if any, rather than overwriting.
--p    Treat filename as a pipe-to command.
-Any of the output-format command-line flags (see mlr -h). Example: using
+		`Any of the output-format command-line flags (see mlr -h). Example: using
   mlr --icsv --opprint put '...' then tee --ojson ./mytap.dat then stats1 ...
 the input is CSV, the output is pretty-print tabular, but the tee-file output
 is written in JSON format.
-
--h|--help Show this message.
 `)
 }
 
@@ -70,19 +72,20 @@ func transformerTeeParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerTeeUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-a" {
+		case "-a":
 			appending = true
 			piping = false
 
-		} else if opt == "-p" {
+		case "-p":
 			appending = false
 			piping = true
 
-		} else {
+		default:
 			// This is inelegant. For error-proofing we advance argi already in our
 			// loop (so individual if-statements don't need to). However,
 			// ParseWriterOptions expects it unadvanced.
@@ -97,7 +100,9 @@ func transformerTeeParseCLI(
 		}
 	}
 
-	cli.FinalizeWriterOptions(&localOptions.WriterOptions)
+	if err := cli.FinalizeWriterOptions(&localOptions.WriterOptions); err != nil {
+		return nil, cli.VerbErrorf(verbNameTee, "%v", err)
+	}
 
 	// Get the filename/command from the command line, after the flags
 	if argi >= argc {
@@ -136,9 +141,9 @@ func NewTransformerTee(
 	filenameOrCommand string,
 	recordWriterOptions *cli.TWriterOptions,
 ) (*TransformerTee, error) {
-	var fileOutputHandler *output.FileOutputHandler = nil
+	var fileOutputHandler *output.FileOutputHandler
 	var err error
-	filenameOrCommandForDisplay := filenameOrCommand
+	var filenameOrCommandForDisplay string
 	if piping {
 		fileOutputHandler, err = output.NewPipeWriteOutputHandler(filenameOrCommand, recordWriterOptions)
 		filenameOrCommandForDisplay = "| " + filenameOrCommand
@@ -186,7 +191,13 @@ func (tr *TransformerTee) Transform(
 	}
 
 	if !inrecAndContext.EndOfStream {
-		err := tr.fileOutputHandler.WriteRecordAndContext(inrecAndContext)
+		// The file-output handler writes records asynchronously on another
+		// goroutine, and buffering formats like pprint/json can hold onto them
+		// even longer. Meanwhile we also forward the same record downstream,
+		// where subsequent verbs may mutate it in place. Give the tee output
+		// its own copy so downstream mutations can't leak into it (issue
+		// #1671).
+		err := tr.fileOutputHandler.WriteRecordAndContext(inrecAndContext.Copy())
 		if err != nil {
 			fmt.Fprintf(
 				os.Stderr,

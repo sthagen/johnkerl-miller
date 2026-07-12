@@ -16,11 +16,22 @@ import (
 
 const verbNameCase = "case"
 
+var caseOptions = []OptionSpec{
+	{Flag: "-k", Type: "bool", Desc: "Case only keys, not keys and values."},
+	{Flag: "-v", Type: "bool", Desc: "Case only values, not keys and values."},
+	{Flag: "-f", Arg: "{a,b,c}", Type: "csv-list", Desc: "Specify which field names to case (default: all)."},
+	{Flag: "-u", Type: "bool", Desc: "Convert to uppercase."},
+	{Flag: "-l", Type: "bool", Desc: "Convert to lowercase."},
+	{Flag: "-s", Type: "bool", Desc: "Convert to sentence case (capitalize first letter)."},
+	{Flag: "-t", Type: "bool", Desc: "Convert to title case (capitalize words)."},
+}
+
 var CaseSetup = TransformerSetup{
 	Verb:         verbNameCase,
 	UsageFunc:    transformerCaseUsage,
 	ParseCLIFunc: transformerCaseParseCLI,
 	IgnoresInput: false,
+	Options:      caseOptions,
 }
 
 const (
@@ -36,15 +47,7 @@ func transformerCaseUsage(
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameCase)
 	fmt.Fprintf(o, "Uppercases strings in record keys and/or values.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-k  Case only keys, not keys and values.\n")
-	fmt.Fprintf(o, "-v  Case only values, not keys and values.\n")
-	fmt.Fprintf(o, "-f  {a,b,c} Specify which field names to case (default: all)\n")
-	fmt.Fprintf(o, "-u  Convert to uppercase\n")
-	fmt.Fprintf(o, "-l  Convert to lowercase\n")
-	fmt.Fprintf(o, "-s  Convert to sentence case (capitalize first letter)\n")
-	fmt.Fprintf(o, "-t  Convert to title case (capitalize words)\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, caseOptions)
 }
 
 func transformerCaseParseCLI(
@@ -75,32 +78,33 @@ func transformerCaseParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerCaseUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-k" {
+		case "-k":
 			which = "keys_only"
 
-		} else if opt == "-v" {
+		case "-v":
 			which = "values_only"
 
-		} else if opt == "-f" {
+		case "-f":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-u" {
+		case "-u":
 			style = e_UPPER_CASE
-		} else if opt == "-l" {
+		case "-l":
 			style = e_LOWER_CASE
-		} else if opt == "-s" {
+		case "-s":
 			style = e_SENTENCE_CASE
-		} else if opt == "-t" {
+		case "-t":
 			style = e_TITLE_CASE
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
@@ -133,11 +137,12 @@ func NewTransformerCase(
 ) (*TransformerCase, error) {
 	tr := &TransformerCase{}
 
-	if which == "keys_only" {
+	switch which {
+	case "keys_only":
 		tr.recordTransformerFunc = tr.transformKeysOnly
-	} else if which == "values_only" {
+	case "values_only":
 		tr.recordTransformerFunc = tr.transformValuesOnly
-	} else {
+	default:
 		tr.recordTransformerFunc = tr.transformKeysAndValues
 	}
 

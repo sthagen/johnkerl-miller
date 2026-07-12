@@ -1,4 +1,4 @@
-<!---  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. --->
+<!--  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. -->
 <div>
 <span class="quicklinks">
 Quick links:
@@ -46,7 +46,7 @@ As a first check, you should be able to run `mlr --version` at your system's com
 <b>mlr --version</b>
 </pre>
 <pre class="pre-non-highlight-in-pair">
-mlr 6.0.0
+mlr 6.20.2-dev
 </pre>
 
 A note on documentation:

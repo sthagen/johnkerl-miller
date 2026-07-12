@@ -158,6 +158,9 @@ Notes about line endings:
 * Default line endings (` + "`--irs`" + ` and ` + "`--ors`" + `) are newline
   which is interpreted to accept carriage-return/newline files (e.g. on Windows)
   for input, and to produce platform-appropriate line endings on output.
+* For CSV, CSV-lite, TSV, and TSV-lite output, ORS may be either newline (the
+  default) or carriage-return/newline: e.g. ` + "`--ors crlf`" + ` or ` + "`--ors '\\r\\n'`" + `
+  for RFC-4180-style line endings on any platform.
 
 Notes about all other separators:
 
@@ -527,6 +530,19 @@ var PPRINTOnlyFlagSection = FlagSection{
 			help: "Right-justifies all fields for PPRINT output.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				options.WriterOptions.RightAlignedPPRINTOutput = true
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--right-align-numeric",
+			help: "Right-justifies fields with numeric values for PPRINT output, leaving " +
+				"other fields left-justified. Headers are right-justified over columns " +
+				"whose values are all numeric, so that header and data share the same " +
+				"alignment. Also applies to markdown output, where numeric columns get " +
+				"right-alignment markers (`---:`) in the header-separator line.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				options.WriterOptions.RightAlignNumericOutput = true
 				*pargi += 1
 			},
 		},
@@ -3386,6 +3402,26 @@ var MiscFlagSection = FlagSection{
 	flags: []Flag{
 
 		{
+			name: "--errors-json",
+			help: "Emit parse errors as a JSON object to stderr instead of a plain text message. Intended for AI agents and scripts that branch on error kind rather than regex-matching prose. Equivalent to setting the `MLR_ERRORS_JSON` environment variable to a truthy value.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				// The actual effect is handled by pre-scan in pkg/entrypoint.
+				// Registration here ensures the flag is recognized (not an
+				// error) during pass-one flag parsing, and appears in --help.
+				*pargi += 1
+			},
+		},
+
+		{
+			name: "--no-shell",
+			help: "Disable Miller's ability to run external commands: the DSL `system` and `exec` functions, piped redirects such as `tee | \"command\"`, and `--prepipe`/`--prepipex` all fail cleanly instead of executing. Equivalent to setting the `MLR_NO_SHELL` environment variable to a truthy value. Intended for running agent-constructed command lines (e.g. via `mlr mcp`) without also granting arbitrary command execution. Once disabled, shell-outs cannot be re-enabled for the rest of the process.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) {
+				lib.DisableShellOut()
+				*pargi += 1
+			},
+		},
+
+		{
 			name: "-x",
 			help: "If any record has an error value in it, report it and stop the process. The default is to print the field value as `(error)` and continue.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
@@ -3458,7 +3494,7 @@ var MiscFlagSection = FlagSection{
 					fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
 					os.Exit(1)
 				}
-				defer handle.Close()
+				defer func() { _ = handle.Close() }()
 
 				lineReader := bufio.NewReader(handle)
 
@@ -3467,8 +3503,6 @@ var MiscFlagSection = FlagSection{
 				for !eof {
 					line, err := lineReader.ReadString('\n')
 					if err == io.EOF {
-						err = nil
-						eof = true
 						break
 					}
 					lineno++
@@ -3567,7 +3601,7 @@ var MiscFlagSection = FlagSection{
 			help: "Specify timezone, overriding `$TZ` environment variable (if any).",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) {
 				CheckArgCount(args, *pargi, argc, 2)
-				os.Setenv("TZ", args[*pargi+1])
+				_ = os.Setenv("TZ", args[*pargi+1])
 				*pargi += 2
 			},
 		},

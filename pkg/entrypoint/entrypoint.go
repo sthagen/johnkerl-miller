@@ -40,9 +40,19 @@ func Main() MainReturn {
 	// found then this function will not return.
 	auxents.Dispatch(os.Args)
 
+	if lib.IsTruthyEnvValue(os.Getenv("MLR_NO_SHELL")) {
+		lib.DisableShellOut()
+	}
+
+	wantJSON := climain.WantErrorsJSON(os.Args)
+
 	options, recordTransformers, err := climain.ParseCommandLine(os.Args)
 	if err != nil {
-		printError(err)
+		if wantJSON {
+			climain.EmitStructuredError(err)
+		} else {
+			printError(err)
+		}
 		os.Exit(1)
 	}
 
@@ -61,13 +71,15 @@ func Main() MainReturn {
 	}
 }
 
-// printError prints err to stderr. Errors that already start with "mlr " (e.g.
-// "mlr stats1: ...") are printed as-is to avoid double-prefixing.
+// printError prints err to stderr. Errors that already carry an "mlr" prefix
+// (e.g. "mlr stats1: ..." or "mlr: verb not found") are printed as-is to
+// avoid double-prefixing.
 func printError(err error) {
-	if strings.HasPrefix(err.Error(), "mlr ") {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
+	msg := err.Error()
+	if strings.HasPrefix(msg, "mlr") {
+		fmt.Fprintf(os.Stderr, "%v\n", msg)
 	} else {
-		fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
+		fmt.Fprintf(os.Stderr, "mlr: %v\n", msg)
 	}
 }
 
@@ -163,14 +175,14 @@ func processFileInPlace(
 	// Get a handle with, perhaps, a recompression wrapper around it.
 	wrappedHandle, isNew, err := lib.WrapOutputHandle(handle, inputFileEncoding)
 	if err != nil {
-		os.Remove(tempFileName)
+		_ = os.Remove(tempFileName)
 		return err
 	}
 
 	// Run the Miller processing stream from the input file to the temp-output file.
 	err = stream.Stream([]string{fileName}, options, recordTransformers, wrappedHandle, false)
 	if err != nil {
-		os.Remove(tempFileName)
+		_ = os.Remove(tempFileName)
 		return err
 	}
 
@@ -178,7 +190,7 @@ func processFileInPlace(
 	if isNew {
 		err = wrappedHandle.Close()
 		if err != nil {
-			os.Remove(tempFileName)
+			_ = os.Remove(tempFileName)
 			return err
 		}
 	}
@@ -187,14 +199,14 @@ func processFileInPlace(
 	// it must be error-checked.
 	err = handle.Close()
 	if err != nil {
-		os.Remove(tempFileName)
+		_ = os.Remove(tempFileName)
 		return err
 	}
 
 	// Rename the temp-output file on top of the input file.
 	err = os.Rename(tempFileName, fileName)
 	if err != nil {
-		os.Remove(tempFileName)
+		_ = os.Remove(tempFileName)
 		return err
 	}
 

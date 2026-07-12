@@ -11,11 +11,14 @@ import (
 
 const verbNameSkipTrivialRecords = "skip-trivial-records"
 
+var skipTrivialRecordsOptions = []OptionSpec{}
+
 var SkipTrivialRecordsSetup = TransformerSetup{
 	Verb:         verbNameSkipTrivialRecords,
 	UsageFunc:    transformerSkipTrivialRecordsUsage,
 	ParseCLIFunc: transformerSkipTrivialRecordsParseCLI,
 	IgnoresInput: false,
+	Options:      skipTrivialRecordsOptions,
 }
 
 func transformerSkipTrivialRecordsUsage(
@@ -24,15 +27,14 @@ func transformerSkipTrivialRecordsUsage(
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameSkipTrivialRecords)
 	fmt.Fprintf(o, "Passes through all records except those with zero fields,\n")
 	fmt.Fprintf(o, "or those for which all fields have empty value.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, skipTrivialRecordsOptions)
 }
 
 func transformerSkipTrivialRecordsParseCLI(
 	pargi *int,
 	argc int,
 	args []string,
-	_ *cli.TOptions,
+	options *cli.TOptions,
 	doConstruct bool, // false for first pass of CLI-parse, true for second pass
 ) (RecordTransformer, error) {
 
@@ -48,7 +50,6 @@ func transformerSkipTrivialRecordsParseCLI(
 		if args[argi] == "--" {
 			break // All transformers must do this so main-flags can follow verb-flags
 		}
-		argi++
 
 		if opt == "-h" || opt == "--help" {
 			transformerSkipTrivialRecordsUsage(os.Stdout)
@@ -58,6 +59,12 @@ func transformerSkipTrivialRecordsParseCLI(
 			return nil, cli.VerbErrorf(verbNameSkipTrivialRecords, "option \"%s\" not recognized", opt)
 		}
 	}
+
+	// Since the user has explicitly asked for trivial records to be skipped,
+	// let the record-readers know that trivial input lines -- e.g. blank
+	// lines at the end of a CSV file -- are to be skipped rather than
+	// treated as fatal header/data length mismatches. See issue #1535.
+	options.ReaderOptions.SkipTrivialRecords = true
 
 	*pargi = argi
 	if !doConstruct { // All transformers must do this for main command-line parsing

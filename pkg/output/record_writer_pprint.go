@@ -2,7 +2,6 @@ package output
 
 import (
 	"bufio"
-	"fmt"
 	"strings"
 
 	"github.com/johnkerl/miller/v6/pkg/cli"
@@ -123,12 +122,40 @@ func (writer *RecordWriterPPRINT) writeHeterogenousList(
 			maxWidths[key] = width
 		}
 	}
+	rightAlignedHeaders := writer.computeRightAlignedHeaders(records)
 	if barred {
-		writer.writeHeterogenousListBarred(records, maxWidths, bufferedOutputStream, outputIsStdout)
+		writer.writeHeterogenousListBarred(records, maxWidths, rightAlignedHeaders,
+			bufferedOutputStream, outputIsStdout)
 	} else {
-		writer.writeHeterogenousListNonBarred(records, maxWidths, bufferedOutputStream, outputIsStdout)
+		writer.writeHeterogenousListNonBarred(records, maxWidths, rightAlignedHeaders,
+			bufferedOutputStream, outputIsStdout)
 	}
 	return true
+}
+
+// computeRightAlignedHeaders returns, for --right-align-numeric, the set of
+// columns whose every value in the batch is numeric. Headers over such
+// columns are right-aligned so that they line up with their data cells;
+// headers over mixed columns stay left-aligned. See issue #380.
+func (writer *RecordWriterPPRINT) computeRightAlignedHeaders(
+	records []*mlrval.Mlrmap,
+) map[string]bool {
+	rightAlignedHeaders := make(map[string]bool)
+	if !writer.writerOptions.RightAlignNumericOutput {
+		return rightAlignedHeaders
+	}
+	for _, outrec := range records {
+		for pe := outrec.Head; pe != nil; pe = pe.Next {
+			isNumeric := pe.Value.IsNumeric()
+			previous, seen := rightAlignedHeaders[pe.Key]
+			if !seen {
+				rightAlignedHeaders[pe.Key] = isNumeric
+			} else {
+				rightAlignedHeaders[pe.Key] = previous && isNumeric
+			}
+		}
+	}
+	return rightAlignedHeaders
 }
 
 // Example:
@@ -143,6 +170,7 @@ func (writer *RecordWriterPPRINT) writeHeterogenousList(
 func (writer *RecordWriterPPRINT) writeHeterogenousListNonBarred(
 	records []*mlrval.Mlrmap,
 	maxWidths map[string]int,
+	rightAlignedHeaders map[string]bool,
 	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
@@ -153,7 +181,7 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListNonBarred(
 		// Print header line
 		if onFirst && !writer.writerOptions.HeaderlessOutput {
 			for pe := outrec.Head; pe != nil; pe = pe.Next {
-				if !writer.writerOptions.RightAlignedPPRINTOutput { // left-align
+				if !writer.headerIsRightAligned(pe.Key, rightAlignedHeaders) { // left-align
 					if pe.Next != nil {
 						// Header line, left-align, not last column
 						bufferedOutputStream.WriteString(colorizer.MaybeColorizeKey(pe.Key, outputIsStdout))
@@ -186,7 +214,7 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListNonBarred(
 			if s == "" {
 				s = "-"
 			}
-			if !writer.writerOptions.RightAlignedPPRINTOutput { // left-align
+			if !writer.cellIsRightAligned(pe.Value) { // left-align
 				if pe.Next != nil {
 					// Data line, left-align, not last column
 					bufferedOutputStream.WriteString(colorizer.MaybeColorizeValue(s, outputIsStdout))
@@ -211,7 +239,8 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListNonBarred(
 		}
 
 		if writer.writerOptions.FlushOnEveryRecord {
-			bufferedOutputStream.Flush()
+			// bufio.Writer errors are sticky; the final Flush in pkg/stream is checked
+			_ = bufferedOutputStream.Flush()
 		}
 	}
 }
@@ -247,6 +276,7 @@ type barredChars struct {
 func (writer *RecordWriterPPRINT) writeHeterogenousListBarred(
 	records []*mlrval.Mlrmap,
 	maxWidths map[string]int,
+	rightAlignedHeaders map[string]bool,
 	bufferedOutputStream *bufio.Writer,
 	outputIsStdout bool,
 ) {
@@ -311,7 +341,7 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListBarred(
 
 			bufferedOutputStream.WriteString(bc.verticalStart)
 			for pe := outrec.Head; pe != nil; pe = pe.Next {
-				if !writer.writerOptions.RightAlignedPPRINTOutput { // left-align
+				if !writer.headerIsRightAligned(pe.Key, rightAlignedHeaders) { // left-align
 					bufferedOutputStream.WriteString(colorizer.MaybeColorizeKey(pe.Key, outputIsStdout))
 					writer.writePadding(pe.Key, maxWidths[pe.Key], bufferedOutputStream)
 				} else { // right-align
@@ -343,7 +373,7 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListBarred(
 		bufferedOutputStream.WriteString(bc.verticalStart)
 		for pe := outrec.Head; pe != nil; pe = pe.Next {
 			s := pe.Value.String()
-			if !writer.writerOptions.RightAlignedPPRINTOutput { // left-align
+			if !writer.cellIsRightAligned(pe.Value) { // left-align
 				bufferedOutputStream.WriteString(colorizer.MaybeColorizeValue(s, outputIsStdout))
 				writer.writePadding(s, maxWidths[pe.Key], bufferedOutputStream)
 			} else { // right-align
@@ -351,7 +381,7 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListBarred(
 				bufferedOutputStream.WriteString(colorizer.MaybeColorizeValue(s, outputIsStdout))
 			}
 			if pe.Next != nil {
-				bufferedOutputStream.WriteString(fmt.Sprint(bc.verticalMiddle))
+				bufferedOutputStream.WriteString(bc.verticalMiddle)
 			} else {
 				bufferedOutputStream.WriteString(bc.verticalEnd)
 				bufferedOutputStream.WriteString(writer.writerOptions.ORS)
@@ -373,9 +403,34 @@ func (writer *RecordWriterPPRINT) writeHeterogenousListBarred(
 		}
 
 		if writer.writerOptions.FlushOnEveryRecord {
-			bufferedOutputStream.Flush()
+			// bufio.Writer errors are sticky; the final Flush in pkg/stream is checked
+			_ = bufferedOutputStream.Flush()
 		}
 	}
+}
+
+// cellIsRightAligned decides the alignment of a single data cell: everything
+// with --right; numeric values only with --right-align-numeric. Header cells
+// are not passed through here -- see headerIsRightAligned.
+func (writer *RecordWriterPPRINT) cellIsRightAligned(value *mlrval.Mlrval) bool {
+	if writer.writerOptions.RightAlignedPPRINTOutput {
+		return true
+	}
+	return writer.writerOptions.RightAlignNumericOutput && value.IsNumeric()
+}
+
+// headerIsRightAligned decides the alignment of a header cell: everything
+// with --right; with --right-align-numeric, headers over all-numeric columns
+// (as precomputed by computeRightAlignedHeaders) so that header and data
+// share the same alignment.
+func (writer *RecordWriterPPRINT) headerIsRightAligned(
+	key string,
+	rightAlignedHeaders map[string]bool,
+) bool {
+	if writer.writerOptions.RightAlignedPPRINTOutput {
+		return true
+	}
+	return rightAlignedHeaders[key]
 }
 
 func (writer *RecordWriterPPRINT) writePadding(

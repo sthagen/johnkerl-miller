@@ -12,11 +12,17 @@ import (
 
 const verbNameFlatten = "flatten"
 
+var flattenOptions = []OptionSpec{
+	{Flag: "-f", Type: "csv-list", Desc: "Comma-separated list of field names to flatten (default all)."},
+	{Flag: "-s", Arg: "{string}", Type: "string", Desc: "Separator, defaulting to mlr --flatsep value."},
+}
+
 var FlattenSetup = TransformerSetup{
 	Verb:         verbNameFlatten,
 	UsageFunc:    transformerFlattenUsage,
 	ParseCLIFunc: transformerFlattenParseCLI,
 	IgnoresInput: false,
+	Options:      flattenOptions,
 }
 
 func transformerFlattenUsage(
@@ -27,10 +33,7 @@ func transformerFlattenUsage(
 		`Flattens multi-level maps to single-level ones. Example: field with name 'a'
 and value '{"b": { "c": 4 }}' becomes name 'a.b.c' and value 4.
 `)
-	fmt.Fprint(o, "Options:\n")
-	fmt.Fprint(o, "-f Comma-separated list of field names to flatten (default all).\n")
-	fmt.Fprintf(o, "-s Separator, defaulting to %s --flatsep value.\n", "mlr")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, flattenOptions)
 }
 
 func transformerFlattenParseCLI(
@@ -60,23 +63,24 @@ func transformerFlattenParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerFlattenUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-s" {
+		case "-s":
 			oFlatSep, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-f" {
+		case "-f":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

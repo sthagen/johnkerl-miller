@@ -11,11 +11,14 @@ import (
 
 const verbNameNothing = "nothing"
 
+var nothingOptions = []OptionSpec{} // no verb-specific options
+
 var NothingSetup = TransformerSetup{
 	Verb:         verbNameNothing,
 	ParseCLIFunc: transformerNothingParseCLI,
 	UsageFunc:    transformerNothingUsage,
 	IgnoresInput: false,
+	Options:      nothingOptions,
 }
 
 func transformerNothingUsage(
@@ -24,8 +27,7 @@ func transformerNothingUsage(
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameNothing)
 	fmt.Fprintf(o, "Drops all input records. Useful for testing, or after tee/print/etc. have\n")
 	fmt.Fprintf(o, "produced other output.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, nothingOptions)
 }
 
 func transformerNothingParseCLI(
@@ -48,7 +50,6 @@ func transformerNothingParseCLI(
 		if args[argi] == "--" {
 			break // All transformers must do this so main-flags can follow verb-flags
 		}
-		argi++
 
 		if opt == "-h" || opt == "--help" {
 			transformerNothingUsage(os.Stdout)

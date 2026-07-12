@@ -130,11 +130,12 @@ func (root *RootNode) buildDumpxStatementNode(
 
 	if redirectorNode.Type == asts.NodeType(NodeTypeNoOp) {
 		// No > >> or | was provided.
-		if defaultOutputStream == os.Stdout {
+		switch defaultOutputStream {
+		case os.Stdout:
 			retval.dumpToRedirectFunc = retval.dumpToStdout
-		} else if defaultOutputStream == os.Stderr {
+		case os.Stderr:
 			retval.dumpToRedirectFunc = retval.dumpToStderr
-		} else {
+		default:
 			lib.InternalCodingErrorIf(true)
 		}
 	} else {
@@ -201,7 +202,9 @@ func (node *DumpStatementNode) Execute(state *runtime.State) (*BlockExitPayload,
 		}
 	}
 	outputString := buffer.String()
-	node.dumpToRedirectFunc(outputString, state)
+	if err := node.dumpToRedirectFunc(outputString, state); err != nil {
+		return nil, err
+	}
 	return nil, nil
 }
 
@@ -243,6 +246,5 @@ func (node *DumpStatementNode) dumpToFileOrPipe(
 	}
 	outputFileName := redirectorTarget.String()
 
-	node.outputHandlerManager.WriteString(outputString, outputFileName)
-	return nil
+	return node.outputHandlerManager.WriteString(outputString, outputFileName)
 }

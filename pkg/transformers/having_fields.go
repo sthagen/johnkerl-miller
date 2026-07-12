@@ -25,12 +25,21 @@ const (
 
 const verbNameHavingFields = "having-fields"
 
+var havingFieldsOptions = []OptionSpec{
+	{Flag: "--at-least", Arg: "{comma-separated names}", Type: "csv-list", Desc: "Pass records that have at least these field names."},
+	{Flag: "--which-are", Arg: "{comma-separated names}", Type: "csv-list", Desc: "Pass records whose field names are exactly these."},
+	{Flag: "--at-most", Arg: "{comma-separated names}", Type: "csv-list", Desc: "Pass records that have at most these field names."},
+	{Flag: "--all-matching", Arg: "{regular expression}", Type: "regex", Desc: "Pass records where all field names match the regex."},
+	{Flag: "--any-matching", Arg: "{regular expression}", Type: "regex", Desc: "Pass records where any field name matches the regex."},
+	{Flag: "--none-matching", Arg: "{regular expression}", Type: "regex", Desc: "Pass records where no field name matches the regex."},
+}
+
 var HavingFieldsSetup = TransformerSetup{
 	Verb:         verbNameHavingFields,
 	UsageFunc:    transformerHavingFieldsUsage,
 	ParseCLIFunc: transformerHavingFieldsParseCLI,
-
 	IgnoresInput: false,
+	Options:      havingFieldsOptions,
 }
 
 func transformerHavingFieldsUsage(
@@ -41,13 +50,7 @@ func transformerHavingFieldsUsage(
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameHavingFields)
 
 	fmt.Fprintf(o, "Conditionally passes through records depending on each record's field names.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "  --at-least      {comma-separated names}\n")
-	fmt.Fprintf(o, "  --which-are     {comma-separated names}\n")
-	fmt.Fprintf(o, "  --at-most       {comma-separated names}\n")
-	fmt.Fprintf(o, "  --all-matching  {regular expression}\n")
-	fmt.Fprintf(o, "  --any-matching  {regular expression}\n")
-	fmt.Fprintf(o, "  --none-matching {regular expression}\n")
+	WriteVerbOptions(o, havingFieldsOptions)
 	fmt.Fprintf(o, "Examples:\n")
 	fmt.Fprintf(o, "  %s %s --which-are amount,status,owner\n", exeName, verb)
 	fmt.Fprintf(o, "  %s %s --any-matching 'sda[0-9]'\n", exeName, verb)
@@ -83,11 +86,12 @@ func transformerHavingFieldsParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerHavingFieldsUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "--at-least" {
+		case "--at-least":
 			havingFieldsCriterion = havingFieldsAtLeast
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -95,7 +99,7 @@ func transformerHavingFieldsParseCLI(
 			}
 			regexString = ""
 
-		} else if opt == "--which-are" {
+		case "--which-are":
 			havingFieldsCriterion = havingFieldsWhichAre
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -103,7 +107,7 @@ func transformerHavingFieldsParseCLI(
 			}
 			regexString = ""
 
-		} else if opt == "--at-most" {
+		case "--at-most":
 			havingFieldsCriterion = havingFieldsAtMost
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -111,7 +115,7 @@ func transformerHavingFieldsParseCLI(
 			}
 			regexString = ""
 
-		} else if opt == "--all-matching" {
+		case "--all-matching":
 			havingFieldsCriterion = havingAllFieldsMatching
 			regexString, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -119,7 +123,7 @@ func transformerHavingFieldsParseCLI(
 			}
 			fieldNames = nil
 
-		} else if opt == "--any-matching" {
+		case "--any-matching":
 			havingFieldsCriterion = havingAnyFieldsMatching
 			regexString, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -127,7 +131,7 @@ func transformerHavingFieldsParseCLI(
 			}
 			fieldNames = nil
 
-		} else if opt == "--none-matching" {
+		case "--none-matching":
 			havingFieldsCriterion = havingNoFieldsMatching
 			regexString, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -135,7 +139,7 @@ func transformerHavingFieldsParseCLI(
 			}
 			fieldNames = nil
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
@@ -187,13 +191,14 @@ func NewTransformerHavingFields(
 		tr.numFieldNames = int64(len(fieldNames))
 		tr.fieldNameSet = lib.StringListToSet(fieldNames)
 
-		if havingFieldsCriterion == havingFieldsAtLeast {
+		switch havingFieldsCriterion {
+		case havingFieldsAtLeast:
 			tr.recordTransformerFunc = tr.transformHavingFieldsAtLeast
-		} else if havingFieldsCriterion == havingFieldsWhichAre {
+		case havingFieldsWhichAre:
 			tr.recordTransformerFunc = tr.transformHavingFieldsWhichAre
-		} else if havingFieldsCriterion == havingFieldsAtMost {
+		case havingFieldsAtMost:
 			tr.recordTransformerFunc = tr.transformHavingFieldsAtMost
-		} else {
+		default:
 			lib.InternalCodingErrorIf(true)
 		}
 
@@ -214,13 +219,14 @@ func NewTransformerHavingFields(
 		}
 		tr.regex = regex
 
-		if havingFieldsCriterion == havingAllFieldsMatching {
+		switch havingFieldsCriterion {
+		case havingAllFieldsMatching:
 			tr.recordTransformerFunc = tr.transformHavingAllFieldsMatching
-		} else if havingFieldsCriterion == havingAnyFieldsMatching {
+		case havingAnyFieldsMatching:
 			tr.recordTransformerFunc = tr.transformHavingAnyFieldsMatching
-		} else if havingFieldsCriterion == havingNoFieldsMatching {
+		case havingNoFieldsMatching:
 			tr.recordTransformerFunc = tr.transformHavingNoFieldsMatching
-		} else {
+		default:
 			lib.InternalCodingErrorIf(true)
 		}
 	}

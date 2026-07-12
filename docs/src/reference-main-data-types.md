@@ -1,4 +1,4 @@
-<!---  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. --->
+<!--  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. -->
 <div>
 <span class="quicklinks">
 Quick links:
@@ -25,6 +25,7 @@ Miller's types are:
     * **float** and **int**: such as `1.2` and `3`: double-precision and 64-bit signed, respectively. See the section on [arithmetic operators and math-related library functions](reference-dsl-builtin-functions.md#math-functions) as well as the [Arithmetic](reference-main-arithmetic.md) page.
     * dates/times are not a separate data type; Miller uses ints for [seconds since the epoch](https://en.wikipedia.org/wiki/Unix_time) and strings for formatted date/times. See the [DSL datetime/timezone functions page](reference-dsl-time.md) for more information.
     * **boolean**: literals `true` and `false`; results of `==`, `<`, `>`, etc. See the section on [boolean operators](reference-dsl-builtin-functions.md#boolean-functions).
+    * **bytes**: raw binary data, such as from [base64_decode](reference-dsl-builtin-functions.md#base64_decode) or [hex_decode](reference-dsl-builtin-functions.md#hex_decode), or literals like `b"\x01\xff"`. Unlike strings, these are never interpreted as UTF-8 text: `strlen` is the byte count, `substr` slices by byte position, and the `.` operator concatenates bytes with bytes. On output (CSV, JSON, etc.) bytes are rendered as lowercase hex. Use [`bytes()`](reference-dsl-builtin-functions.md#bytes) and [`string()`](reference-dsl-builtin-functions.md#string) to convert to/from strings, and [`md5`](reference-dsl-builtin-functions.md#md5)/`sha1`/`sha256`/`sha512` to hash raw payloads.
 * Collections:
     * **map**: such as `{"a":1,"b":[2,3,4]}`, supporting key-indexing, preservation of insertion order, [library functions](reference-dsl-builtin-functions.md#collections-functions), etc. See the [Maps](reference-main-maps.md) page.
     * **array**: such as `["a", 2, true]`, supporting one-up indexing and slicing, [library functions](reference-dsl-builtin-functions.md#collections-functions), etc. See the [Arrays](reference-main-arrays.md) page.
@@ -61,6 +62,54 @@ will produce `x=1,y=2,z=3`.
 Numbers retain their original string representation, so if `x` is `1.2` on one
 record and `1.200` on another, they'll print out that way on output (unless of
 course they've been modified during processing, e.g. `mlr put '$x = $x + 10`).
+One exception: on JSON output, numbers whose original text isn't valid in the
+JSON grammar -- e.g. `004.56`, whose leading zeros JSON disallows -- are
+re-rendered (here, as `4.56`) so that Miller always writes valid JSON.
+
+Note that double quotes in CSV input don't affect type inference. In CSV,
+quoting exists to allow field content containing commas, newlines, and/or
+double quotes -- unlike in JSON, quoting doesn't distinguish strings from
+numbers. So `"4.56"` in a CSV file scans as a float, just as `4.56` does. If
+you want values kept as strings, you can use `mlr -S` (or, synonymously, `mlr
+--infer-none`) to disable type inference entirely, or use the
+[`string` DSL function](reference-dsl-builtin-functions.md#string) to cast
+specific fields:
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --ojson cat data/quoted-numeric.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+[
+{
+  "a": "hello",
+  "b": 4.56
+}
+]
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --ojson -S cat data/quoted-numeric.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+[
+{
+  "a": "hello",
+  "b": "004.56"
+}
+]
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --ojson put '$b = string($b)' data/quoted-numeric.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+[
+{
+  "a": "hello",
+  "b": "004.56"
+}
+]
+</pre>
 
 Generally strings, numbers, and booleans don't mix; use type-casting like
 `string($x)` to convert. However, the dot (string-concatenation) operator has

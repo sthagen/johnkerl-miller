@@ -9,7 +9,7 @@ import (
 	"github.com/johnkerl/miller/v6/pkg/lib"
 )
 
-func (mlrmap *Mlrmap) MarshalJSON(
+func (mlrmap *Mlrmap) FormatAsJSON(
 	jsonFormatting TJSONFormatting,
 	outputIsStdout bool,
 ) (string, error) {
@@ -44,9 +44,10 @@ func (mlrmap *Mlrmap) marshalJSONAux(
 	elementNestingDepth int,
 	outputIsStdout bool,
 ) (string, error) {
-	if jsonFormatting == JSON_MULTILINE {
+	switch jsonFormatting {
+	case JSON_MULTILINE:
 		return mlrmap.marshalJSONAuxMultiline(jsonFormatting, elementNestingDepth, outputIsStdout)
-	} else if jsonFormatting == JSON_SINGLE_LINE {
+	case JSON_SINGLE_LINE:
 		return mlrmap.marshalJSONAuxSingleLine(jsonFormatting, elementNestingDepth, outputIsStdout)
 	}
 	lib.InternalCodingErrorIf(true)
@@ -146,7 +147,7 @@ func (mlrmap *Mlrmap) marshalJSONAuxSingleLine(
 func (entry *MlrmapEntry) JSONStringifyInPlace(
 	jsonFormatting TJSONFormatting,
 ) {
-	outputBytes, err := entry.Value.MarshalJSON(jsonFormatting, false)
+	outputBytes, err := entry.Value.FormatAsJSON(jsonFormatting, false)
 	if err != nil {
 		entry.Value = FromError(err)
 	} else {

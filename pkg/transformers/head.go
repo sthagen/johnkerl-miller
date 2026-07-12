@@ -11,11 +11,17 @@ import (
 
 const verbNameHead = "head"
 
+var headOptions = []OptionSpec{
+	{Flag: "-g", Arg: "{a,b,c}", Type: "csv-list", Desc: "Optional group-by-field names for head counts, e.g. a,b,c."},
+	{Flag: "-n", Arg: "{n}", Type: "int", Desc: "Head-count to print. Default 10. A negative count, e.g. -n -2, passes through all but the last n records, optionally by category."},
+}
+
 var HeadSetup = TransformerSetup{
 	Verb:         verbNameHead,
 	UsageFunc:    transformerHeadUsage,
 	ParseCLIFunc: transformerHeadParseCLI,
 	IgnoresInput: false,
+	Options:      headOptions,
 }
 
 func transformerHeadUsage(
@@ -24,13 +30,7 @@ func transformerHeadUsage(
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameHead)
 	fmt.Fprintf(o, "Passes through the first n records, optionally by category.\n")
 	fmt.Fprintf(o, "Without -g, ceases consuming more input (i.e. is fast) when n records have been read.\n")
-
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-g {a,b,c} Optional group-by-field names for head counts, e.g. a,b,c.\n")
-	fmt.Fprintf(o, "-n {n} Head-count to print. Default 10.\n")
-	fmt.Fprintf(o, "           A negative count, e.g. -n -2, passes through all but the last n records,\n")
-	fmt.Fprintf(o, "           optionally by category.\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, headOptions)
 }
 
 func transformerHeadParseCLI(
@@ -59,25 +59,26 @@ func transformerHeadParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerHeadUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-n" {
+		case "-n":
 			n, err := cli.VerbGetIntArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			headCount = n
 
-		} else if opt == "-g" {
+		case "-g":
 			names, err := cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			groupByFieldNames = names
 
-		} else {
+		default:
 			transformerHeadUsage(os.Stderr)
 			return nil, fmt.Errorf("%s %s: option \"%s\" not recognized", "mlr", verb, opt)
 		}

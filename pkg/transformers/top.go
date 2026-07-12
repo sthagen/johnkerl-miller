@@ -15,11 +15,23 @@ import (
 const verbNameTop = "top"
 const verbTopDefaultOutputFieldName = "top_idx"
 
+var topOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{a,b,c}", Type: "csv-list", Desc: "Value-field names for top counts."},
+	{Flag: "-g", Arg: "{d,e,f}", Type: "csv-list", Desc: "Optional group-by-field names for top counts."},
+	{Flag: "-n", Arg: "{count}", Type: "int", Desc: "How many records to print per category; default 1."},
+	{Flag: "-a", Type: "bool", Desc: "Print all fields for top-value records; default is to print only value and group-by fields. Requires a single value-field name only."},
+	{Flag: "--max", Type: "bool", Desc: "Print top largest values. This is the default."},
+	{Flag: "--min", Type: "bool", Desc: "Print top smallest values; default is top largest values."},
+	{Flag: "-F", Type: "bool", Desc: "Keep top values as floats even if they look like integers (ignored in Miller 6, kept for backward compatibility)."},
+	{Flag: "-o", Arg: "{name}", Type: "string", Desc: "Field name for output indices. Default \"top_idx\". Ignored if -a is used."},
+}
+
 var TopSetup = TransformerSetup{
 	Verb:         verbNameTop,
 	UsageFunc:    transformerTopUsage,
 	ParseCLIFunc: transformerTopParseCLI,
 	IgnoresInput: false,
+	Options:      topOptions,
 }
 
 func transformerTopUsage(
@@ -28,17 +40,7 @@ func transformerTopUsage(
 	argv0 := "mlr"
 	verb := verbNameTop
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", argv0, verb)
-	fmt.Fprintf(o, "-f {a,b,c}    Value-field names for top counts.\n")
-	fmt.Fprintf(o, "-g {d,e,f}    Optional group-by-field names for top counts.\n")
-	fmt.Fprintf(o, "-n {count}    How many records to print per category; default 1.\n")
-	fmt.Fprintf(o, "-a            Print all fields for top-value records; default is\n")
-	fmt.Fprintf(o, "              to print only value and group-by fields. Requires a single\n")
-	fmt.Fprintf(o, "              value-field name only.\n")
-	fmt.Fprintf(o, "--min         Print top smallest values; default is top largest values.\n")
-	fmt.Fprintf(o, "-F            Keep top values as floats even if they look like integers.\n")
-	fmt.Fprintf(o, "-o {name}     Field name for output indices. Default \"%s\".\n", verbTopDefaultOutputFieldName)
-	fmt.Fprintf(o, "              This is ignored if -a is used.\n")
-
+	WriteVerbOptions(o, topOptions)
 	fmt.Fprintf(o, "Prints the n records with smallest/largest values at specified fields,\n")
 	fmt.Fprintf(o, "optionally by category. If -a is given, then the top records are emitted\n")
 	fmt.Fprintf(o, "with the same fields as they appeared in the input. Without -a, only fields\n")
@@ -78,40 +80,41 @@ func transformerTopParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerTopUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-n" {
+		case "-n":
 			topCount, err = cli.VerbGetIntArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
-		} else if opt == "-f" {
+		case "-f":
 			valueFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
-		} else if opt == "-g" {
+		case "-g":
 			groupByFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
-		} else if opt == "-a" {
+		case "-a":
 			showFullRecords = true
-		} else if opt == "--max" {
+		case "--max":
 			doMax = true
-		} else if opt == "--min" {
+		case "--min":
 			doMax = false
-		} else if opt == "-F" {
+		case "-F":
 			// Ignored in Miller 6; allowed for command-line backward compatibility
-		} else if opt == "-o" {
+		case "-o":
 			outputFieldName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

@@ -13,11 +13,17 @@ import (
 
 const verbNameCountSimilar = "count-similar"
 
+var countSimilarOptions = []OptionSpec{
+	{Flag: "-g", Arg: "{a,b,c}", Type: "csv-list", Desc: "Group-by-field names for counts, e.g. a,b,c"},
+	{Flag: "-o", Arg: "{name}", Type: "string", Desc: "Field name for output-counts. Defaults to \"count\"."},
+}
+
 var CountSimilarSetup = TransformerSetup{
 	Verb:         verbNameCountSimilar,
 	UsageFunc:    transformerCountSimilarUsage,
 	ParseCLIFunc: transformerCountSimilarParseCLI,
 	IgnoresInput: false,
+	Options:      countSimilarOptions,
 }
 
 func transformerCountSimilarUsage(
@@ -26,10 +32,7 @@ func transformerCountSimilarUsage(
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameCountSimilar)
 	fmt.Fprintf(o, "Ingests all records, then emits each record augmented by a count of\n")
 	fmt.Fprintf(o, "the number of other records having the same group-by field values.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-g {a,b,c} Group-by-field names for counts, e.g. a,b,c\n")
-	fmt.Fprintf(o, "-o {name} Field name for output-counts. Defaults to \"count\".\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, countSimilarOptions)
 }
 
 func transformerCountSimilarParseCLI(
@@ -59,23 +62,24 @@ func transformerCountSimilarParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerCountSimilarUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-g" {
+		case "-g":
 			groupByFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-o" {
+		case "-o":
 			counterFieldName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

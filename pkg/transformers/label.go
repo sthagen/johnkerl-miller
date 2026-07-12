@@ -12,11 +12,14 @@ import (
 
 const verbNameLabel = "label"
 
+var labelOptions = []OptionSpec{}
+
 var LabelSetup = TransformerSetup{
 	Verb:         verbNameLabel,
 	UsageFunc:    transformerLabelUsage,
 	ParseCLIFunc: transformerLabelParseCLI,
 	IgnoresInput: false,
+	Options:      labelOptions,
 }
 
 func transformerLabelUsage(
@@ -28,8 +31,7 @@ func transformerLabelUsage(
 	fmt.Fprintf(o, "names.) Particularly useful with --inidx or --implicit-csv-header, to give\n")
 	fmt.Fprintf(o, "useful names to otherwise integer-indexed fields.\n")
 	fmt.Fprintf(o, "\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, labelOptions)
 }
 
 func transformerLabelParseCLI(
@@ -52,7 +54,6 @@ func transformerLabelParseCLI(
 		if args[argi] == "--" {
 			break // All transformers must do this so main-flags can follow verb-flags
 		}
-		argi++
 
 		if opt == "-h" || opt == "--help" {
 			transformerLabelUsage(os.Stdout)

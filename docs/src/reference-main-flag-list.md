@@ -1,4 +1,4 @@
-<!---  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. --->
+<!--  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. -->
 <div>
 <span class="quicklinks">
 Quick links:
@@ -299,6 +299,7 @@ These are flags which don't fit into any other category.
 
 **Flags:**
 
+* `--errors-json`: Emit parse errors as a JSON object to stderr instead of a plain text message. Intended for AI agents and scripts that branch on error kind rather than regex-matching prose. Equivalent to setting the `MLR_ERRORS_JSON` environment variable to a truthy value.
 * `--fflush`: Force buffered output to be written after every output record. The default is flush output after every record if the output is to the terminal, or less often if the output is to a file or a pipe. The default is a significant performance optimization for large files.  Use this flag to force frequent updates even when output is to a pipe or file, at a performance cost.
 * `--files {filename}`: Use this to specify a file which itself contains, one per line, names of input files. May be used more than once.
 * `--from {filename}`: Use this to specify an input file before the verb(s), rather than after. May be used more than once. Example: `mlr --from a.dat --from b.dat cat` is the same as `mlr cat a.dat b.dat`.
@@ -312,6 +313,7 @@ These are flags which don't fit into any other category.
 * `--no-dedupe-field-names`: By default, if an input record has a field named `x` and another also named `x`, the second will be renamed `x_2`, and so on.  With this flag provided, the second `x`'s value will replace the first `x`'s value when the record is read.  This flag has no effect on JSON input records, where duplicate keys always result in the last one's value being retained.
 * `--no-fflush`: Let buffered output not be written after every output record. The default is flush output after every record if the output is to the terminal, or less often if the output is to a file or a pipe. The default is a significant performance optimization for large files.  Use this flag to allow less-frequent updates when output is to the terminal. This is unlikely to be a noticeable performance improvement, since direct-to-screen output for large files has its own overhead.
 * `--no-hash-records`: See --hash-records.
+* `--no-shell`: Disable Miller's ability to run external commands: the DSL `system` and `exec` functions, piped redirects such as `tee | "command"`, and `--prepipe`/`--prepipex` all fail cleanly instead of executing. Equivalent to setting the `MLR_NO_SHELL` environment variable to a truthy value. Intended for running agent-constructed command lines (e.g. via `mlr mcp`) without also granting arbitrary command execution. Once disabled, shell-outs cannot be re-enabled for the rest of the process.
 * `--norc`: Do not load a .mlrrc file.
 * `--nr-progress-mod {m}`: With m a positive integer: print filename and record count to os.Stderr every m input records.
 * `--ofmt {format}`: E.g. `%.18f`, `%.0f`, `%9.6e`. Please use sprintf-style codes (https://pkg.go.dev/fmt) for floating-point numbers. If not specified, default formatting is used.  See also the `fmtnum` function and the `format-values` verb.
@@ -413,6 +415,7 @@ These are flags which are applicable to PPRINT format.
 * `--fixed {string}`: Fixed width specification. One of 'widths:<col1-width>,<col2-width>,...', left-align, left-align-multi-word, right-align, right-align-multi-word
 * `--fw {string}`: Shortcut for --fixed left-align-multi-word
 * `--right`: Right-justifies all fields for PPRINT output.
+* `--right-align-numeric`: Right-justifies fields with numeric values for PPRINT output, leaving other fields left-justified. Headers are right-justified over columns whose values are all numeric, so that header and data share the same alignment. Also applies to markdown output, where numeric columns get right-alignment markers (`---:`) in the header-separator line.
 
 ## Profiling flags
 
@@ -449,6 +452,9 @@ Notes about line endings:
 * Default line endings (`--irs` and `--ors`) are newline
   which is interpreted to accept carriage-return/newline files (e.g. on Windows)
   for input, and to produce platform-appropriate line endings on output.
+* For CSV, CSV-lite, TSV, and TSV-lite output, ORS may be either newline (the
+  default) or carriage-return/newline: e.g. `--ors crlf` or `--ors '\r\n'`
+  for RFC-4180-style line endings on any platform.
 
 Notes about all other separators:
 

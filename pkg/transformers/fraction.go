@@ -15,11 +15,19 @@ import (
 
 const verbNameFraction = "fraction"
 
+var fractionOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{a,b,c}", Type: "csv-list", Desc: "Field name(s) for fraction calculation"},
+	{Flag: "-g", Arg: "{d,e,f}", Type: "csv-list", Desc: "Optional group-by-field name(s) for fraction counts"},
+	{Flag: "-p", Type: "bool", Desc: "Produce percents [0..100], not fractions [0..1]. Output field names end with \"_percent\" rather than \"_fraction\""},
+	{Flag: "-c", Type: "bool", Desc: "Produce cumulative distributions, i.e. running sums: each output value folds in the sum of the previous for the specified group. E.g. with input records x=1 x=2 x=3 and x=4, emits output records x=1,x_cumulative_fraction=0.1 x=2,x_cumulative_fraction=0.3 x=3,x_cumulative_fraction=0.6 and x=4,x_cumulative_fraction=1.0"},
+}
+
 var FractionSetup = TransformerSetup{
 	Verb:         verbNameFraction,
 	UsageFunc:    transformerFractionUsage,
 	ParseCLIFunc: transformerFractionParseCLI,
 	IgnoresInput: false,
+	Options:      fractionOptions,
 }
 
 func transformerFractionUsage(
@@ -37,16 +45,7 @@ func transformerFractionUsage(
 	fmt.Fprintf(o, "input records and accumulates sums; on the second pass it computes quotients\n")
 	fmt.Fprintf(o, "and emits output records. This means it produces no output until all input is read.\n")
 	fmt.Fprintf(o, "\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-f {a,b,c}    Field name(s) for fraction calculation\n")
-	fmt.Fprintf(o, "-g {d,e,f}    Optional group-by-field name(s) for fraction counts\n")
-	fmt.Fprintf(o, "-p            Produce percents [0..100], not fractions [0..1]. Output field names\n")
-	fmt.Fprintf(o, "              end with \"_percent\" rather than \"_fraction\"\n")
-	fmt.Fprintf(o, "-c            Produce cumulative distributions, i.e. running sums: each output\n")
-	fmt.Fprintf(o, "              value folds in the sum of the previous for the specified group\n")
-	fmt.Fprintf(o, "              E.g. with input records  x=1  x=2  x=3  and  x=4, emits output records\n")
-	fmt.Fprintf(o, "              x=1,x_cumulative_fraction=0.1  x=2,x_cumulative_fraction=0.3\n")
-	fmt.Fprintf(o, "              x=3,x_cumulative_fraction=0.6  and  x=4,x_cumulative_fraction=1.0\n")
+	WriteVerbOptions(o, fractionOptions)
 }
 
 func transformerFractionParseCLI(
@@ -79,29 +78,30 @@ func transformerFractionParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerFractionUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-f" {
+		case "-f":
 			fractionFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-g" {
+		case "-g":
 			groupByFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-p" {
+		case "-p":
 			doPercents = true
 
-		} else if opt == "-c" {
+		case "-c":
 			doCumu = true
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
@@ -246,9 +246,9 @@ func (tr *TransformerFraction) Transform(
 					if value != nil {
 						value.AssertNumeric() // may fatal the process
 
-						var numerator *mlrval.Mlrval = nil
-						var cumu *mlrval.Mlrval = nil
-						var outputValue *mlrval.Mlrval = nil
+						var numerator *mlrval.Mlrval
+						var cumu *mlrval.Mlrval
+						var outputValue *mlrval.Mlrval
 
 						if tr.doCumu {
 							cumu = cumusForGroup[fractionFieldName]

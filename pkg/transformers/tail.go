@@ -12,11 +12,17 @@ import (
 
 const verbNameTail = "tail"
 
+var tailOptions = []OptionSpec{
+	{Flag: "-g", Arg: "{a,b,c}", Type: "csv-list", Desc: "Optional group-by-field names for tail counts, e.g. a,b,c."},
+	{Flag: "-n", Arg: "{n}", Type: "int", Desc: "Tail-count to print. Default 10. A leading '+' means start at the nth record rather than print the last n: e.g. -n +3 passes through all but the first 2 records, optionally by category."},
+}
+
 var TailSetup = TransformerSetup{
 	Verb:         verbNameTail,
 	UsageFunc:    transformerTailUsage,
 	ParseCLIFunc: transformerTailParseCLI,
 	IgnoresInput: false,
+	Options:      tailOptions,
 }
 
 func transformerTailUsage(
@@ -24,14 +30,7 @@ func transformerTailUsage(
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameTail)
 	fmt.Fprintln(o, "Passes through the last n records, optionally by category.")
-
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-g {a,b,c} Optional group-by-field names for tail counts, e.g. a,b,c.\n")
-	fmt.Fprintf(o, "-n {n} Tail-count to print. Default 10.\n")
-	fmt.Fprintf(o, "           A leading '+' means start at the nth record rather than print\n")
-	fmt.Fprintf(o, "           the last n: e.g. -n +3 passes through all but the first 2\n")
-	fmt.Fprintf(o, "           records, optionally by category.\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, tailOptions)
 }
 
 func transformerTailParseCLI(
@@ -61,11 +60,12 @@ func transformerTailParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerTailUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-n" {
+		case "-n":
 			if argi < argc && strings.HasPrefix(args[argi], "+") {
 				fromStart = true
 			}
@@ -75,14 +75,14 @@ func transformerTailParseCLI(
 			}
 			tailCount = n
 
-		} else if opt == "-g" {
+		case "-g":
 			names, err := cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			groupByFieldNames = names
 
-		} else {
+		default:
 			transformerTailUsage(os.Stderr)
 			return nil, fmt.Errorf("%s %s: option \"%s\" not recognized", "mlr", verb, opt)
 		}

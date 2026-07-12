@@ -12,11 +12,27 @@ import (
 
 const verbNameSample = "sample"
 
+var sampleOptions = []OptionSpec{
+	{
+		Flag: "-g",
+		Arg:  "{a,b,c}",
+		Type: "csv-list",
+		Desc: "Optional: group-by-field names for samples, e.g. a,b,c.",
+	},
+	{
+		Flag: "-k",
+		Arg:  "{k}",
+		Type: "int",
+		Desc: "Required: number of records to output in total, or by group if using -g.",
+	},
+}
+
 var SampleSetup = TransformerSetup{
 	Verb:         verbNameSample,
 	UsageFunc:    transformerSampleUsage,
 	ParseCLIFunc: transformerSampleParseCLI,
 	IgnoresInput: false,
+	Options:      sampleOptions,
 }
 
 func transformerSampleUsage(
@@ -27,10 +43,7 @@ func transformerSampleUsage(
 		`Reservoir sampling (subsampling without replacement), optionally by category.
 See also %s bootstrap and %s shuffle.
 `, "mlr", "mlr")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-g {a,b,c} Optional: group-by-field names for samples, e.g. a,b,c.\n")
-	fmt.Fprintf(o, "-k {k} Required: number of records to output in total, or by group if using -g.\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, sampleOptions)
 }
 
 func transformerSampleParseCLI(
@@ -60,23 +73,24 @@ func transformerSampleParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerSampleUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-k" {
+		case "-k":
 			sampleCount, err = cli.VerbGetIntArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-g" {
+		case "-g":
 			groupByFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

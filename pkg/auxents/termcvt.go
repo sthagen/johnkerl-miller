@@ -43,29 +43,30 @@ func termcvtMain(args []string) int {
 		}
 		args = args[1:]
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			termcvtUsage(verb, os.Stdout, 0)
-		} else if opt == "-I" {
+		case "-I":
 			doInPlace = true
-		} else if opt == "--cr2crlf" {
+		case "--cr2crlf":
 			inputTerminator = "\r"
 			outputTerminator = "\r\n"
-		} else if opt == "--lf2crlf" {
+		case "--lf2crlf":
 			inputTerminator = "\n"
 			outputTerminator = "\r\n"
-		} else if opt == "--crlf2cr" {
+		case "--crlf2cr":
 			inputTerminator = "\r\n"
 			outputTerminator = "\r"
-		} else if opt == "--lf2cr" {
+		case "--lf2cr":
 			inputTerminator = "\n"
 			outputTerminator = "\r"
-		} else if opt == "--crlf2lf" {
+		case "--crlf2lf":
 			inputTerminator = "\r\n"
 			outputTerminator = "\n"
-		} else if opt == "--cr2lf" {
+		case "--cr2lf":
 			inputTerminator = "\r"
 			outputTerminator = "\n"
-		} else {
+		default:
 			termcvtUsage(verb, os.Stderr, 1)
 		}
 	}
@@ -95,9 +96,11 @@ func termcvtMain(args []string) int {
 
 			termcvtFile(istream, ostream, inputTerminator, outputTerminator)
 
-			istream.Close()
-			// TODO: check return status
-			ostream.Close()
+			_ = istream.Close()
+			if err := ostream.Close(); err != nil {
+				fmt.Fprintf(os.Stderr, "mlr termcvt: %v\n", err)
+				os.Exit(1)
+			}
 
 			err = os.Rename(tempname, filename)
 			if err != nil {
@@ -119,7 +122,7 @@ func termcvtMain(args []string) int {
 
 			termcvtFile(istream, os.Stdout, inputTerminator, outputTerminator)
 
-			istream.Close()
+			_ = istream.Close()
 		}
 	}
 	return 0
@@ -143,6 +146,9 @@ func termcvtFile(istream *os.File, ostream *os.File, inputTerminator string, out
 
 		// This is how to do a chomp:
 		line = strings.TrimRight(line, inputTerminator)
-		ostream.Write([]byte(line + outputTerminator))
+		if _, err := ostream.Write([]byte(line + outputTerminator)); err != nil {
+			fmt.Fprintf(os.Stderr, "mlr termcvt: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }

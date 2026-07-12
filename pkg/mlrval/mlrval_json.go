@@ -1,5 +1,5 @@
 // Mlrval implements the Unmarshaler and Marshaler interfaces needed for
-// marshaling/unmarshaling to/from JSON, via the UnmarshalJSON and MarshalJSON
+// marshaling/unmarshaling to/from JSON, via the UnmarshalJSON and FormatAsJSON
 // methods.
 //
 // Please see also https://golang.org/pkg/encoding/json/
@@ -166,18 +166,19 @@ func MlrvalDecodeFromJSON(decoder *json.Decoder) (
 
 	} else {
 		isArray := false
-		var expectedClosingDelimiter = ' '
-		var collectionType = ""
+		var expectedClosingDelimiter rune
+		var collectionType string
 
-		if delimiter == '[' {
+		switch delimiter {
+		case '[':
 			isArray = true
 			expectedClosingDelimiter = ']'
 			collectionType = "JSON array"
-		} else if delimiter == '{' {
+		case '{':
 			isArray = false
 			expectedClosingDelimiter = '}'
 			collectionType = "JSON object`"
-		} else {
+		default:
 			return nil, false, fmt.Errorf(
 				"JSON reader: Unhandled opening delimiter \"%s\"", string(delimiter),
 			)
@@ -258,7 +259,7 @@ func MlrvalDecodeFromJSON(decoder *json.Decoder) (
 	}
 }
 
-func (mv *Mlrval) MarshalJSON(
+func (mv *Mlrval) FormatAsJSON(
 	jsonFormatting TJSONFormatting,
 	outputIsStdout bool,
 ) (string, error) {
@@ -283,6 +284,8 @@ func (mv *Mlrval) marshalJSONAux(
 		return mv.marshalJSONVoid(outputIsStdout)
 	case MT_STRING:
 		return mv.marshalJSONString(outputIsStdout)
+	case MT_BYTES:
+		return mv.marshalJSONBytes(outputIsStdout)
 	case MT_INT:
 		return mv.marshalJSONInt(outputIsStdout)
 	case MT_FLOAT:
@@ -334,6 +337,13 @@ func (mv *Mlrval) marshalJSONString(outputIsStdout bool) (string, error) {
 	lib.InternalCodingErrorIf(mv.mvtype != MT_STRING)
 
 	return colorizer.MaybeColorizeValue(millerJSONEncodeString(mv.printrep), outputIsStdout), nil
+}
+
+// Bytes are JSON-encoded as their hex representation, quoted as a JSON
+// string. Hex is quote-safe ASCII so no further escaping is needed.
+func (mv *Mlrval) marshalJSONBytes(outputIsStdout bool) (string, error) {
+	lib.InternalCodingErrorIf(mv.mvtype != MT_BYTES)
+	return colorizer.MaybeColorizeValue(`"`+mv.String()+`"`, outputIsStdout), nil
 }
 
 // Wraps with double-quotes and escape-encoded JSON-special characters.
@@ -403,7 +413,79 @@ func (mv *Mlrval) marshalJSONInt(outputIsStdout bool) (string, error) {
 
 func (mv *Mlrval) marshalJSONFloat(outputIsStdout bool) (string, error) {
 	lib.InternalCodingErrorIf(mv.mvtype != MT_FLOAT)
-	return colorizer.MaybeColorizeValue(mv.String(), outputIsStdout), nil
+	s := mv.String()
+	// Miller type-inference accepts various number formats which the JSON
+	// grammar disallows: leading zeros like 004.56, leading '+', bare leading
+	// or trailing decimal points like .56 or 4., etc. Normally we preserve the
+	// user's original formatting on output; however, for JSON, we are required
+	// to disrespect the user's formatting whenever it would produce invalid
+	// JSON, and re-render the number. This parallels marshalJSONInt.
+	// See also https://github.com/johnkerl/miller/issues/1114
+	// and https://github.com/johnkerl/miller/issues/1293.
+	if !isValidJSONNumber(s) {
+		fval, ok := mv.GetFloatValue()
+		if !ok {
+			panic("Internal coding error: float-typed mlrval denied float access")
+		}
+		s = strconv.FormatFloat(fval, 'f', -1, 64)
+	}
+	return colorizer.MaybeColorizeValue(s, outputIsStdout), nil
+}
+
+// isValidJSONNumber determines whether a string lies within the JSON grammar
+// for numbers, namely, -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?.
+func isValidJSONNumber(s string) bool {
+	n := len(s)
+	i := 0
+
+	if i >= n {
+		return false
+	}
+	if s[i] == '-' {
+		i++
+	}
+
+	// Integer part: '0' alone, or a nonzero digit followed by any digits.
+	if i >= n {
+		return false
+	}
+	if s[i] == '0' {
+		i++
+	} else if '1' <= s[i] && s[i] <= '9' {
+		i++
+		for i < n && '0' <= s[i] && s[i] <= '9' {
+			i++
+		}
+	} else {
+		return false
+	}
+
+	// Optional fractional part: '.' followed by one or more digits.
+	if i < n && s[i] == '.' {
+		i++
+		if i >= n || s[i] < '0' || s[i] > '9' {
+			return false
+		}
+		for i < n && '0' <= s[i] && s[i] <= '9' {
+			i++
+		}
+	}
+
+	// Optional exponent part: 'e'/'E', optional sign, one or more digits.
+	if i < n && (s[i] == 'e' || s[i] == 'E') {
+		i++
+		if i < n && (s[i] == '+' || s[i] == '-') {
+			i++
+		}
+		if i >= n || s[i] < '0' || s[i] > '9' {
+			return false
+		}
+		for i < n && '0' <= s[i] && s[i] <= '9' {
+			i++
+		}
+	}
+
+	return i == n
 }
 
 func (mv *Mlrval) marshalJSONBool(outputIsStdout bool) (string, error) {

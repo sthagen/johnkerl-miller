@@ -12,11 +12,27 @@ import (
 
 const verbNameSec2GMT = "sec2gmt"
 
+var sec2GMTOptions = []OptionSpec{
+	{Flag: "-1", Type: "bool", Desc: "Format seconds with 1 decimal place."},
+	{Flag: "-2", Type: "bool", Desc: "Format seconds with 2 decimal places."},
+	{Flag: "-3", Type: "bool", Desc: "Format seconds with 3 decimal places."},
+	{Flag: "-4", Type: "bool", Desc: "Format seconds with 4 decimal places."},
+	{Flag: "-5", Type: "bool", Desc: "Format seconds with 5 decimal places."},
+	{Flag: "-6", Type: "bool", Desc: "Format seconds with 6 decimal places."},
+	{Flag: "-7", Type: "bool", Desc: "Format seconds with 7 decimal places."},
+	{Flag: "-8", Type: "bool", Desc: "Format seconds with 8 decimal places."},
+	{Flag: "-9", Type: "bool", Desc: "Format seconds with 9 decimal places."},
+	{Flag: "--millis", Type: "bool", Desc: "Input numbers are treated as milliseconds since the epoch."},
+	{Flag: "--micros", Type: "bool", Desc: "Input numbers are treated as microseconds since the epoch."},
+	{Flag: "--nanos", Type: "bool", Desc: "Input numbers are treated as nanoseconds since the epoch."},
+}
+
 var Sec2GMTSetup = TransformerSetup{
 	Verb:         verbNameSec2GMT,
 	UsageFunc:    transformerSec2GMTUsage,
 	ParseCLIFunc: transformerSec2GMTParseCLI,
 	IgnoresInput: false,
+	Options:      sec2GMTOptions,
 }
 
 func transformerSec2GMTUsage(
@@ -29,12 +45,7 @@ func transformerSec2GMTUsage(
 	fmt.Fprintf(o, "  %s %s time1,time2\n", "mlr", verbNameSec2GMT)
 	fmt.Fprintf(o, "is the same as\n")
 	fmt.Fprintf(o, "  %s put '$time1 = sec2gmt($time1); $time2 = sec2gmt($time2)'\n", "mlr")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-1 through -9: format the seconds using 1..9 decimal places, respectively.\n")
-	fmt.Fprintf(o, "--millis Input numbers are treated as milliseconds since the epoch.\n")
-	fmt.Fprintf(o, "--micros Input numbers are treated as microseconds since the epoch.\n")
-	fmt.Fprintf(o, "--nanos  Input numbers are treated as nanoseconds since the epoch.\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, sec2GMTOptions)
 }
 
 func transformerSec2GMTParseCLI(
@@ -62,37 +73,38 @@ func transformerSec2GMTParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerSec2GMTUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-1" {
+		case "-1":
 			numDecimalPlaces = 1
-		} else if opt == "-2" {
+		case "-2":
 			numDecimalPlaces = 2
-		} else if opt == "-3" {
+		case "-3":
 			numDecimalPlaces = 3
-		} else if opt == "-4" {
+		case "-4":
 			numDecimalPlaces = 4
-		} else if opt == "-5" {
+		case "-5":
 			numDecimalPlaces = 5
-		} else if opt == "-6" {
+		case "-6":
 			numDecimalPlaces = 6
-		} else if opt == "-7" {
+		case "-7":
 			numDecimalPlaces = 7
-		} else if opt == "-8" {
+		case "-8":
 			numDecimalPlaces = 8
-		} else if opt == "-9" {
+		case "-9":
 			numDecimalPlaces = 9
 
-		} else if opt == "--millis" {
+		case "--millis":
 			preDivide = 1.0e3
-		} else if opt == "--micros" {
+		case "--micros":
 			preDivide = 1.0e6
-		} else if opt == "--nanos" {
+		case "--nanos":
 			preDivide = 1.0e9
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verbNameSec2GMT, "option \"%s\" not recognized", opt)
 		}
 	}

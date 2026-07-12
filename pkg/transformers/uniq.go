@@ -15,11 +15,31 @@ const verbNameCountDistinct = "count-distinct"
 const verbNameUniq = "uniq"
 const uniqDefaultOutputFieldName = "count"
 
+var countDistinctOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{a,b,c}", Type: "csv-list", Desc: "Field names for distinct count (synonym for -g)."},
+	{Flag: "-g", Arg: "{a,b,c}", Type: "csv-list", Desc: "Field names for distinct count."},
+	{Flag: "-x", Arg: "{a,b,c}", Type: "csv-list", Desc: "Field names to exclude for distinct count; use each record's other fields instead."},
+	{Flag: "-n", Type: "bool", Desc: "Show only the number of distinct values. Not compatible with -u."},
+	{Flag: "-o", Arg: "{name}", Type: "string", Desc: "Field name for output count. Default \"count\". Ignored with -u."},
+	{Flag: "-u", Type: "bool", Desc: "Do unlashed counts for multiple field names. With -f a,b and without -u, computes counts for distinct combinations of a and b field values. With -f a,b and with -u, computes counts for distinct a field values and counts for distinct b field values separately."},
+}
+
 var CountDistinctSetup = TransformerSetup{
 	Verb:         verbNameCountDistinct,
 	UsageFunc:    transformerCountDistinctUsage,
 	ParseCLIFunc: transformerCountDistinctParseCLI,
 	IgnoresInput: false,
+	Options:      countDistinctOptions,
+}
+
+var uniqOptions = []OptionSpec{
+	{Flag: "-g", Arg: "{d,e,f}", Type: "csv-list", Desc: "Group-by field names for uniq counts."},
+	{Flag: "-f", Arg: "{d,e,f}", Type: "csv-list", Desc: "Synonym for -g."},
+	{Flag: "-x", Arg: "{a,b,c}", Type: "csv-list", Desc: "Field names to exclude for uniq; use each record's other fields instead."},
+	{Flag: "-c", Type: "bool", Desc: "Show repeat counts in addition to unique values."},
+	{Flag: "-n", Type: "bool", Desc: "Show only the number of distinct values."},
+	{Flag: "-o", Arg: "{name}", Type: "string", Desc: "Field name for output count. Default \"count\"."},
+	{Flag: "-a", Type: "bool", Desc: "Output each unique record only once. Incompatible with -g. With -c, produces unique records, with repeat counts for each. With -n, produces only one record which is the unique-record count. With neither -c nor -n, produces unique records."},
 }
 
 var UniqSetup = TransformerSetup{
@@ -27,6 +47,7 @@ var UniqSetup = TransformerSetup{
 	UsageFunc:    transformerUniqUsage,
 	ParseCLIFunc: transformerUniqParseCLI,
 	IgnoresInput: false,
+	Options:      uniqOptions,
 }
 
 func transformerCountDistinctUsage(
@@ -38,17 +59,7 @@ func transformerCountDistinctUsage(
 	fmt.Fprintf(o, "Prints number of records having distinct values for specified field names.\n")
 	fmt.Fprintf(o, "Same as uniq -c.\n")
 	fmt.Fprintf(o, "\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-f {a,b,c}    Field names for distinct count.\n")
-	fmt.Fprintf(o, "-x {a,b,c}    Field names to exclude for distinct count: use each record's others instead.\n")
-	fmt.Fprintf(o, "-n            Show only the number of distinct values. Not compatible with -u.\n")
-	fmt.Fprintf(o, "-o {name}     Field name for output count. Default \"%s\".\n", uniqDefaultOutputFieldName)
-	fmt.Fprintf(o, "              Ignored with -u.\n")
-	fmt.Fprintf(o, "-u            Do unlashed counts for multiple field names. With -f a,b and\n")
-	fmt.Fprintf(o, "              without -u, computes counts for distinct combinations of a\n")
-	fmt.Fprintf(o, "              and b field values. With -f a,b and with -u, computes counts\n")
-	fmt.Fprintf(o, "              for distinct a field values and counts for distinct b field\n")
-	fmt.Fprintf(o, "              values separately.\n")
+	WriteVerbOptions(o, countDistinctOptions)
 }
 
 func transformerCountDistinctParseCLI(
@@ -82,36 +93,37 @@ func transformerCountDistinctParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerCountDistinctUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-g" || opt == "-f" {
+		case "-g", "-f":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-x" {
+		case "-x":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			invertFieldNames = true
 
-		} else if opt == "-n" {
+		case "-n":
 			showNumDistinctOnly = true
 
-		} else if opt == "-o" {
+		case "-o":
 			outputFieldName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-u" {
+		case "-u":
 			doLashed = false
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
@@ -154,18 +166,14 @@ func transformerUniqUsage(
 	verb := verbNameUniq
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", argv0, verb)
 	fmt.Fprintf(o, "Prints distinct values for specified field names. With -c, same as\n")
-	fmt.Fprintf(o, "count-distinct. For uniq, -f is a synonym for -g.\n")
+	fmt.Fprintf(o, "count-distinct. For uniq, -f is a synonym for -g. Output fields are\n")
+	fmt.Fprintf(o, "written in the order in which they are named with -g or -f, not in the\n")
+	fmt.Fprintf(o, "order in which they appear in the input records.\n")
+	fmt.Fprintf(o, "To deduplicate records by one or more fields while keeping all other\n")
+	fmt.Fprintf(o, "fields, use head: e.g. \"%s head -n 1 -g hash\" keeps the first record\n", argv0)
+	fmt.Fprintf(o, "for each distinct value of the hash field, with all fields intact.\n")
 	fmt.Fprintf(o, "\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-g {d,e,f}    Group-by-field names for uniq counts.\n")
-	fmt.Fprintf(o, "-x {a,b,c}    Field names to exclude for uniq: use each record's others instead.\n")
-	fmt.Fprintf(o, "-c            Show repeat counts in addition to unique values.\n")
-	fmt.Fprintf(o, "-n            Show only the number of distinct values.\n")
-	fmt.Fprintf(o, "-o {name}     Field name for output count. Default \"%s\".\n", uniqDefaultOutputFieldName)
-	fmt.Fprintf(o, "-a            Output each unique record only once. Incompatible with -g.\n")
-	fmt.Fprintf(o, "              With -c, produces unique records, with repeat counts for each.\n")
-	fmt.Fprintf(o, "              With -n, produces only one record which is the unique-record count.\n")
-	fmt.Fprintf(o, "              With neither -c nor -n, produces unique records.\n")
+	WriteVerbOptions(o, uniqOptions)
 }
 
 func transformerUniqParseCLI(
@@ -200,39 +208,40 @@ func transformerUniqParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerUniqUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-g" || opt == "-f" {
+		case "-g", "-f":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-x" {
+		case "-x":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			invertFieldNames = true
 
-		} else if opt == "-c" {
+		case "-c":
 			showCounts = true
 
-		} else if opt == "-n" {
+		case "-n":
 			showNumDistinctOnly = true
 
-		} else if opt == "-o" {
+		case "-o":
 			outputFieldName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-a" {
+		case "-a":
 			uniqifyEntireRecords = true
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

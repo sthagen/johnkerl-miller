@@ -12,11 +12,14 @@ import (
 
 const verbNameGroupLike = "group-like"
 
+var groupLikeOptions = []OptionSpec{}
+
 var GroupLikeSetup = TransformerSetup{
 	Verb:         verbNameGroupLike,
 	UsageFunc:    transformerGroupLikeUsage,
 	ParseCLIFunc: transformerGroupLikeParseCLI,
 	IgnoresInput: false,
+	Options:      groupLikeOptions,
 }
 
 func transformerGroupLikeUsage(
@@ -24,8 +27,7 @@ func transformerGroupLikeUsage(
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameGroupLike)
 	fmt.Fprintln(o, "Outputs records in batches having identical field names.")
-	fmt.Fprintln(o, "Options:")
-	fmt.Fprintln(o, "-h|--help Show this message.")
+	WriteVerbOptions(o, groupLikeOptions)
 }
 
 func transformerGroupLikeParseCLI(
@@ -48,7 +50,6 @@ func transformerGroupLikeParseCLI(
 		if args[argi] == "--" {
 			break // All transformers must do this so main-flags can follow verb-flags
 		}
-		argi++
 
 		if opt == "-h" || opt == "--help" {
 			transformerGroupLikeUsage(os.Stdout)

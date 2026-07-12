@@ -13,11 +13,18 @@ import (
 
 const verbNameCount = "count"
 
+var countOptions = []OptionSpec{
+	{Flag: "-g", Arg: "{a,b,c}", Type: "csv-list", Desc: "Optional group-by-field names for counts, e.g. a,b,c"},
+	{Flag: "-n", Type: "bool", Desc: "Show only the number of distinct values. Not interesting without -g."},
+	{Flag: "-o", Arg: "{name}", Type: "string", Desc: "Field name for output-count. Default \"count\"."},
+}
+
 var CountSetup = TransformerSetup{
 	Verb:         verbNameCount,
 	UsageFunc:    transformerCountUsage,
 	ParseCLIFunc: transformerCountParseCLI,
 	IgnoresInput: false,
+	Options:      countOptions,
 }
 
 func transformerCountUsage(
@@ -27,11 +34,7 @@ func transformerCountUsage(
 	fmt.Fprint(o,
 		`Prints number of records, optionally grouped by distinct values for specified field names.
 `)
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-g {a,b,c} Optional group-by-field names for counts, e.g. a,b,c\n")
-	fmt.Fprintf(o, "-n {n} Show only the number of distinct values. Not interesting without -g.\n")
-	fmt.Fprintf(o, "-o {name} Field name for output-count. Default \"count\".\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, countOptions)
 }
 
 func transformerCountParseCLI(
@@ -62,26 +65,27 @@ func transformerCountParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerCountUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-g" {
+		case "-g":
 			groupByFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-n" {
+		case "-n":
 			showCountsOnly = true
 
-		} else if opt == "-o" {
+		case "-o":
 			outputFieldName, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

@@ -13,11 +13,17 @@ import (
 
 const verbNameUnsparsify = "unsparsify"
 
+var unsparsifyOptions = []OptionSpec{
+	{Flag: "--fill-with", Arg: "{filler string}", Type: "string", Desc: "What to fill absent fields with. Defaults to the empty string."},
+	{Flag: "-f", Arg: "{a,b,c}", Type: "csv-list", Desc: "Specify field names to be operated on; others are not modified and operation is streaming."},
+}
+
 var UnsparsifySetup = TransformerSetup{
 	Verb:         verbNameUnsparsify,
 	UsageFunc:    transformerUnsparsifyUsage,
 	ParseCLIFunc: transformerUnsparsifyParseCLI,
 	IgnoresInput: false,
+	Options:      unsparsifyOptions,
 }
 
 func transformerUnsparsifyUsage(
@@ -30,12 +36,7 @@ For field names absent in a given record but present in others, fills in
 a value. This verb retains all input before producing any output.
 `)
 
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "--fill-with {filler string}  What to fill absent fields with. Defaults to\n")
-	fmt.Fprintf(o, "                             the empty string.\n")
-	fmt.Fprintf(o, "-f {a,b,c} Specify field names to be operated on. Any other fields won't be\n")
-	fmt.Fprintf(o, "           modified, and operation will be streaming.\n")
-	fmt.Fprintf(o, "-h|--help  Show this message.\n")
+	WriteVerbOptions(o, unsparsifyOptions)
 
 	fmt.Fprint(o,
 		`Example: if the input is two records, one being 'a=1,b=2' and the other
@@ -71,23 +72,24 @@ func transformerUnsparsifyParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerUnsparsifyUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "--fill-with" {
+		case "--fill-with":
 			fillerString, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-f" {
+		case "-f":
 			specifiedFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

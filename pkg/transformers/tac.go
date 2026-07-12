@@ -11,11 +11,14 @@ import (
 
 const verbNameTac = "tac"
 
+var tacOptions = []OptionSpec{}
+
 var TacSetup = TransformerSetup{
 	Verb:         verbNameTac,
 	UsageFunc:    transformerTacUsage,
 	ParseCLIFunc: transformerTacParseCLI,
 	IgnoresInput: false,
+	Options:      tacOptions,
 }
 
 func transformerTacUsage(
@@ -23,8 +26,7 @@ func transformerTacUsage(
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameTac)
 	fmt.Fprintf(o, "Prints records in reverse order from the order in which they were encountered.\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, tacOptions)
 }
 
 func transformerTacParseCLI(
@@ -47,7 +49,6 @@ func transformerTacParseCLI(
 		if args[argi] == "--" {
 			break // All transformers must do this so main-flags can follow verb-flags
 		}
-		argi++
 
 		if opt == "-h" || opt == "--help" {
 			transformerTacUsage(os.Stdout)

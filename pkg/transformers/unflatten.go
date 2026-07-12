@@ -12,11 +12,17 @@ import (
 
 const verbNameUnflatten = "unflatten"
 
+var unflattenOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{a,b,c}", Type: "csv-list", Desc: "Comma-separated list of field names to unflatten (default all)."},
+	{Flag: "-s", Arg: "{string}", Type: "string", Desc: "Separator, defaulting to mlr --flatsep value."},
+}
+
 var UnflattenSetup = TransformerSetup{
 	Verb:         verbNameUnflatten,
 	UsageFunc:    transformerUnflattenUsage,
 	ParseCLIFunc: transformerUnflattenParseCLI,
 	IgnoresInput: false,
+	Options:      unflattenOptions,
 }
 
 func transformerUnflattenUsage(
@@ -27,10 +33,7 @@ func transformerUnflattenUsage(
 		`Reverses flatten. Example: field with name 'a.b.c' and value 4
 becomes name 'a' and value '{"b": { "c": 4 }}'.
 `)
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-f {a,b,c} Comma-separated list of field names to unflatten (default all).\n")
-	fmt.Fprintf(o, "-s {string} Separator, defaulting to %s --flatsep value.\n", "mlr")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, unflattenOptions)
 }
 
 func transformerUnflattenParseCLI(
@@ -60,23 +63,24 @@ func transformerUnflattenParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerUnflattenUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-s" {
+		case "-s":
 			oFlatSep, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-f" {
+		case "-f":
 			fieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}

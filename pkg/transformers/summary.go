@@ -29,7 +29,7 @@ type tSummarizerInfo struct {
 }
 
 var allSummarizerInfos = []tSummarizerInfo{
-	{"field_type", "string, int, etc. -- if a column has mixed types, all encountered types are printed", stFieldType},
+	{"field_type", "string, int, etc. -- if a column has mixed types, all encountered types are printed (see notes below)", stFieldType},
 
 	{"count", "+1 for every instance of the field across all records in the input record stream", stAccumulator},
 	{"null_count", "count of field values either empty string or JSON null", stAccumulator},
@@ -67,11 +67,19 @@ var summaryDefaultSummarizerNames = []string{
 	"distinct_count",
 }
 
+var summaryOptions = []OptionSpec{
+	{Flag: "-a", Arg: "{mean,sum,etc.}", Type: "enum", Desc: "Use only the specified summarizers.", Values: []string{"field_type", "count", "null_count", "distinct_count", "mode", "sum", "mean", "stddev", "var", "skewness", "minlen", "maxlen", "min", "p25", "median", "p75", "max", "iqr", "lof", "lif", "uif", "uof"}},
+	{Flag: "-x", Arg: "{mean,sum,etc.}", Type: "enum", Desc: "Use all summarizers except the specified ones.", Values: []string{"field_type", "count", "null_count", "distinct_count", "mode", "sum", "mean", "stddev", "var", "skewness", "minlen", "maxlen", "min", "p25", "median", "p75", "max", "iqr", "lof", "lif", "uif", "uof"}},
+	{Flag: "--all", Type: "bool", Desc: "Use all available summarizers."},
+	{Flag: "--transpose", Type: "bool", Desc: "Show output with field names as column names."},
+}
+
 var SummarySetup = TransformerSetup{
 	Verb:         verbNameSummary,
 	UsageFunc:    transformerSummaryUsage,
 	ParseCLIFunc: transformerSummaryParseCLI,
 	IgnoresInput: false,
+	Options:      summaryOptions,
 }
 
 func transformerSummaryUsage(
@@ -99,13 +107,10 @@ func transformerSummaryUsage(
 	fmt.Fprintf(o, "* min, p25, median, p75, and max work for strings as well as numbers\n")
 	fmt.Fprintf(o, "* Distinct-counts are computed on string representations -- so 4.1 and 4.10 are counted as distinct here.\n")
 	fmt.Fprintf(o, "* If the mode is not unique in the input data, the first-encountered value is reported as the mode.\n")
+	fmt.Fprintf(o, "* A field_type of \"int-string\", \"empty-string\", etc. means the column contains values of mixed types --\n")
+	fmt.Fprintf(o, "  all types encountered are printed, hyphen-joined, in the order first encountered.\n")
 	fmt.Fprintf(o, "\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-a {mean,sum,etc.} Use only the specified summarizers.\n")
-	fmt.Fprintf(o, "-x {mean,sum,etc.} Use all summarizers, except the specified ones.\n")
-	fmt.Fprintf(o, "--all              Use all available summarizers.\n")
-	fmt.Fprintf(o, "--transpose        Show output with field names as column names..\n")
-	fmt.Fprintf(o, "-h|--help Show this message.\n")
+	WriteVerbOptions(o, summaryOptions)
 }
 
 func transformerSummaryParseCLI(
@@ -146,14 +151,15 @@ func transformerSummaryParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerSummaryUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "--all" {
+		case "--all":
 			summarizerNames = allSummarizerNamesList
 
-		} else if opt == "-a" {
+		case "-a":
 			summarizerNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
@@ -164,7 +170,7 @@ func transformerSummaryParseCLI(
 				}
 			}
 
-		} else if opt == "-x" {
+		case "-x":
 			excludeSummarizerNames, err := cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
@@ -187,10 +193,10 @@ func transformerSummaryParseCLI(
 				}
 			}
 
-		} else if opt == "--transpose" {
+		case "--transpose":
 			transposeOutput = true
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
@@ -363,11 +369,12 @@ func (tr *TransformerSummary) emit(
 		}
 
 		for _, info := range allSummarizerInfos {
-			if info.stype == stAccumulator {
+			switch info.stype {
+			case stAccumulator:
 				if tr.summarizerNames[info.name] {
 					newrec.PutCopy(info.name, fieldSummary.accumulators[info.name].Emit())
 				}
-			} else if info.stype == stPercentile {
+			case stPercentile:
 				if tr.summarizerNames[info.name] {
 					newrec.PutCopy(info.name, fieldSummary.percentileKeeper.EmitNamed(info.name))
 				}
@@ -405,9 +412,10 @@ func (tr *TransformerSummary) emitTransposed(
 	}
 
 	for _, info := range allSummarizerInfos {
-		if info.stype == stAccumulator {
+		switch info.stype {
+		case stAccumulator:
 			tr.maybeEmitAccumulatorTransposed(oracs, octx, info.name)
-		} else if info.stype == stPercentile {
+		case stPercentile:
 			tr.maybeEmitPercentileNameTransposed(oracs, octx, info.name)
 		}
 	}

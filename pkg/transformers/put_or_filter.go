@@ -16,20 +16,60 @@ import (
 
 const verbNamePut = "put"
 
+var putOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{file name}", Type: "filename", Desc: "File containing a DSL expression (see examples below). If the filename is a directory, all *.mlr files in that directory are loaded.", Repeatable: true},
+	{Flag: "-e", Arg: "{expression}", Type: "string", Desc: "DSL expression to evaluate. You can use this after -f to add an expression. Example use case: define functions/subroutines in a file you specify with -f, then call them with an expression you specify with -e.", Repeatable: true},
+	{Flag: "-s", Arg: "{name=value}", Type: "string", Desc: "Predefines out-of-stream variable @name to have the given value. Thus mlr put -s foo=97 '$column += @foo' is like mlr put 'begin {@foo = 97} $column += @foo'. The value part is subject to type-inferencing. May be specified more than once, e.g. -s name1=value1 -s name2=value2. Note: the value may be an environment variable, e.g. -s sequence=$SEQUENCE.", Repeatable: true},
+	{Flag: "-x", Type: "bool", Desc: "Prints records for which {expression} evaluates to false, not true, i.e. invert the sense of the filter expression. Default false."},
+	{Flag: "-q", Type: "bool", Desc: "Does not include the modified record in the output stream. Useful for when all desired output is in begin and/or end blocks."},
+	{Flag: "-S", Type: "bool", Desc: "No-op in Miller 6 and above, since type-inferencing is now done by the record-readers before filter/put is executed. Supported as a no-op pass-through flag for backward compatibility."},
+	{Flag: "-F", Type: "bool", Desc: "No-op in Miller 6 and above, since type-inferencing is now done by the record-readers before filter/put is executed. Supported as a no-op pass-through flag for backward compatibility."},
+	{Flag: "-w", Type: "bool", Desc: "Print warnings about things like uninitialized variables."},
+	{Flag: "-W", Type: "bool", Desc: "Same as -w, but exit the process if there are any warnings."},
+	{Flag: "-p", Type: "bool", Desc: "Prints the expression's AST (abstract syntax tree), which gives full transparency on the precedence and associativity rules of Miller's grammar, to stdout."},
+	{Flag: "-d", Type: "bool", Desc: "Like -p but uses a parenthesized-expression format for the AST."},
+	{Flag: "-D", Type: "bool", Desc: "Like -d but with output all on one line."},
+	{Flag: "-E", Type: "bool", Desc: "Echo DSL expression before printing parse-tree."},
+	{Flag: "-v", Type: "bool", Desc: "Same as -E -p."},
+	{Flag: "-X", Type: "bool", Desc: "Exit after parsing but before stream-processing. Useful with -v/-d/-D, if you only want to look at parser information."},
+	{Flag: "--explain", Type: "bool", Desc: "Parse and type-check the DSL expression, report whether it is valid, and exit without reading the input stream. Exit status is 0 if the expression is valid and non-zero otherwise; combine with --errors-json for a machine-readable error."},
+}
+
 var PutSetup = TransformerSetup{
 	Verb:         verbNamePut,
 	UsageFunc:    transformerPutUsage,
 	ParseCLIFunc: transformerPutOrFilterParseCLI,
 	IgnoresInput: false,
+	Options:      putOptions,
 }
 
 const verbNameFilter = "filter"
+
+var filterOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{file name}", Type: "filename", Desc: "File containing a DSL expression (see examples below). If the filename is a directory, all *.mlr files in that directory are loaded.", Repeatable: true},
+	{Flag: "-e", Arg: "{expression}", Type: "string", Desc: "DSL expression to evaluate. You can use this after -f to add an expression. Example use case: define functions/subroutines in a file you specify with -f, then call them with an expression you specify with -e.", Repeatable: true},
+	{Flag: "-s", Arg: "{name=value}", Type: "string", Desc: "Predefines out-of-stream variable @name to have the given value. Thus mlr put -s foo=97 '$column += @foo' is like mlr put 'begin {@foo = 97} $column += @foo'. The value part is subject to type-inferencing. May be specified more than once, e.g. -s name1=value1 -s name2=value2. Note: the value may be an environment variable, e.g. -s sequence=$SEQUENCE.", Repeatable: true},
+	{Flag: "-x", Type: "bool", Desc: "Prints records for which {expression} evaluates to false, not true, i.e. invert the sense of the filter expression. Default false."},
+	{Flag: "-q", Type: "bool", Desc: "Does not include the modified record in the output stream. Useful for when all desired output is in begin and/or end blocks."},
+	{Flag: "-S", Type: "bool", Desc: "No-op in Miller 6 and above, since type-inferencing is now done by the record-readers before filter/put is executed. Supported as a no-op pass-through flag for backward compatibility."},
+	{Flag: "-F", Type: "bool", Desc: "No-op in Miller 6 and above, since type-inferencing is now done by the record-readers before filter/put is executed. Supported as a no-op pass-through flag for backward compatibility."},
+	{Flag: "-w", Type: "bool", Desc: "Print warnings about things like uninitialized variables."},
+	{Flag: "-W", Type: "bool", Desc: "Same as -w, but exit the process if there are any warnings."},
+	{Flag: "-p", Type: "bool", Desc: "Prints the expression's AST (abstract syntax tree), which gives full transparency on the precedence and associativity rules of Miller's grammar, to stdout."},
+	{Flag: "-d", Type: "bool", Desc: "Like -p but uses a parenthesized-expression format for the AST."},
+	{Flag: "-D", Type: "bool", Desc: "Like -d but with output all on one line."},
+	{Flag: "-E", Type: "bool", Desc: "Echo DSL expression before printing parse-tree."},
+	{Flag: "-v", Type: "bool", Desc: "Same as -E -p."},
+	{Flag: "-X", Type: "bool", Desc: "Exit after parsing but before stream-processing. Useful with -v/-d/-D, if you only want to look at parser information."},
+	{Flag: "--explain", Type: "bool", Desc: "Parse and type-check the DSL expression, report whether it is valid, and exit without reading the input stream. Exit status is 0 if the expression is valid and non-zero otherwise; combine with --errors-json for a machine-readable error."},
+}
 
 var FilterSetup = TransformerSetup{
 	Verb:         verbNameFilter,
 	UsageFunc:    transformerFilterUsage,
 	ParseCLIFunc: transformerPutOrFilterParseCLI,
 	IgnoresInput: false,
+	Options:      filterOptions,
 }
 
 func transformerPutUsage(
@@ -49,67 +89,26 @@ func transformerPutOrFilterUsage(
 	verb string,
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options] {DSL expression}\n", "mlr", verb)
-	if verb == "put" {
+	switch verb {
+	case "put":
 		fmt.Fprintf(o, "Lets you use a domain-specific language to programmatically alter stream records.\n")
-	} else if verb == "filter" {
+	case "filter":
 		fmt.Fprintf(o, "Lets you use a domain-specific language to programmatically filter which\n")
 		fmt.Fprintf(o, "stream records will be output.\n")
 	}
 	fmt.Fprintf(o, "See also: https://miller.readthedocs.io/en/latest/reference-verbs\n")
 	fmt.Fprintf(o, "\n")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o,
-		`-f {file name} File containing a DSL expression (see examples below). If the filename
-   is a directory, all *.mlr files in that directory are loaded.
-
--e {expression} You can use this after -f to add an expression. Example use
-   case: define functions/subroutines in a file you specify with -f, then call
-   them with an expression you specify with -e.
-
-(If you mix -e and -f then the expressions are evaluated in the order encountered.
-Since the expression pieces are simply concatenated, please be sure to use intervening
-semicolons to separate expressions.)
-
--s name=value: Predefines out-of-stream variable @name to have
-    Thus mlr put -s foo=97 '$column += @foo' is like
-    mlr put 'begin {@foo = 97} $column += @foo'.
-    The value part is subject to type-inferencing.
-    May be specified more than once, e.g. -s name1=value1 -s name2=value2.
-    Note: the value may be an environment variable, e.g. -s sequence=$SEQUENCE
-
--x (default false) Prints records for which {expression} evaluates to false, not true,
-   i.e. invert the sense of the filter expression.
-
--q Does not include the modified record in the output stream.
-   Useful for when all desired output is in begin and/or end blocks.
-
--S and -F: There are no-ops in Miller 6 and above, since now type-inferencing is done
-   by the record-readers before filter/put is executed. Supported as no-op pass-through
-   flags for backward compatibility.
-
--h|--help Show this message.
-
-Parser-info options:
-
--w Print warnings about things like uninitialized variables.
-
--W Same as -w, but exit the process if there are any warnings.
-
--p Prints the expressions's AST (abstract syntax tree), which gives full
-  transparency on the precedence and associativity rules of Miller's grammar,
-  to stdout.
-
--d Like -p but uses a parenthesized-expression format for the AST.
-
--D Like -d but with output all on one line.
-
--E Echo DSL expression before printing parse-tree
-
--v Same as -E -p.
-
--X Exit after parsing but before stream-processing. Useful with -v/-d/-D, if you
-   only want to look at parser information.
-`)
+	if verb == "put" {
+		WriteVerbOptions(o, putOptions)
+	} else {
+		WriteVerbOptions(o, filterOptions)
+	}
+	fmt.Fprintf(o, "\n")
+	fmt.Fprintf(o, "If you mix -e and -f then the expressions are evaluated in the order encountered.\n")
+	fmt.Fprintf(o, "Since the expression pieces are simply concatenated, please be sure to use intervening\n")
+	fmt.Fprintf(o, "semicolons to separate expressions.\n")
+	fmt.Fprintf(o, "\n")
+	fmt.Fprintf(o, "Parser-info options are -w, -W, -p, -d, -D, -E, -v, and -X.\n")
 
 	if verb == "put" {
 		fmt.Fprintln(o)
@@ -191,13 +190,14 @@ func transformerPutOrFilterParseCLI(
 	verb := args[argi]
 	argi++
 
-	var dslStrings []string = []string{}
+	dslStrings := []string{}
 	haveDSLStringsHere := false
 	echoDSLString := false
 	printASTAsTree := false
 	printASTMultiLine := false
 	printASTSingleLine := false
 	exitAfterParse := false
+	doExplain := false
 	doWarnings := false
 	warningsAreFatal := false
 	strictMode := false
@@ -234,11 +234,12 @@ func transformerPutOrFilterParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerPutOrFilterUsage(os.Stdout, verb)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-f" {
+		case "-f":
 			// Get a DSL string from the user-specified filename
 			filename, err := cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
@@ -266,7 +267,7 @@ func transformerPutOrFilterParseCLI(
 			}
 			haveDSLStringsHere = true
 
-		} else if opt == "-e" {
+		case "-e":
 			dslString, err := cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
@@ -274,7 +275,7 @@ func transformerPutOrFilterParseCLI(
 			dslStrings = append(dslStrings, dslString)
 			haveDSLStringsHere = true
 
-		} else if opt == "-s" {
+		case "-s":
 			// E.g.
 			//   mlr put -s sum=0
 			// is like
@@ -285,45 +286,47 @@ func transformerPutOrFilterParseCLI(
 			}
 			presets = append(presets, preset)
 
-		} else if opt == "-x" {
+		case "-x":
 			invertFilter = true
-		} else if opt == "-q" {
+		case "-q":
 			suppressOutputRecord = true
 
-		} else if opt == "-E" {
+		case "-E":
 			echoDSLString = true
-		} else if opt == "-p" {
+		case "-p":
 			printASTAsTree = true
-		} else if opt == "-v" {
+		case "-v":
 			echoDSLString = true
 			printASTAsTree = true
-		} else if opt == "-d" {
+		case "-d":
 			printASTMultiLine = true
-		} else if opt == "-D" {
+		case "-D":
 			printASTSingleLine = true
-		} else if opt == "-X" {
+		case "-X":
 			exitAfterParse = true
-		} else if opt == "-w" {
+		case "--explain":
+			doExplain = true
+		case "-w":
 			doWarnings = true
 			warningsAreFatal = false
-		} else if opt == "-z" {
+		case "-z":
 			// TODO: perhaps doWarnings and warningsAreFatal as well.
 			// But first I want to see what can be caught at runtime
 			// without static analysis.
 			strictMode = true
-		} else if opt == "-W" {
+		case "-W":
 			doWarnings = true
 			warningsAreFatal = true
 
-		} else if opt == "-S" {
+		case "-S":
 			// TODO: this is a no-op in Miller 6 and above.
 			// Comment this in more detail.
 
-		} else if opt == "-F" {
+		case "-F":
 			// TODO: this is a no-op in Miller 6 and above.
 			// Comment this in more detail.
 
-		} else {
+		default:
 			// This is inelegant. For error-proofing we advance argi already in our
 			// loop (so individual if-statements don't need to). However,
 			// ParseWriterOptions expects it unadvanced.
@@ -338,7 +341,9 @@ func transformerPutOrFilterParseCLI(
 		}
 	}
 
-	cli.FinalizeWriterOptions(&options.WriterOptions)
+	if err := cli.FinalizeWriterOptions(&options.WriterOptions); err != nil {
+		return nil, cli.VerbErrorf(verb, "%v", err)
+	}
 
 	// If they've used either of 'mlr put -f {filename}' or 'mlr put -e
 	// {expression}' then that specifies their DSL expression. But if they've
@@ -375,6 +380,7 @@ func transformerPutOrFilterParseCLI(
 		printASTMultiLine,
 		printASTSingleLine,
 		exitAfterParse,
+		doExplain,
 		doWarnings,
 		warningsAreFatal,
 		strictMode,
@@ -409,6 +415,7 @@ func NewTransformerPut(
 	printASTMultiLine bool,
 	printASTSingleLine bool,
 	exitAfterParse bool,
+	doExplain bool,
 	doWarnings bool,
 	warningsAreFatal bool,
 	strictMode bool,
@@ -448,6 +455,26 @@ func NewTransformerPut(
 
 		},
 	)
+
+	// --explain is a validate/dry-run: report whether the DSL parsed and
+	// type-checked, then exit without reading the input stream. A parse/build
+	// error is returned so it flows through the normal error path (including
+	// --errors-json); a valid expression prints a confirmation and exits 0.
+	if doExplain {
+		if err != nil {
+			return nil, err
+		}
+		verbName := "put"
+		if doFilter {
+			verbName = "filter"
+		}
+		if warningsAreFatal && hadWarnings {
+			fmt.Fprintf(os.Stderr, "mlr %s: DSL expression has warnings treated as fatal.\n", verbName)
+			os.Exit(1)
+		}
+		fmt.Printf("mlr %s: DSL expression is valid.\n", verbName)
+		os.Exit(0)
+	}
 
 	if warningsAreFatal && hadWarnings {
 		fmt.Printf(

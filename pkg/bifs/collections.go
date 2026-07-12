@@ -74,6 +74,7 @@ func init() {
 		/*BOOL   */ depth_from_scalar,
 		/*VOID   */ depth_from_scalar,
 		/*STRING */ depth_from_scalar,
+		/*BYTES  */ depth_te,
 		/*ARRAY  */ depth_from_array,
 		/*MAP    */ depth_from_map,
 		/*FUNC   */ depth_te,
@@ -145,6 +146,7 @@ var leafcount_dispositions = [mlrval.MT_DIM]UnaryFunc{
 	/*BOOL   */ leafcount_from_scalar,
 	/*VOID   */ leafcount_from_scalar,
 	/*STRING */ leafcount_from_scalar,
+	/*BYTES  */ leafcount_te,
 	/*ARRAY  */ leafcount_from_array,
 	/*MAP    */ leafcount_from_map,
 	/*FUNC   */ leafcount_te,
@@ -788,7 +790,7 @@ func BIF_json_parse(input1 *mlrval.Mlrval) *mlrval.Mlrval {
 }
 
 func BIF_json_stringify_unary(input1 *mlrval.Mlrval) *mlrval.Mlrval {
-	outputBytes, err := input1.MarshalJSON(mlrval.JSON_SINGLE_LINE, false)
+	outputBytes, err := input1.FormatAsJSON(mlrval.JSON_SINGLE_LINE, false)
 	if err != nil {
 		return mlrval.FromError(err)
 	}
@@ -805,7 +807,7 @@ func BIF_json_stringify_binary(input1, input2 *mlrval.Mlrval) *mlrval.Mlrval {
 		jsonFormatting = mlrval.JSON_MULTILINE
 	}
 
-	outputBytes, err := input1.MarshalJSON(jsonFormatting, false)
+	outputBytes, err := input1.FormatAsJSON(jsonFormatting, false)
 	if err != nil {
 		return mlrval.FromError(err)
 	}

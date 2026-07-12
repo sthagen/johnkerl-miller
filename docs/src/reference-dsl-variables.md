@@ -1,4 +1,4 @@
-<!---  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. --->
+<!--  PLEASE DO NOT EDIT DIRECTLY. EDIT THE .md.in FILE PLEASE. -->
 <div>
 <span class="quicklinks">
 Quick links:
@@ -654,6 +654,7 @@ is_absent
 is_array
 is_bool
 is_boolean
+is_bytes
 is_empty
 is_empty_map
 is_error
@@ -680,6 +681,7 @@ asserting_absent
 asserting_array
 asserting_bool
 asserting_boolean
+asserting_bytes
 asserting_empty
 asserting_empty_map
 asserting_error

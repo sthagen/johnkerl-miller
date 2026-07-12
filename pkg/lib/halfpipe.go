@@ -20,6 +20,9 @@ import (
 // free.
 
 func OpenOutboundHalfPipe(commandString string) (*os.File, error) {
+	if !shellOutEnabled {
+		return nil, fmt.Errorf("piped redirects are disabled by --no-shell / MLR_NO_SHELL")
+	}
 	readPipe, writePipe, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -40,7 +43,7 @@ func OpenOutboundHalfPipe(commandString string) (*os.File, error) {
 		return nil, err
 	}
 
-	go process.Wait()
+	go func() { _, _ = process.Wait() }()
 
 	return writePipe, nil
 }
@@ -58,6 +61,9 @@ func OpenOutboundHalfPipe(commandString string) (*os.File, error) {
 // free.
 
 func OpenInboundHalfPipe(commandString string) (*os.File, error) {
+	if !shellOutEnabled {
+		return nil, fmt.Errorf("--prepipe/--prepipex are disabled by --no-shell / MLR_NO_SHELL")
+	}
 	readPipe, writePipe, err := os.Pipe()
 	if err != nil {
 		return nil, err
@@ -87,7 +93,7 @@ func OpenInboundHalfPipe(commandString string) (*os.File, error) {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
 		}
-		readPipe.Close()
+		_ = readPipe.Close()
 	}(process, readPipe)
 
 	return readPipe, nil

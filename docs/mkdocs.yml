@@ -24,6 +24,7 @@ nav:
   - 'Getting started':
     - "Installing Miller": "installing-miller.md"
     - "Miller in 10 minutes": "10min.md"
+    - "Miller and AI": "ai.md"
     - "Keystroke-savers": "keystroke-savers.md"
     - "Intro to Miller's programming language": "miller-programming-language.md"
     - "Miller on Windows": "miller-on-windows.md"
@@ -40,10 +41,14 @@ nav:
     - "Shell completion": "shell-completion.md"
     - "Syntax highlighting: vimrc": "vimrc.md"
     - "The REPL": "repl.md"
+    - "The Miller Agent Skill": "agent-skill.md"
+    - "The Miller MCP server": "mcp-server.md"
+    - "Miller AI internals": "ai-support.md"
     - "Online help": "online-help.md"
     - "How to contribute": "contributing.md"
   - 'FAQs and examples':
     - "CSV, with and without headers": "csv-with-and-without-headers.md"
+    - "Troubleshooting CSV and JSON input": "troubleshooting-csv-and-json-input.md"
     - "Shapes of data": "shapes-of-data.md"
     - "Operating on all fields": "operating-on-all-fields.md"
     - "Operating on all records": "operating-on-all-records.md"

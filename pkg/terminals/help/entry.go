@@ -232,6 +232,14 @@ func GetTerminalFlagNames() []string {
 func HelpMain(args []string) int {
 	args = args[1:]
 
+	// Machine-readable help: `mlr help --as-json [topic [names...]]`. The
+	// --as-json token (or a truthy MLR_HELP_JSON env var) may appear anywhere;
+	// if either is set we emit structured JSON and the plain-text handlers
+	// below are bypassed.
+	if jsonMode, rest := wantJSONOutput(args); jsonMode {
+		return helpJSON(rest)
+	}
+
 	// "mlr help" and nothing else
 	if len(args) == 0 {
 		handleDefault()
@@ -571,15 +579,16 @@ func helpTypeArithmeticInfoAux(extended bool) {
 			fmt.Printf("%-10s |", mlrvals[i].String())
 		}
 		for j := 0; j < n; j++ {
-			if i == -2 {
+			switch i {
+			case -2:
 				if mlrvals[j].IsVoid() {
 					fmt.Printf("%-10s", "(empty)")
 				} else {
 					fmt.Printf(" %-10s", mlrvals[j].String())
 				}
-			} else if i == -1 {
+			case -1:
 				fmt.Printf(" %-10s", "------")
-			} else {
+			default:
 				sum := bifs.BIF_plus_binary(mlrvals[i], mlrvals[j])
 				if sum.IsVoid() {
 					fmt.Printf(" %-10s", "(empty)")
@@ -623,15 +632,16 @@ func helpTypeArithmeticInfoAux(extended bool) {
 				fmt.Printf("%-10s |", mlrvals[i].String())
 			}
 			for j := 0; j < n; j++ {
-				if i == -2 {
+				switch i {
+				case -2:
 					if mlrvals[j].IsVoid() {
 						fmt.Printf("%-10s", "(empty)")
 					} else {
 						fmt.Printf(" %-10s", mlrvals[j].String())
 					}
-				} else if i == -1 {
+				case -1:
 					fmt.Printf(" %-10s", "------")
-				} else {
+				default:
 
 					inode := cst.BuildMlrvalLiteralNode(mlrvals[i])
 					jnode := cst.BuildMlrvalLiteralNode(mlrvals[j])
@@ -811,12 +821,8 @@ func helpByExactSearch(things []string) bool {
 // We need to look various places, e.g. "sec2gmt" is the name of a verb as well
 // as a DSL function.
 func helpByExactSearchOne(thing string) bool {
-	found := false
-
 	// flag
-	if cli.FLAG_TABLE.ShowHelpForFlagWithName(thing) {
-		found = true
-	}
+	found := cli.FLAG_TABLE.ShowHelpForFlagWithName(thing)
 
 	// verb
 	if transformers.ShowHelpForTransformer(thing) {
@@ -847,12 +853,8 @@ func helpByApproximateSearch(things []string) bool {
 }
 
 func helpByApproximateSearchOne(thing string) bool {
-	found := false
-
 	// flag
-	if cli.FLAG_TABLE.ShowHelpForFlagApproximateWithName(thing) {
-		found = true
-	}
+	found := cli.FLAG_TABLE.ShowHelpForFlagApproximateWithName(thing)
 
 	// verb
 	if transformers.ShowHelpForTransformerApproximate(thing) {

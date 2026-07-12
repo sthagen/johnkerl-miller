@@ -17,31 +17,34 @@ const verbNameSplit = "split"
 const splitDefaultOutputFileNamePrefix = "split"
 const splitDefaultFileNamePartJoiner = "_"
 
+var splitOptions = []OptionSpec{
+	{Flag: "-n", Arg: "{n}", Type: "int", Desc: "Cap output file sizes at N records."},
+	{Flag: "-m", Arg: "{m}", Type: "int", Desc: "Produce M files, round-robining records among them."},
+	{Flag: "-g", Arg: "{a,b,c}", Type: "csv-list", Desc: "Write separate files with records having distinct values for the specified field names."},
+	{Flag: "--prefix", Arg: "{p}", Type: "string", Desc: "Output filename prefix. Default \"split\"."},
+	{Flag: "--suffix", Arg: "{s}", Type: "string", Desc: "Output filename suffix. Default is from the output format, e.g. \"csv\"."},
+	{Flag: "--folder", Arg: "{f}", Type: "filename", Desc: "Output directory. Default is current directory."},
+	{Flag: "-a", Type: "bool", Desc: "Append to existing files rather than overwriting."},
+	{Flag: "-v", Type: "bool", Desc: "Send records downstream as well as splitting to files."},
+	{Flag: "-e", Type: "bool", Desc: "Do NOT URL-escape names of output files."},
+	{Flag: "-j", Arg: "{J}", Type: "string", Desc: "String used to join filename parts. Default \"_\"."},
+}
+
 var SplitSetup = TransformerSetup{
 	Verb:         verbNameSplit,
 	UsageFunc:    transformerSplitUsage,
 	ParseCLIFunc: transformerSplitParseCLI,
 	IgnoresInput: false,
+	Options:      splitOptions,
 }
 
 func transformerSplitUsage(
 	o *os.File,
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options] {filename}\n", "mlr", verbNameSplit)
+	WriteVerbOptions(o, splitOptions)
 	fmt.Fprintf(o,
-		`Options:
--n {n}:      Cap file sizes at N records.
--m {m}:      Produce M files, round-robining records among them.
--g {a,b,c}:  Write separate files with records having distinct values for fields named a,b,c.
-Exactly one  of -m, -n, or -g must be supplied.
---prefix {p} Specify filename prefix; default "`+splitDefaultOutputFileNamePrefix+`".
---suffix {s} Specify filename suffix; default is from mlr output format, e.g. "csv".
---folder {f} Specify output directory; default is current directory.
--a           Append to existing file(s), if any, rather than overwriting.
--v           Send records along to downstream verbs as well as splitting to files.
--e           Do NOT URL-escape names of output files.
--j {J}       Use string J to join filename parts; default "`+splitDefaultFileNamePartJoiner+`".
--h|--help    Show this message.
+		`Exactly one of -m, -n, or -g must be supplied.
 Any of the output-format command-line flags (see mlr -h). For example, using
   mlr --icsv --from myfile.csv split --ojson -n 1000
 the input is CSV, but the output files are JSON.
@@ -88,17 +91,17 @@ func transformerSplitParseCLI(
 	argi++
 
 	var n int64 = 0
-	var doMod bool = false
-	var doSize bool = false
+	doMod := false
+	doSize := false
 	var groupByFieldNames []string = nil
-	var emitDownstream bool = false
-	var escapeFileNameCharacters bool = true
-	var fileNamePartJoiner string = splitDefaultFileNamePartJoiner
-	var doAppend bool = false
-	var outputFileNamePrefix string = splitDefaultOutputFileNamePrefix
-	var outputFileNameSuffix string = "uninit"
+	emitDownstream := false
+	escapeFileNameCharacters := true
+	fileNamePartJoiner := splitDefaultFileNamePartJoiner
+	doAppend := false
+	outputFileNamePrefix := splitDefaultOutputFileNamePrefix
+	outputFileNameSuffix := "uninit"
 	haveOutputFileNameSuffix := false
-	var outputFolder string = ""
+	outputFolder := ""
 
 	var localOptions *cli.TOptions = nil
 	if mainOptions != nil {
@@ -118,65 +121,66 @@ func transformerSplitParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerSplitUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-n" {
+		case "-n":
 			n, err = cli.VerbGetIntArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			doSize = true
 
-		} else if opt == "-m" {
+		case "-m":
 			n, err = cli.VerbGetIntArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			doMod = true
 
-		} else if opt == "-g" {
+		case "-g":
 			groupByFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "--prefix" {
+		case "--prefix":
 			outputFileNamePrefix, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "--suffix" {
+		case "--suffix":
 			outputFileNameSuffix, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			haveOutputFileNameSuffix = true
 
-		} else if opt == "--folder" {
+		case "--folder":
 			outputFolder, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else if opt == "-a" {
+		case "-a":
 			doAppend = true
 
-		} else if opt == "-v" {
+		case "-v":
 			emitDownstream = true
 
-		} else if opt == "-e" {
+		case "-e":
 			escapeFileNameCharacters = false
 
-		} else if opt == "-j" {
+		case "-j":
 			fileNamePartJoiner, err = cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			// This is inelegant. For error-proofing we advance argi already in our
 			// loop (so individual if-statements don't need to). However,
 			// ParseWriterOptions expects it unadvanced.
@@ -199,7 +203,9 @@ func transformerSplitParseCLI(
 		return nil, cli.VerbErrorf(verb, "-n, -g, and -s are mutually exclusive")
 	}
 
-	cli.FinalizeWriterOptions(&localOptions.WriterOptions)
+	if err := cli.FinalizeWriterOptions(&localOptions.WriterOptions); err != nil {
+		return nil, cli.VerbErrorf(verb, "%v", err)
+	}
 	if !haveOutputFileNameSuffix {
 		outputFileNameSuffix = localOptions.WriterOptions.OutputFileFormat
 	}
@@ -327,7 +333,14 @@ func (tr *TransformerSplit) splitModUngrouped(
 		remainder := 1 + (tr.ungroupedCounter % tr.n)
 		filename := tr.makeUngroupedOutputFileName(remainder)
 
-		err := tr.outputHandlerManager.WriteRecordAndContext(inrecAndContext, filename)
+		// If we're also emitting the record downstream, give the (asynchronous)
+		// file-writer its own copy so downstream in-place mutations can't leak
+		// into the split output (issue #1671).
+		recordAndContextForWriter := inrecAndContext
+		if tr.emitDownstream {
+			recordAndContextForWriter = inrecAndContext.Copy()
+		}
+		err := tr.outputHandlerManager.WriteRecordAndContext(recordAndContextForWriter, filename)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
 			os.Exit(1)
@@ -384,7 +397,14 @@ func (tr *TransformerSplit) splitSizeUngrouped(
 			tr.previousQuotient = quotient
 		}
 
-		err = tr.outputHandler.WriteRecordAndContext(inrecAndContext)
+		// If we're also emitting the record downstream, give the (asynchronous)
+		// file-writer its own copy so downstream in-place mutations can't leak
+		// into the split output (issue #1671).
+		recordAndContextForWriter := inrecAndContext
+		if tr.emitDownstream {
+			recordAndContextForWriter = inrecAndContext.Copy()
+		}
+		err = tr.outputHandler.WriteRecordAndContext(recordAndContextForWriter)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
 			os.Exit(1)
@@ -428,7 +448,14 @@ func (tr *TransformerSplit) splitGrouped(
 		} else {
 			filename = tr.makeGroupedOutputFileName(groupByFieldValues)
 		}
-		err := tr.outputHandlerManager.WriteRecordAndContext(inrecAndContext, filename)
+		// If we're also emitting the record downstream, give the (asynchronous)
+		// file-writer its own copy so downstream in-place mutations can't leak
+		// into the split output (issue #1671).
+		recordAndContextForWriter := inrecAndContext
+		if tr.emitDownstream {
+			recordAndContextForWriter = inrecAndContext.Copy()
+		}
+		err := tr.outputHandlerManager.WriteRecordAndContext(recordAndContextForWriter, filename)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
 			os.Exit(1)

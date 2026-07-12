@@ -17,11 +17,18 @@ import (
 
 const verbNameSortWithinRecords = "sort-within-records"
 
+var sortWithinRecordsOptions = []OptionSpec{
+	{Flag: "-f", Arg: "{names}", Type: "csv-list", Desc: "Sort only these keys; others preserve record order."},
+	{Flag: "-r", Arg: "{regex}", Type: "regex", Desc: "Sort only keys matching this regex; others preserve record order. Example: -r '^[xy]' sorts keys starting with x or y. With no regex argument, -r recursively sorts subobjects/submaps (e.g. for JSON input), or combines with -f to treat names as regexes."},
+	{Flag: "-n", Type: "bool", Desc: "Sort field names naturally (e.g. 2 before 12). Combines with -f/-r."},
+}
+
 var SortWithinRecordsSetup = TransformerSetup{
 	Verb:         verbNameSortWithinRecords,
 	UsageFunc:    transformerSortWithinRecordsUsage,
 	ParseCLIFunc: transformerSortWithinRecordsParseCLI,
 	IgnoresInput: false,
+	Options:      sortWithinRecordsOptions,
 }
 
 func transformerSortWithinRecordsUsage(
@@ -29,14 +36,7 @@ func transformerSortWithinRecordsUsage(
 ) {
 	fmt.Fprintf(o, "Usage: %s %s [options]\n", "mlr", verbNameSortWithinRecords)
 	fmt.Fprintln(o, "Outputs records sorted lexically ascending by keys.")
-	fmt.Fprintf(o, "Options:\n")
-	fmt.Fprintf(o, "-f {names}   Sort only these keys; others preserve record order.\n")
-	fmt.Fprintf(o, "-r {regex}   Sort only keys matching this regex; others preserve record order.\n")
-	fmt.Fprintf(o, "             Example: -r '^[xy]' sorts keys starting with x or y.\n")
-	fmt.Fprintf(o, "             With no regex argument, -r recursively sorts subobjects/submaps\n")
-	fmt.Fprintf(o, "             (e.g. for JSON input), or combines with -f to treat names as regex.\n")
-	fmt.Fprintf(o, "-n           Sort field names naturally (e.g. 2 before 12). Combines with -f/-r.\n")
-	fmt.Fprintf(o, "-h|--help    Show this message.\n")
+	WriteVerbOptions(o, sortWithinRecordsOptions)
 }
 
 func transformerSortWithinRecordsParseCLI(
@@ -66,11 +66,12 @@ func transformerSortWithinRecordsParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerSortWithinRecordsUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-r" {
+		case "-r":
 			// If the next token exists and isn't another flag, consume it as
 			// the regex pattern. Otherwise -r is arity-0: combined with a
 			// preceding -f it means regex mode; standalone it means recursive.
@@ -84,17 +85,17 @@ func transformerSortWithinRecordsParseCLI(
 				doRecurse = true
 			}
 
-		} else if opt == "-f" {
+		case "-f":
 			names, err := cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 			fieldNames = names
 
-		} else if opt == "-n" {
+		case "-n":
 			doNatural = true
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verbNameSortWithinRecords, "option \"%s\" not recognized", opt)
 		}
 	}

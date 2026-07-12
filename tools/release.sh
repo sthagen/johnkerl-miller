@@ -35,6 +35,13 @@
 # safe to re-run after a partial failure.  `rpmbuild` is mandatory for
 # `pre-release` and the script aborts in phase 0 if missing; `rpmlint` is
 # optional (phase 3 runs it if installed, otherwise skips the lint step).
+#
+# Phase 0 also refuses to run `pre-release`/`docs` unless the working tree is
+# currently on `--branch` (default `main`): committing/pushing from the wrong
+# branch would otherwise fail silently, since `git push origin main` reports
+# "Everything up-to-date" when the local `main` ref itself has no new commits,
+# even if HEAD (on some other branch) does.  `afterwork` is exempt since it
+# explicitly `git checkout`s the branch itself.
 
 set -euo pipefail
 
@@ -99,6 +106,51 @@ confirm() {
     y|Y|yes|YES) return 0 ;;
     *) die "user declined: $prompt" ;;
   esac
+}
+
+# push_if_needed pushes $1 (a local branch that is presumed checked out, or
+# at least resolvable) to origin, but skips the confirmation prompt and the
+# push entirely when origin already has those exact commits -- e.g. a
+# resumed run whose earlier attempt already pushed successfully. Any
+# additional args (e.g. -u) are passed through to `git push`.
+push_if_needed() {
+  local branch="$1"; shift
+  run_cmd git fetch origin "$branch" >/dev/null 2>&1 || true
+  local local_sha remote_sha
+  local_sha="$(git rev-parse "$branch" 2>/dev/null || true)"
+  remote_sha="$(git rev-parse "origin/$branch" 2>/dev/null || true)"
+  if [ -n "$local_sha" ] && [ "$local_sha" = "$remote_sha" ]; then
+    note "origin/$branch already matches local $branch (idempotent: skipping push)"
+    return 0
+  fi
+  confirm "push branch '$branch' to origin?"
+  run_cmd git push "$@" origin "$branch"
+}
+
+# verify_release_tag_commit guards against the classic ordering bug: a
+# release/tag for $TAG created (by hand, or by anything other than this
+# script's own Phase 4) BEFORE the version-bump commit was pushed. Git tags
+# don't retroactively follow branch movement, so once cut against the wrong
+# commit they stay wrong -- and a same-tag `gh release view` success on a
+# resumed run looks identical whether the tag is right or wrong. This checks
+# the actual tagged commit's pkg/version/version.go, not just tag existence.
+verify_release_tag_commit() {
+  local tag="$1"
+  # Read-only (fetch/rev-parse/show), so this runs even under --dry-run --
+  # skipping it there would hide exactly the bug it exists to catch.
+  git fetch --tags origin >/dev/null 2>&1 || true
+  if ! git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
+    # Not fetchable yet (e.g. propagation lag right after creation); nothing
+    # to check against.
+    return 0
+  fi
+  local tagged_version
+  tagged_version="$(git show "${tag}:pkg/version/version.go" 2>/dev/null \
+    | awk -F'"' '/^var[[:space:]]+STRING/ { print $2; exit }')"
+  if [ "$tagged_version" != "$VERSION" ]; then
+    die "tag '$tag' points at a commit where pkg/version/version.go reports '$tagged_version', not '$VERSION' -- it was likely created before the version-bump commit landed (see docs/src/how-to-release.md.in's warning on tag ordering). Delete the release and the tag (locally and on origin) and recreate it pointing at the correct commit before continuing."
+  fi
+  note "verified tag '$tag' points at a commit with version.go == '$VERSION'"
 }
 
 # ============================================================================
@@ -185,6 +237,20 @@ preflight_common() {
   if ! git diff-index --quiet HEAD -- 2>/dev/null; then
     git status --short
     die "working tree has uncommitted changes; commit or stash first"
+  fi
+
+  # `afterwork` explicitly checks out $BRANCH itself, so it self-heals from
+  # being invoked on the wrong branch. `pre-release` and `docs` do not: they
+  # commit/push against whatever is currently checked out, so catch a stray
+  # branch here rather than silently committing to it (and having
+  # `git push origin $BRANCH` report "Everything up-to-date" without actually
+  # publishing the new commit).
+  if [ "$SUBCOMMAND" != "afterwork" ]; then
+    local current_branch
+    current_branch="$(git rev-parse --abbrev-ref HEAD)"
+    if [ "$current_branch" != "$BRANCH" ]; then
+      die "currently on branch '$current_branch', expected '$BRANCH' -- 'git checkout $BRANCH' first, or pass --branch '$current_branch' if that's intentional"
+    fi
   fi
 
   log "preflight (common) ok"
@@ -371,19 +437,25 @@ phase_1_bump_versions() {
   run_cmd make dev
 
   banner "PHASE 1: commit + push"
-  if git diff-index --quiet HEAD -- 2>/dev/null; then
-    note "no staged or unstaged changes after make dev -- commit likely already present"
+  # Stage first, then check what's *staged* against HEAD. Checking
+  # git diff-index against the worktree before staging is racy: files
+  # `make dev` just rewrote can have mtimes too close to the index's
+  # cached stat info for git to trust without rehashing, so it can
+  # report "dirty" even when the regenerated content is identical to
+  # what's already committed. `git add` forces the real content
+  # comparison and refreshes the index, so the post-add check is exact.
+  run_cmd git add pkg/version/version.go miller.spec
+  # `make dev` may have regenerated docs and manpages; include them.
+  # Pick up anything else make dev touched, but limit to tracked files only
+  # to avoid sweeping in stray files.
+  run_cmd git add -u
+  if git diff --cached --quiet; then
+    note "no staged changes after make dev -- commit likely already present"
   else
-    run_cmd git add pkg/version/version.go miller.spec
-    # `make dev` may have regenerated docs and manpages; include them.
-    # Pick up anything else make dev touched, but limit to tracked files only
-    # to avoid sweeping in stray files.
-    run_cmd git add -u
     run_cmd git commit -m "Prepare ${VERSION} release"
   fi
 
-  confirm "push branch '$BRANCH' to origin?"
-  run_cmd git push origin "$BRANCH"
+  push_if_needed "$BRANCH"
 
   log "phase 1 complete"
 }
@@ -434,13 +506,30 @@ phase_3_srpm() {
   run_cmd mkdir -p "$rpm_top/SPECS" "$rpm_top/SOURCES" "$rpm_top/SRPMS"
 
   # Check for an already-built SRPM for this version before rebuilding.
+  # Reuse is content-aware, not just version-keyed: a same-named SRPM from
+  # an earlier aborted run could have been built from a since-superseded
+  # tarball (e.g. a bugfix rebuild before the tag was ever pushed), so we
+  # only reuse it if its recorded source-tarball sha256 still matches the
+  # tarball on disk right now.
+  local tgz_sha=""
+  if [ "$DRY_RUN" != "yes" ]; then
+    tgz_sha="$(shasum -a 256 "$tgz" | awk '{ print $1 }')"
+  fi
+
   local existing
   existing="$(ls -1 "$rpm_top"/SRPMS/miller-"${VERSION}"-1*.src.rpm 2>/dev/null | head -n1 || true)"
   if [ -n "$existing" ]; then
-    note "existing SRPM found (idempotent: reusing): $existing"
-    SRPM_PATH="$existing"
-    log "phase 3 complete"
-    return 0
+    local sha_marker="${existing}.srctarball.sha256"
+    local recorded_sha=""
+    [ -f "$sha_marker" ] && recorded_sha="$(cat "$sha_marker")"
+    if [ -n "$tgz_sha" ] && [ "$recorded_sha" = "$tgz_sha" ]; then
+      note "existing SRPM found and matches current $tgz sha256 (idempotent: reusing): $existing"
+      SRPM_PATH="$existing"
+      log "phase 3 complete"
+      return 0
+    else
+      warn "existing SRPM found but its recorded source tarball sha256 doesn't match current $tgz -- rebuilding: $existing"
+    fi
   fi
 
   run_cmd cp miller.spec "$rpm_top/SPECS/"
@@ -466,6 +555,7 @@ phase_3_srpm() {
   else
     SRPM_PATH="$(ls -1 "$rpm_top"/SRPMS/miller-"${VERSION}"-1*.src.rpm | head -n1)"
     [ -n "$SRPM_PATH" ] && [ -f "$SRPM_PATH" ] || die "rpmbuild reported success but no SRPM found under $rpm_top/SRPMS"
+    echo "$tgz_sha" > "${SRPM_PATH}.srctarball.sha256"
     log "built SRPM: $SRPM_PATH"
   fi
 
@@ -483,7 +573,16 @@ phase_4_github_release() {
   [ -n "${SRPM_PATH:-}" ] || die "SRPM_PATH not set -- phase 3 did not run?"
 
   if gh release view "$TAG" >/dev/null 2>&1; then
-    note "gh release $TAG already exists (idempotent: will only upload missing assets)"
+    note "gh release $TAG already exists"
+    if [ -n "$NOTES_FILE" ]; then
+      # Resuming with a (possibly edited) --notes-file should still take
+      # effect -- otherwise editing NOTES_FILE and re-running silently
+      # leaves the already-created release's notes frozen at first creation.
+      log "updating existing release notes from '$NOTES_FILE'"
+      run_cmd gh release edit "$TAG" --notes-file "$NOTES_FILE"
+    else
+      note "no --notes-file given; leaving existing release notes/title untouched"
+    fi
   else
     [ -n "$NOTES_FILE" ] || die "gh release $TAG does not exist and --notes-file was not provided"
     confirm "create GitHub pre-release $TAG from notes file '$NOTES_FILE'?"
@@ -492,6 +591,8 @@ phase_4_github_release() {
       --title "Miller $VERSION" \
       --notes-file "$NOTES_FILE"
   fi
+
+  verify_release_tag_commit "$TAG"
 
   banner "PHASE 4: upload assets"
   # --clobber so that a resumed run can re-upload a replaced artifact.
@@ -567,8 +668,7 @@ phase_5_docs_branch() {
     run_cmd git commit -m "docs: Miller $VERSION Documentation site_name"
   fi
 
-  confirm "push branch '$VERSION' to origin?"
-  run_cmd git push -u origin "$VERSION"
+  push_if_needed "$VERSION" -u
 
   banner "PHASE 5: manual ReadTheDocs steps"
   cat <<EOF
@@ -626,8 +726,7 @@ phase_6_afterwork_bump() {
       run_cmd git commit -m "Post-${VERSION} release: back to ${target}"
     fi
 
-    confirm "push branch '$BRANCH' to origin?"
-    run_cmd git push origin "$BRANCH"
+    push_if_needed "$BRANCH"
   fi
 
   log "phase 6 complete"

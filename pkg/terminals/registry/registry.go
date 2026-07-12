@@ -15,10 +15,13 @@ const (
 	TerminalList = "terminal-list"
 	Completion   = "completion"
 	Help         = "help"
+	Mcp          = "mcp"
 	Regtest      = "regtest"
 	Repl         = "repl"
 	Script       = "script"
+	Skill        = "skill"
 	Version      = "version"
+	Which        = "which"
 )
 
 // Names is the ordered list of all terminal subcommand names.
@@ -26,10 +29,13 @@ var Names = []string{
 	TerminalList,
 	Completion,
 	Help,
+	Mcp,
 	Regtest,
 	Repl,
 	Script,
+	Skill,
 	Version,
+	Which,
 }
 
 // Top-level version flags, handled in pkg/climain before normal command-line

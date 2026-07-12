@@ -40,11 +40,19 @@ import (
 
 const verbNameReshape = "reshape"
 
+var reshapeOptions = []OptionSpec{
+	{Flag: "-i", Arg: "{input field names}", Type: "csv-list", Desc: "Input field names for wide-to-long reshape. Use with -o."},
+	{Flag: "-r", Arg: "{input field regex}", Type: "regex", Desc: "Input field regex for wide-to-long reshape. May be repeated. Use with -o. If you have multiple regexes, please specify them using multiple -r, since regexes can contain commas within them.", Repeatable: true},
+	{Flag: "-o", Arg: "{key-field name,value-field name}", Type: "csv-list", Desc: "Output key-field and value-field names for wide-to-long reshape. Requires -i or -r."},
+	{Flag: "-s", Arg: "{key-field name,value-field name}", Type: "csv-list", Desc: "Key-field and value-field names for long-to-wide reshape."},
+}
+
 var ReshapeSetup = TransformerSetup{
 	Verb:         verbNameReshape,
 	UsageFunc:    transformerReshapeUsage,
 	ParseCLIFunc: transformerReshapeParseCLI,
 	IgnoresInput: false,
+	Options:      reshapeOptions,
 }
 
 func transformerReshapeUsage(
@@ -70,6 +78,7 @@ func transformerReshapeUsage(
 	fmt.Fprintf(o, "  These pivot/reshape the input data to undo the wide-to-long operation.\n")
 	fmt.Fprintf(o, "  Note: this does not work with tail -f; it produces output records only after\n")
 	fmt.Fprintf(o, "  all input records have been read.\n")
+	WriteVerbOptions(o, reshapeOptions)
 	fmt.Fprintf(o, "\n")
 	fmt.Fprintf(o, "Examples:\n")
 	fmt.Fprintf(o, "\n")
@@ -144,16 +153,17 @@ func transformerReshapeParseCLI(
 		}
 		argi++
 
-		if opt == "-h" || opt == "--help" {
+		switch opt {
+		case "-h", "--help":
 			transformerReshapeUsage(os.Stdout)
 			return nil, cli.ErrHelpRequested
 
-		} else if opt == "-i" {
+		case "-i":
 			inputFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
-		} else if opt == "-r" {
+		case "-r":
 			inputFieldRegexString, err := cli.VerbGetStringArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
@@ -162,18 +172,18 @@ func transformerReshapeParseCLI(
 				inputFieldRegexStrings = []string{}
 			}
 			inputFieldRegexStrings = append(inputFieldRegexStrings, inputFieldRegexString)
-		} else if opt == "-o" {
+		case "-o":
 			outputFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
-		} else if opt == "-s" {
+		case "-s":
 			splitOutFieldNames, err = cli.VerbGetStringArrayArg(verb, opt, args, &argi, argc)
 			if err != nil {
 				return nil, err
 			}
 
-		} else {
+		default:
 			return nil, cli.VerbErrorf(verb, "option \"%s\" not recognized", opt)
 		}
 	}
@@ -411,8 +421,7 @@ func (tr *TransformerReshape) longToWide(
 		}
 
 		otherValuesJoined := inrec.GetValuesJoined()
-		var bucket *tReshapeBucket = nil
-		bucket = otherValuesToBuckets.Get(otherValuesJoined)
+		bucket := otherValuesToBuckets.Get(otherValuesJoined)
 		if bucket == nil {
 			bucket = newReshapeBucket(inrec)
 			otherValuesToBuckets.Put(otherValuesJoined, bucket)

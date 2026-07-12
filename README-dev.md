@@ -1,6 +1,7 @@
 # Quickstart for developers
 
 * `make`, `make check`, `make docs`, etc: see [Makefile](Makefile) in the repo base directory.
+* Linting: `make lint` runs [golangci-lint](https://golangci-lint.run/) (config in [.golangci.yml](.golangci.yml)) with the same invocation used by [.github/workflows/golangci-lint.yml](.github/workflows/golangci-lint.yml), so a clean local run usually means CI's lint job will pass too. Install golangci-lint locally per the [official instructions](https://golangci-lint.run/welcome/install/#local-installation) (match the CI version, currently v2.12.2). It's a separate step from `make dev`/`make check` -- run it explicitly before pushing. `make staticcheck` (requires [staticcheck](https://staticcheck.io)) is a second, independent static-analysis pass. Note: CI's lint job caches `staticcheck` results across commits/PRs and can occasionally fail on a stale cache (spurious warnings unrelated to your diff) even when `make lint` is clean locally; the job is `continue-on-error: true` so this won't block merging, and a maintainer can clear the cache with `gh cache delete` if needed.
 * Software-testing methodology: see [./test/README.md](./test/README.md).
 * Source-code indexing: please see [https://sourcegraph.com/github.com/johnkerl/miller](https://sourcegraph.com/github.com/johnkerl/miller)
 * Godoc As of September 2021, `godoc` support is minimal: package-level synopses exist; most `func`/`const`/etc content lacks `godoc`-style comments.  To view doc material, you can:
@@ -22,7 +23,40 @@ The Go implementation is auto-built using GitHub Actions: see [.github/workflows
 * The quoted-DKVP feature from [issue 266](https://github.com/johnkerl/miller/issues/266) will be easily addressed.
 * String/number-formatting issues in [issue 211](https://github.com/johnkerl/miller/issues/211), [issue 178](https://github.com/johnkerl/miller/issues/178), [issue 151](https://github.com/johnkerl/miller/issues/151), and [issue 259](https://github.com/johnkerl/miller/issues/259) will be fixed during the Go port.
 * I think some DST/timezone issues such as [issue 359](https://github.com/johnkerl/miller/issues/359) will be easier to fix using the Go datetime library than using the C datetime library
-* The code will be easier to read and, I hope, easier for others to contribute to. What this means is it should be quicker and easier to add new features to Miller -- after the development-time cost of the port itself is paid, of course.
+* The code will be easier to read, and, I hope, easier for others to contribute to. What this means is it should be quicker and easier to add new features to Miller -- after the development-time cost of the port itself is paid, of course.
+
+## Developer note: C time conversion and thread safety
+
+This note is for developers who are looking at old Miller 5 C code,
+release branches, downstream forks, or references to `mlr_timegm`/`timegm`
+while working on [issue 1816](https://github.com/johnkerl/miller/issues/1816).
+Current Miller is implemented in Go, so normal work on `main` should prefer
+Go's `time` package and should not reintroduce C-library time-conversion
+wrappers.
+
+When maintaining legacy C code, treat UTC/local timestamp conversion as a
+thread-safety boundary.  Some historical implementations of `timegm` are
+small portability wrappers around `mktime`: they temporarily change the
+process-wide `TZ` environment variable, call `tzset`, run the conversion, and
+then restore the previous environment.  That pattern can be acceptable in a
+single-threaded command-line path, but it is not safe to call concurrently
+because the environment and timezone state are global to the process.
+
+If a legacy `mlr_timegm` helper is needed, document whether it is merely a
+portable `timegm` replacement or whether it mutates `TZ`.  Do not call such a
+helper from multiple worker threads unless access is serialized and all callers
+understand that unrelated local-time formatting/parsing in the same process may
+observe the temporary timezone.  Prefer a platform `timegm`/`_mkgmtime`-style
+function that does not rely on changing global process state, or an explicit
+UTC conversion algorithm, when portability permits.
+
+For new code, keep timezone selection explicit in function arguments or in the
+existing CLI configuration rather than by changing process environment during a
+conversion.  If tests are added around legacy C conversion behavior, include a
+comment noting whether they assume single-threaded execution.  This keeps the
+Go implementation's concurrency model separate from the older C portability
+tradeoffs and gives future maintainers a clear warning before touching
+`mlr_timegm` or related `timegm` compatibility code.
 
 # Why Go
 
