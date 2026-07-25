@@ -90,12 +90,16 @@ func transformerTeeParseCLI(
 			// loop (so individual if-statements don't need to). However,
 			// ParseWriterOptions expects it unadvanced.
 			largi := argi - 1
-			if cli.FLAG_TABLE.Parse(args, argc, &largi, localOptions) {
+			handled, err := cli.FLAG_TABLE.Parse(args, argc, &largi, localOptions)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
 				// This lets mlr main and mlr tee have different output formats.
 				// Nothing else to handle here.
 				argi = largi
 			} else {
-				os.Exit(1)
+				return nil, cli.VerbErrorf(verbNameTee, "option \"%s\" not recognized", opt)
 			}
 		}
 	}
@@ -123,8 +127,7 @@ func transformerTeeParseCLI(
 		&localOptions.WriterOptions,
 	)
 	if err != nil {
-		// Error message already printed out
-		os.Exit(1)
+		return nil, err
 	}
 
 	return transformer, nil
@@ -169,7 +172,7 @@ func (tr *TransformerTee) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 
 	// If we receive a downstream-done flag from a transformer downstream from
 	// us, read it to unblock their goroutine but -- unlike most other verbs --
@@ -199,25 +202,22 @@ func (tr *TransformerTee) Transform(
 		// #1671).
 		err := tr.fileOutputHandler.WriteRecordAndContext(inrecAndContext.Copy())
 		if err != nil {
-			fmt.Fprintf(
-				os.Stderr,
-				"%s: error writing to tee \"%s\":\n",
-				"mlr", tr.filenameOrCommandForDisplay,
+			return fmt.Errorf(
+				"%s: error writing to tee \"%s\":\n%v",
+				"mlr", tr.filenameOrCommandForDisplay, err,
 			)
-			os.Exit(1)
 		}
 
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	} else {
 		err := tr.fileOutputHandler.Close()
 		if err != nil {
-			fmt.Fprintf(
-				os.Stderr,
-				"%s: error closing tee \"%s\":\n",
-				"mlr", tr.filenameOrCommandForDisplay,
+			return fmt.Errorf(
+				"%s: error closing tee \"%s\":\n%v",
+				"mlr", tr.filenameOrCommandForDisplay, err,
 			)
-			os.Exit(1)
 		}
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	}
+	return nil
 }

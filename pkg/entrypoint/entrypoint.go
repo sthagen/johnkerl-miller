@@ -4,6 +4,7 @@
 package entrypoint
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -37,8 +38,10 @@ func Main() MainReturn {
 
 	// 'mlr repl' or 'mlr lecat' or any other non-miller-per-se toolery which
 	// is delivered (for convenience) within the mlr executable. If argv[1] is
-	// found then this function will not return.
-	auxents.Dispatch(os.Args)
+	// an auxent name, it's run here and its exit code is the process's.
+	if handled, exitCode := auxents.Dispatch(os.Args); handled {
+		os.Exit(exitCode)
+	}
 
 	if lib.IsTruthyEnvValue(os.Getenv("MLR_NO_SHELL")) {
 		lib.DisableShellOut()
@@ -48,12 +51,7 @@ func Main() MainReturn {
 
 	options, recordTransformers, err := climain.ParseCommandLine(os.Args)
 	if err != nil {
-		if wantJSON {
-			climain.EmitStructuredError(err)
-		} else {
-			printError(err)
-		}
-		os.Exit(1)
+		exitOnError(err, wantJSON)
 	}
 
 	if !options.DoInPlace {
@@ -62,12 +60,34 @@ func Main() MainReturn {
 		err = processFilesInPlace(options)
 	}
 	if err != nil {
-		printError(err)
-		os.Exit(1)
+		exitOnError(err, false)
 	}
 
 	return MainReturn{
 		PrintElapsedTime: options.PrintElapsedTime,
+	}
+}
+
+// exitOnError terminates the process for a non-nil error from command-line
+// parsing or stream processing. Sentinel errors carry their own exit codes
+// and have already produced whatever output they wanted; any other error is
+// printed (structured if --errors-json is active) and exits 1. This is
+// intended to be the single os.Exit point below main; see plans/exit.md.
+func exitOnError(err error, wantJSON bool) {
+	var exitRequest *lib.ExitRequest
+	switch {
+	case errors.Is(err, cli.ErrHelpRequested):
+		os.Exit(0)
+	case errors.Is(err, cli.ErrUsagePrinted):
+		os.Exit(1)
+	case errors.As(err, &exitRequest):
+		os.Exit(exitRequest.Code)
+	case wantJSON:
+		climain.EmitStructuredError(err)
+		os.Exit(1)
+	default:
+		printError(err)
+		os.Exit(1)
 	}
 }
 

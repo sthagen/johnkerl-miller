@@ -35,6 +35,32 @@ Options:
 -h|--help Show this message.
 
 ================================================================
+bootstrap-ci
+Usage: mlr bootstrap-ci [options]
+Computes bootstrap confidence intervals for statistics of given fields,
+accumulated across the input record stream: values are resampled with
+replacement many times, the statistic is computed on each resample, and the
+confidence interval is taken from percentiles of the resampled statistics.
+For each value field and statistic, outputs the full-data statistic in
+{field}_{stat}, along with confidence-interval endpoints in {field}_{stat}_lo
+and {field}_{stat}_hi. Use mlr --seed for reproducible results.
+See also mlr bootstrap and mlr stats1.
+Options:
+-a {mean,...} Names of statistics to bootstrap: one or more of the listed
+              values, as in mlr stats1 -a. Also accepts median (same as p50) and
+              percentiles p{n} for n in 0..100. Defaults to mean.
+-f {a,b,c}    Value-field names on which to compute statistics. Required.
+-g {d,e,f}    Optional group-by-field names.
+-n {n}        Number of bootstrap resamples. Must be positive. Defaults to 1000.
+-c {level}    Confidence level, strictly between 0 and 1. Defaults to 0.95.
+-i            Use interpolated percentiles, like R's type=7, for percentile
+              statistics as well as for the confidence-interval endpoints;
+              default like type=1.
+-h|--help     Show this message.
+Example: mlr --seed 12345 bootstrap-ci -f x,y
+Example: mlr --seed 12345 bootstrap-ci -a mean,median -f x -g shape -n 5000 -c 0.99
+
+================================================================
 case
 Usage: mlr case [options]
 Uppercases strings in record keys and/or values.
@@ -536,6 +562,13 @@ Options:
 --ul                                 Emit unpaired records from the left file.
 --ur                                 Emit unpaired records from the right
                                      file(s).
+--ignore-empty                       Treat records with empty-string values in
+                                     any join-field as if that join-field were
+                                     absent, on both the left and right files.
+                                     Such records are never paired -- not even
+                                     with one another -- and are treated as
+                                     unpaired, subject to --np/--ul/--ur as
+                                     usual.
 -s|--sorted-input                    Require sorted input: records must be
                                      sorted lexically by their join-field names,
                                      else not all records will be paired. The
@@ -1266,6 +1299,12 @@ Options:
                    case please avoid pprint-format output since end of input
                    stream will never be seen. Likewise, if input is coming from
                    `tail -f` be sure to use `--records-per-batch 1`.
+-w {n}             Sliding-window mode: compute statistics over a trailing
+                   window of up to n records (including the current one), rather
+                   than over the whole record stream. Windows are kept per group
+                   when -g is used. One output record is emitted per input
+                   record, with the windowed statistics appended to it. Not
+                   compatible with -s.
 -S                 No-op flag for backward compatibility with Miller 5.
 -F                 No-op flag for backward compatibility with Miller 5.
 -h|--help          Show this message.
@@ -1292,6 +1331,9 @@ Names of accumulators for -a, one or more of:
 Example: mlr stats1 -a min,p10,p50,p90,max -f value -g size,shape
 Example: mlr stats1 -a count,mode -f size
 Example: mlr stats1 -a count,mode -f size -g shape
+Example: mlr stats1 -a mean,min,max -f quantity -g name -w 7
+        This emits one output record per input record, with sliding-window
+         statistics over the last up-to-7 records for each name.
 Example: mlr stats1 -a count,mode --fr '^[a-h].*$' --gr '^k.*$'
         This computes count and mode statistics on all field names beginning
          with a through h, grouped by all field names starting with k.
@@ -1370,15 +1412,15 @@ Options:
 
 Names of steppers for -a, comma-separated, one or more of:
   counter    Count instances of field(s) between successive records
-  delta      Compute differences in field(s) between successive records
+  delta      Compute differences in field(s) between successive records. Use delta or equivalently delta_1 for the previous record, or delta_{n} for n records back.
   ewma       Exponentially weighted moving average over successive records
   from-first Compute differences in field(s) from first record
-  ratio      Compute ratios in field(s) between successive records
+  ratio      Compute ratios in field(s) between successive records. Use ratio or equivalently ratio_1 for the previous record, or ratio_{n} for n records back.
   rprod      Compute running products of field(s) between successive records
   rsum       Compute running sums of field(s) between successive records
-  shift      Alias for shift_lag
-  shift_lag  Include value(s) in field(s) from the previous record, if any
-  shift_lead Include value(s) in field(s) from the next record, if any
+  shift      Alias for shift_lag. Use shift or equivalently shift_1 for the previous record, or shift_{n} for n records back.
+  shift_lag  Include value(s) in field(s) from the previous record, if any. Use shift_lag or equivalently shift_lag_1 for the previous record, or shift_lag_{n} for n records back.
+  shift_lead Include value(s) in field(s) from the next record, if any. Use shift_lead or equivalently shift_lead_1 for the next record, or shift_lead_{n} for n records forward.
   slwin      Sliding-window averages over m records back and n forward. E.g. slwin_7_2 for 7 back and 2 forward.
 
 Examples:
@@ -1388,6 +1430,12 @@ Examples:
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y -g group_name
   mlr step -a slwin_9_0,slwin_0_9 -f x
+  mlr step -a shift_lag_12 -f sales
+
+The shift, shift_lag, shift_lead, delta, and ratio steppers accept an
+optional trailing count: shift_lag_{n} refers n records back, and
+shift_lead_{n} refers n records forward. The plain forms are equivalent
+to a count of 1: e.g. shift_lag is the same as shift_lag_1.
 
 Please see https://miller.readthedocs.io/en/latest/reference-verbs.html#filter or
 https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average

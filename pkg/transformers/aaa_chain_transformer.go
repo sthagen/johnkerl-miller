@@ -140,6 +140,7 @@ func ChainTransformer(
 	readerDownstreamDoneChannel chan<- bool, // for mlr head -- see also stream.go
 	recordTransformers []RecordTransformer, // not *recordTransformer since this is an interface
 	writerRecordChannel chan<- []*types.RecordAndContext, // list of *types.RecordAndContext
+	dataProcessingErrorChannel chan<- error, // for mid-stream transformer errors -- see stream.go
 	options *cli.TOptions,
 ) {
 	i := 0
@@ -184,6 +185,7 @@ func ChainTransformer(
 			orchan,
 			idchan,
 			odchan,
+			dataProcessingErrorChannel,
 			options,
 		)
 	}
@@ -196,26 +198,47 @@ func runSingleTransformer(
 	outputRecordChannel chan<- []*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
+	dataProcessingErrorChannel chan<- error,
 	options *cli.TOptions,
 ) {
 
 	done := false
 	for !done {
 		recordsAndContexts := <-inputRecordChannel
-		done = runSingleTransformerBatch(
+		var err error
+		done, err = runSingleTransformerBatch(
 			recordsAndContexts,
 			recordTransformer,
 			isFirstInChain,
 			outputRecordChannel,
 			inputDownstreamDoneChannel,
 			outputDownstreamDoneChannel,
+			dataProcessingErrorChannel,
 			options,
 		)
+		if err != nil {
+			// runSingleTransformerBatch has already sent the error to
+			// dataProcessingErrorChannel and then forwarded an end-of-stream
+			// marker downstream, so the record-writer drains and finishes,
+			// upon which stream.Stream returns the error.
+			//
+			// Tell upstream (transformers and ultimately the record-reader,
+			// via the mlr-head mechanism) that we'll ignore further input.
+			select {
+			case outputDownstreamDoneChannel <- true:
+			default:
+			}
+			return
+		}
 	}
 }
 
-// TODO: comment
-// Returns true on end of record stream
+// runSingleTransformerBatch passes one batch of records through the
+// transformer. The boolean return is true on end of record stream. A non-nil
+// error is a mid-stream transformer failure: the error has already been sent
+// to dataProcessingErrorChannel, and any output produced before the failure,
+// plus an end-of-stream marker, has already been forwarded downstream so the
+// rest of the chain and the record-writer can drain and finish cleanly.
 func runSingleTransformerBatch(
 	inputRecordsAndContexts []*types.RecordAndContext, // list of types.RecordAndContext
 	recordTransformer RecordTransformer,
@@ -223,8 +246,9 @@ func runSingleTransformerBatch(
 	outputRecordChannel chan<- []*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
+	dataProcessingErrorChannel chan<- error,
 	options *cli.TOptions,
-) bool {
+) (bool, error) {
 	outputRecordsAndContexts := make([]*types.RecordAndContext, 0, len(inputRecordsAndContexts))
 	done := false
 
@@ -257,7 +281,7 @@ func runSingleTransformerBatch(
 		// there is no record to be transformed.
 
 		if inputRecordAndContext.EndOfStream || inputRecordAndContext.Record != nil {
-			recordTransformer.Transform(
+			err := recordTransformer.Transform(
 				inputRecordAndContext,
 				&outputRecordsAndContexts,
 				// TODO: maybe refactor these out of each transformer.
@@ -265,6 +289,25 @@ func runSingleTransformerBatch(
 				inputDownstreamDoneChannel,
 				outputDownstreamDoneChannel,
 			)
+			if err != nil {
+				// Surface the error to stream.Stream's select loop.
+				// Non-blocking send: if another goroutine errored first, that
+				// error wins. This must happen before the end-of-stream
+				// marker is forwarded below: the marker lets the
+				// record-writer finish and signal done-writing, and the error
+				// must already be buffered by then or stream.Stream could
+				// return nil, losing the nonzero exit code.
+				select {
+				case dataProcessingErrorChannel <- err:
+				default:
+				}
+				// Forward what was produced before the failure, plus an
+				// end-of-stream marker so downstream drains and finishes.
+				outputRecordsAndContexts = append(outputRecordsAndContexts,
+					types.NewEndOfStreamMarker(&inputRecordAndContext.Context))
+				outputRecordChannel <- outputRecordsAndContexts
+				return true, err
+			}
 		} else {
 			outputRecordsAndContexts = append(outputRecordsAndContexts, inputRecordAndContext)
 		}
@@ -281,5 +324,5 @@ func runSingleTransformerBatch(
 
 	outputRecordChannel <- outputRecordsAndContexts
 
-	return done
+	return done, nil
 }

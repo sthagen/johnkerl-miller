@@ -162,12 +162,7 @@ func NewTransformerCut(
 			// Handles "a.*b"i Miller case-insensitive-regex specification
 			regex, err := lib.CompileMillerRegex(regexString)
 			if err != nil {
-				fmt.Fprintf(
-					os.Stderr,
-					"%s %s: cannot compile regex [%s]\n",
-					"mlr", verbNameCut, regexString,
-				)
-				os.Exit(1)
+				return nil, cli.VerbErrorf(verbNameCut, "cannot compile regex [%s]", regexString)
 			}
 			tr.regexes[i] = regex
 		}
@@ -182,9 +177,9 @@ func (tr *TransformerCut) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
+	return tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 // mlr cut -f a,b,c
@@ -193,7 +188,7 @@ func (tr *TransformerCut) includeWithInputOrder(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		outrec := mlrval.NewMlrmap()
@@ -209,6 +204,7 @@ func (tr *TransformerCut) includeWithInputOrder(
 	} else {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	}
+	return nil
 }
 
 // mlr cut -o -f a,b,c
@@ -217,7 +213,7 @@ func (tr *TransformerCut) includeWithArgOrder(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		outrec := mlrval.NewMlrmap()
@@ -232,6 +228,7 @@ func (tr *TransformerCut) includeWithArgOrder(
 	} else {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	}
+	return nil
 }
 
 // mlr cut -x -f a,b,c
@@ -240,7 +237,7 @@ func (tr *TransformerCut) exclude(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		for _, fieldName := range tr.fieldNameList {
@@ -250,6 +247,7 @@ func (tr *TransformerCut) exclude(
 		}
 	}
 	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
+	return nil
 }
 
 type entryIndex struct {
@@ -262,7 +260,7 @@ func (tr *TransformerCut) processWithRegexes(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 		newrec := mlrval.NewMlrmapAsRecord()
@@ -300,4 +298,5 @@ func (tr *TransformerCut) processWithRegexes(
 	} else {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
 	}
+	return nil
 }

@@ -105,8 +105,6 @@
 package utils
 
 import (
-	"fmt"
-	"os"
 	"strings"
 
 	"github.com/johnkerl/miller/v6/pkg/cli"
@@ -126,8 +124,9 @@ type JoinBucketKeeper struct {
 	// TODO: merge with leof flag
 	recordReaderDone bool
 
-	leftJoinFieldNames   []string
-	leftKeepFieldNameSet map[string]bool
+	leftJoinFieldNames    []string
+	leftKeepFieldNameSet  map[string]bool
+	ignoreEmptyJoinFields bool
 
 	// Given a left-file of the following form (with left-join-field name "L"):
 	//   +-----+
@@ -159,13 +158,13 @@ func NewJoinBucketKeeper(
 	joinReaderOptions *cli.TReaderOptions,
 	leftJoinFieldNames []string,
 	leftKeepFieldNameSet map[string]bool,
-) *JoinBucketKeeper {
+	ignoreEmptyJoinFields bool,
+) (*JoinBucketKeeper, error) {
 
 	// Instantiate the record-reader
 	recordReader, err := input.Create(joinReaderOptions, 1) // TODO: maybe increase records per batch
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "mlr join: %v\n", err)
-		os.Exit(1)
+		return nil, cli.VerbErrorf("join", "%v", err)
 	}
 
 	// Set the initial context for the left-file.  Since Go is concurrent, the
@@ -190,8 +189,9 @@ func NewJoinBucketKeeper(
 		errorChannel:     errorChannel,
 		recordReaderDone: false,
 
-		leftJoinFieldNames:   leftJoinFieldNames,
-		leftKeepFieldNameSet: leftKeepFieldNameSet,
+		leftJoinFieldNames:    leftJoinFieldNames,
+		leftKeepFieldNameSet:  leftKeepFieldNameSet,
+		ignoreEmptyJoinFields: ignoreEmptyJoinFields,
 
 		JoinBucket:           NewJoinBucket(nil),
 		peekRecordAndContext: nil,
@@ -201,7 +201,7 @@ func NewJoinBucketKeeper(
 		state: LEFT_STATE_0_PREFILL,
 	}
 
-	return keeper
+	return keeper, nil
 }
 
 // For JoinBucketKeeper state machine
@@ -246,7 +246,7 @@ func (keeper *JoinBucketKeeper) computeState() tJoinBucketKeeperState {
 
 func (keeper *JoinBucketKeeper) FindJoinBucket(
 	rightFieldValues []*mlrval.Mlrval, // nil means right-file EOF
-) bool {
+) (bool, error) {
 	// TODO: comment me
 	isPaired := false
 
@@ -254,9 +254,13 @@ func (keeper *JoinBucketKeeper) FindJoinBucket(
 	// to be had) but it may or may not make the join keys from the current
 	// right record.
 	if keeper.state == LEFT_STATE_0_PREFILL {
-		keeper.prepareForFirstJoinBucket()
+		if err := keeper.prepareForFirstJoinBucket(); err != nil {
+			return false, err
+		}
 		if keeper.peekRecordAndContext != nil {
-			keeper.fillNextJoinBucket()
+			if err := keeper.fillNextJoinBucket(); err != nil {
+				return false, err
+			}
 		}
 		keeper.state = keeper.computeState()
 	}
@@ -272,10 +276,14 @@ func (keeper *JoinBucketKeeper) FindJoinBucket(
 				// Example: joining on "id" column and left file has several
 				// join-field records with id=3, then several with id=7, but
 				// the current right record has id=5.
-				keeper.prepareForNewJoinBucket(rightFieldValues)
+				if err := keeper.prepareForNewJoinBucket(rightFieldValues); err != nil {
+					return false, err
+				}
 
 				if keeper.peekRecordAndContext != nil {
-					keeper.fillNextJoinBucket()
+					if err := keeper.fillNextJoinBucket(); err != nil {
+						return false, err
+					}
 				}
 
 				// TODO: privatize more
@@ -300,37 +308,39 @@ func (keeper *JoinBucketKeeper) FindJoinBucket(
 				// and no need to advance left.
 				isPaired = false
 			}
-		} else if keeper.state != LEFT_STATE_3_EOF {
-			fmt.Fprintf(
-				os.Stderr,
-				"%s: internal coding error: failed transition from prefill state.\n",
-				"mlr",
-			)
-			os.Exit(1)
+		} else {
+			lib.InternalCodingErrorWithMessageIf(keeper.state != LEFT_STATE_3_EOF,
+				"failed transition from prefill state")
 		}
 
 	} else { // Right EOF
-		keeper.markRemainingsAsUnpaired()
+		if err := keeper.markRemainingsAsUnpaired(); err != nil {
+			return false, err
+		}
 	}
 
 	keeper.state = keeper.computeState()
 
-	return isPaired
+	return isPaired, nil
 }
 
 // This finds the first peek record which possesses all the necessary join-field
 // keys.  Any other records found along the way, lacking the necessary
 // join-field keys, are moved to the left-unpaired list.
 
-func (keeper *JoinBucketKeeper) prepareForFirstJoinBucket() {
+func (keeper *JoinBucketKeeper) prepareForFirstJoinBucket() error {
 	for {
 		// Skip over records not having the join keys. These go straight to the
 		// left-unpaired list.
-		keeper.peekRecordAndContext = keeper.readRecord()
+		var err error
+		keeper.peekRecordAndContext, err = keeper.readRecord()
+		if err != nil {
+			return err
+		}
 		if keeper.peekRecordAndContext == nil { // left EOF
 			break
 		}
-		if keeper.peekRecordAndContext.Record.HasSelectedKeys(keeper.leftJoinFieldNames) {
+		if recordHasJoinKeys(keeper.peekRecordAndContext.Record, keeper.leftJoinFieldNames, keeper.ignoreEmptyJoinFields) {
 			break
 		}
 		keeper.leftUnpaireds = append(keeper.leftUnpaireds, keeper.peekRecordAndContext)
@@ -338,8 +348,8 @@ func (keeper *JoinBucketKeeper) prepareForFirstJoinBucket() {
 
 	if keeper.peekRecordAndContext == nil {
 		keeper.leof = true
-		return
 	}
+	return nil
 }
 
 // After right-file input has moved past the current join-bucket, this finds
@@ -360,14 +370,14 @@ func (keeper *JoinBucketKeeper) prepareForFirstJoinBucket() {
 
 func (keeper *JoinBucketKeeper) prepareForNewJoinBucket(
 	rightFieldValues []*mlrval.Mlrval,
-) {
+) error {
 	if !keeper.JoinBucket.WasPaired {
 		moveRecordsAndContexts(&keeper.leftUnpaireds, &keeper.JoinBucket.RecordsAndContexts)
 	}
 	keeper.JoinBucket = NewJoinBucket(nil)
 
 	if keeper.peekRecordAndContext == nil { // left EOF
-		return
+		return nil
 	}
 
 	peekRec := keeper.peekRecordAndContext.Record
@@ -383,7 +393,7 @@ func (keeper *JoinBucketKeeper) prepareForNewJoinBucket(
 
 	cmp := compareLexically(peekFieldValues, rightFieldValues)
 	if cmp >= 0 {
-		return
+		return nil
 	}
 
 	// Keep seeking and filling the bucket until = or >; this may or may not
@@ -395,13 +405,17 @@ func (keeper *JoinBucketKeeper) prepareForNewJoinBucket(
 		for {
 			// Skip over records not having the join keys. These go straight to the
 			// left-unpaired list.
-			keeper.peekRecordAndContext = keeper.readRecord()
+			var err error
+			keeper.peekRecordAndContext, err = keeper.readRecord()
+			if err != nil {
+				return err
+			}
 			if keeper.peekRecordAndContext == nil {
 				break
 			}
 			peekRec := keeper.peekRecordAndContext.Record
 
-			if peekRec.HasSelectedKeys(keeper.leftJoinFieldNames) {
+			if recordHasJoinKeys(peekRec, keeper.leftJoinFieldNames, keeper.ignoreEmptyJoinFields) {
 				break
 			}
 			keeper.leftUnpaireds = append(keeper.leftUnpaireds, keeper.peekRecordAndContext)
@@ -425,6 +439,7 @@ func (keeper *JoinBucketKeeper) prepareForNewJoinBucket(
 			break
 		}
 	}
+	return nil
 }
 
 // This takes the peek record and forms a complete join-bucket with all records
@@ -441,20 +456,14 @@ func (keeper *JoinBucketKeeper) prepareForNewJoinBucket(
 // * peekRecordAndContext != nil
 // * peekRecordAndContext has the join keys
 
-func (keeper *JoinBucketKeeper) fillNextJoinBucket() {
+func (keeper *JoinBucketKeeper) fillNextJoinBucket() error {
 	peekRec := keeper.peekRecordAndContext.Record
 	peekFieldValues, hasAllJoinKeys := peekRec.ReferenceSelectedValues(
 		keeper.leftJoinFieldNames,
 	)
 
-	if !hasAllJoinKeys {
-		fmt.Fprintf(
-			os.Stderr,
-			"%s: internal coding error: peek record should have had join keys.\n",
-			"mlr",
-		)
-		os.Exit(1)
-	}
+	lib.InternalCodingErrorWithMessageIf(!hasAllJoinKeys,
+		"peek record should have had join keys")
 
 	keeper.JoinBucket.leftFieldValues = mlrval.CopyMlrvalArray(peekFieldValues)
 	keeper.JoinBucket.RecordsAndContexts = append(keeper.JoinBucket.RecordsAndContexts, keeper.peekRecordAndContext)
@@ -465,7 +474,11 @@ func (keeper *JoinBucketKeeper) fillNextJoinBucket() {
 	for {
 		// Skip over records not having the join keys. These go straight to the
 		// left-unpaired list.
-		keeper.peekRecordAndContext = keeper.readRecord()
+		var err error
+		keeper.peekRecordAndContext, err = keeper.readRecord()
+		if err != nil {
+			return err
+		}
 		if keeper.peekRecordAndContext == nil { // left EOF
 			keeper.leof = true
 			break
@@ -475,6 +488,9 @@ func (keeper *JoinBucketKeeper) fillNextJoinBucket() {
 		peekFieldValues, hasAllJoinKeys := peekRec.ReferenceSelectedValues(
 			keeper.leftJoinFieldNames,
 		)
+		if hasAllJoinKeys && keeper.ignoreEmptyJoinFields && valuesContainVoid(peekFieldValues) {
+			hasAllJoinKeys = false
+		}
 
 		if hasAllJoinKeys {
 			cmp := compareLexically(
@@ -490,10 +506,11 @@ func (keeper *JoinBucketKeeper) fillNextJoinBucket() {
 		}
 		keeper.peekRecordAndContext = nil
 	}
+	return nil
 }
 
 // TODO: comment
-func (keeper *JoinBucketKeeper) markRemainingsAsUnpaired() {
+func (keeper *JoinBucketKeeper) markRemainingsAsUnpaired() error {
 	// 1. Any records already in keeper.JoinBucket.records (current bucket)
 	if !keeper.JoinBucket.WasPaired {
 		moveRecordsAndContexts(&keeper.leftUnpaireds, &keeper.JoinBucket.RecordsAndContexts)
@@ -508,12 +525,17 @@ func (keeper *JoinBucketKeeper) markRemainingsAsUnpaired() {
 
 	// 3. Remainder of left input stream
 	for {
-		keeper.peekRecordAndContext = keeper.readRecord()
+		var err error
+		keeper.peekRecordAndContext, err = keeper.readRecord()
+		if err != nil {
+			return err
+		}
 		if keeper.peekRecordAndContext == nil {
 			break
 		}
 		keeper.leftUnpaireds = append(keeper.leftUnpaireds, keeper.peekRecordAndContext)
 	}
+	return nil
 }
 
 // TODO: comment
@@ -538,15 +560,14 @@ func (keeper *JoinBucketKeeper) ReleaseLeftUnpaireds(
 // Method to get the next left-file record from the record-reader goroutine.
 // Returns nil at EOF.
 
-func (keeper *JoinBucketKeeper) readRecord() *types.RecordAndContext {
+func (keeper *JoinBucketKeeper) readRecord() (*types.RecordAndContext, error) {
 	if keeper.recordReaderDone {
-		return nil
+		return nil, nil
 	}
 
 	select {
 	case err := <-keeper.errorChannel:
-		fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	case leftrecsAndContexts := <-keeper.readerChannel:
 		// TODO: temp
 		lib.InternalCodingErrorIf(len(leftrecsAndContexts) != 1)
@@ -560,17 +581,14 @@ func (keeper *JoinBucketKeeper) readRecord() *types.RecordAndContext {
 			// before declaring the left-file read complete.
 			select {
 			case err := <-keeper.errorChannel:
-				fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-				os.Exit(1)
+				return nil, err
 			default:
 			}
 			keeper.recordReaderDone = true
-			return nil
+			return nil, nil
 		}
-		return leftrecAndContext
+		return leftrecAndContext, nil
 	}
-
-	return nil
 }
 
 // Pops everything off second-argument list and push to first-argument list.
@@ -581,6 +599,37 @@ func moveRecordsAndContexts(
 ) {
 	*destination = append(*destination, (*source)...)
 	*source = (*source)[:0]
+}
+
+// recordHasJoinKeys reports whether rec has all of the given field names. If
+// ignoreEmptyJoinFields is set, a field holding an empty-string value counts
+// as absent, same as for --ignore-empty on the right-hand side of the join.
+func recordHasJoinKeys(
+	rec *mlrval.Mlrmap,
+	fieldNames []string,
+	ignoreEmptyJoinFields bool,
+) bool {
+	for _, fieldName := range fieldNames {
+		value := rec.Get(fieldName)
+		if value == nil {
+			return false
+		}
+		if ignoreEmptyJoinFields && value.IsVoid() {
+			return false
+		}
+	}
+	return true
+}
+
+// valuesContainVoid returns true if any of the given values is present but
+// empty-string (mlrval "void").
+func valuesContainVoid(values []*mlrval.Mlrval) bool {
+	for _, value := range values {
+		if value != nil && value.IsVoid() {
+			return true
+		}
+	}
+	return false
 }
 
 // Returns -1, 0, 1 as left <, ==, > right, using lexical comparison only (even

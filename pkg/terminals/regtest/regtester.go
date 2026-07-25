@@ -146,7 +146,7 @@ func (rt *RegTester) resetCounts() {
 
 func (rt *RegTester) Execute(
 	casePaths []string,
-) bool {
+) (bool, error) {
 	// Don't let the current user's settings affect expected results
 	for _, name := range envVarsToUnset {
 		_ = os.Unsetenv(name)
@@ -175,7 +175,9 @@ func (rt *RegTester) Execute(
 	}
 
 	for _, path := range casePaths {
-		rt.executeSinglePath(path)
+		if _, err := rt.executeSinglePath(path); err != nil {
+			return false, err
+		}
 	}
 
 	if len(rt.failCaseNames) > 0 && rt.firstNFailsToShow > 0 {
@@ -215,12 +217,12 @@ func (rt *RegTester) Execute(
 		if !rt.plainMode {
 			fmt.Printf("%s overall\n", colorizer.MaybeColorizePass("PASS", true))
 		}
-		return true
+		return true, nil
 	}
 	if !rt.plainMode {
 		fmt.Printf("%s overall\n", colorizer.MaybeColorizeFail("FAIL", true))
 	}
-	return false
+	return false, nil
 }
 
 // Recursively invoked routine to process either a single .cmd file, or a
@@ -228,15 +230,18 @@ func (rt *RegTester) Execute(
 
 func (rt *RegTester) executeSinglePath(
 	path string,
-) bool {
+) (bool, error) {
 	handle, err := os.Stat(path)
 	if err != nil {
 		fmt.Printf("%s: %v\n", path, err)
-		return false
+		return false, nil
 	}
 	mode := handle.Mode()
 	if mode.IsDir() {
-		passed, hasCaseSubdirectories := rt.executeSingleDirectory(path)
+		passed, hasCaseSubdirectories, err := rt.executeSingleDirectory(path)
+		if err != nil {
+			return false, err
+		}
 		if hasCaseSubdirectories {
 			if passed {
 				rt.directoryPassCount++
@@ -245,7 +250,7 @@ func (rt *RegTester) executeSinglePath(
 				rt.failDirNames = append(rt.failDirNames, path)
 			}
 		}
-		return passed
+		return passed, nil
 	} else if mode.IsRegular() {
 		basename := filepath.Base(path)
 		if basename == CmdName {
@@ -256,21 +261,24 @@ func (rt *RegTester) executeSinglePath(
 				rt.caseFailCount++
 				rt.failCaseNames = append(rt.failCaseNames, path)
 			}
-			return passed
+			return passed, nil
 		}
-		return true // No .cmd files directly inside
+		return true, nil // No .cmd files directly inside
 	}
 
 	fmt.Printf("%s: neither directory nor regular file.\n", path)
-	return false // fall-through
+	return false, nil // fall-through
 }
 
 func (rt *RegTester) executeSingleDirectory(
 	dirName string,
-) (bool, bool) {
+) (bool, bool, error) {
 	passed := true
 	// TODO: comment
-	fileNames, hasCaseSubdirectories := rt.hasCaseSubdirectories(dirName)
+	fileNames, hasCaseSubdirectories, err := rt.hasCaseSubdirectories(dirName)
+	if err != nil {
+		return false, false, err
+	}
 
 	if !rt.plainMode {
 		if hasCaseSubdirectories && rt.verbosityLevel >= 2 {
@@ -281,7 +289,10 @@ func (rt *RegTester) executeSingleDirectory(
 	for _, name := range fileNames {
 		path := dirName + "/" + name
 
-		ok := rt.executeSinglePath(path)
+		ok, err := rt.executeSinglePath(path)
+		if err != nil {
+			return false, false, err
+		}
 		if !ok {
 			passed = false
 		}
@@ -309,7 +320,7 @@ func (rt *RegTester) executeSingleDirectory(
 		}
 	}
 
-	return passed, hasCaseSubdirectories
+	return passed, hasCaseSubdirectories, nil
 }
 
 // Sees if a directory contains a single test case. If so, we don't want to
@@ -322,28 +333,26 @@ func (rt *RegTester) executeSingleDirectory(
 
 func (rt *RegTester) hasCaseSubdirectories(
 	dirName string,
-) ([]string, bool) {
+) ([]string, bool, error) {
 	f, err := os.Open(dirName)
 	if err != nil {
-		fmt.Printf("%s: %v\n", dirName, err)
-		os.Exit(1)
+		return nil, false, err
 	}
 	defer func() { _ = f.Close() }()
 
 	names, err := f.Readdirnames(-1)
 	if err != nil {
-		fmt.Printf("%s: %v\n", dirName, err)
-		os.Exit(1)
+		return nil, false, err
 	}
 	sort.Strings(names)
 
 	for _, name := range names {
 		path := dirName + string(filepath.Separator) + name
 		if rt.isCaseDirectory(path) {
-			return names, true
+			return names, true, nil
 		}
 	}
-	return names, false
+	return names, false, nil
 }
 
 func (rt *RegTester) isCaseDirectory(
@@ -454,13 +463,18 @@ func (rt *RegTester) executeSingleCmdFile(
 
 	passed := true
 
-	// Set any case-specific environment variables before running the case.
+	// Set any case-specific environment variables before running the case,
+	// remembering their prior values so they can be restored afterward. E.g.
+	// the suite-wide MLRRC=__none__ must be restored after a case which
+	// points MLRRC at a test file.
+	previousEnvValues := make(map[string]string)
 	for pe := envKeyValuePairs.Head; pe != nil; pe = pe.Next {
 		key := pe.Key
 		value := pe.Value
 		if verbosityLevel >= 3 {
 			fmt.Printf("SETENV %s=%s\n", key, value)
 		}
+		previousEnvValues[key] = os.Getenv(key)
 		_ = os.Setenv(key, value)
 	}
 	// This is so 'mlr' files can find the case-directory if they need it --
@@ -488,7 +502,7 @@ func (rt *RegTester) executeSingleCmdFile(
 	actualStdout, actualStderr, actualExitCode := RunMillerCommand(rt.exeName, cmd)
 	// ****************************************************************
 
-	// Unset any case-specific environment variables after running the case.
+	// Restore any case-specific environment variables after running the case.
 	// This is important since the setenv is done in the current process,
 	// and we don't want to affect subsequent test cases.
 	for pe := envKeyValuePairs.Head; pe != nil; pe = pe.Next {
@@ -496,7 +510,7 @@ func (rt *RegTester) executeSingleCmdFile(
 		if verbosityLevel >= 3 {
 			fmt.Printf("UNSETENV %s\n", key)
 		}
-		_ = os.Setenv(key, "")
+		_ = os.Setenv(key, previousEnvValues[key])
 	}
 	_ = os.Setenv("CASEDIR", "")
 

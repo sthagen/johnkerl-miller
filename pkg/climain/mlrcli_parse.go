@@ -151,24 +151,33 @@ func parseCommandLinePassOne(
 
 		if args[argi][0] == '-' {
 			if args[argi] == registry.VersionFlag {
-				// Exiting flag: handle it immediately.
+				// Exiting flag: print immediately, then request exit 0 from the
+				// entrypoint.
 				fmt.Printf("mlr %s\n", version.STRING)
-				os.Exit(0)
+				parseErr = lib.NewExitZeroRequest()
+				return
 			} else if args[argi] == registry.BareVersionFlag {
-				// Exiting flag: handle it immediately.
+				// Exiting flag: print immediately, then request exit 0 from the
+				// entrypoint.
 				fmt.Printf("%s\n", version.STRING)
-				os.Exit(0)
+				parseErr = lib.NewExitZeroRequest()
+				return
 			} else if help.ParseTerminalUsage(args[argi]) {
-				// Exiting flag: handle it immediately.
+				// Exiting flag: the usage text has been printed.
 				// Most help is in the 'mlr help' terminal but there are a few
 				// shorthands like 'mlr -h' and 'mlr -F'.
-				os.Exit(0)
+				parseErr = lib.NewExitZeroRequest()
+				return
 
 			} else if args[argi] == "--norc" {
 				argi += 1
 				flagSequences = append(flagSequences, args[oargi:argi])
 
-			} else if cli.FLAG_TABLE.Parse(args, argc, &argi, options) {
+			} else if handled, flagErr := cli.FLAG_TABLE.Parse(args, argc, &argi, options); flagErr != nil {
+				parseErr = flagErr
+				return
+
+			} else if handled {
 				flagSequences = append(flagSequences, args[oargi:argi])
 
 			} else if args[argi] == "--" {
@@ -196,13 +205,15 @@ func parseCommandLinePassOne(
 			// The first verb in the then-chain can *optionally* be preceded by
 			// 'then'.  The others one *must* be.
 			if args[argi] == "then" || args[argi] == "+" {
-				cli.CheckArgCount(args, argi, argc, 1)
 				oargi++
 				argi++
 			}
 			if argi >= argc {
-				fmt.Fprintln(os.Stderr, "mlr: 'then' must have a verb after it.")
-				os.Exit(1)
+				parseErr = &CLIError{
+					Kind: "generic",
+					Msg:  "mlr: 'then' must have a verb after it.",
+				}
+				return
 			}
 			verb := args[argi]
 			onFirst = false
@@ -226,11 +237,11 @@ func parseCommandLinePassOne(
 				false, // false for first pass of CLI-parse, true for second pass -- this is the first pass
 			)
 			if err != nil {
-				if errors.Is(err, cli.ErrHelpRequested) {
-					os.Exit(0)
-				}
-				if errors.Is(err, cli.ErrUsagePrinted) {
-					os.Exit(1)
+				if errors.Is(err, cli.ErrHelpRequested) || errors.Is(err, cli.ErrUsagePrinted) {
+					// Sentinel errors: any output has already been printed; the
+					// entrypoint maps these to their exit codes.
+					parseErr = err
+					return
 				}
 				// Return a structured error so the caller can emit JSON or
 				// prose depending on --errors-json.
@@ -268,7 +279,8 @@ func parseCommandLinePassOne(
 			// piped stdin) defaults to 'cat'.
 			if argc == 1 {
 				help.MainUsage(os.Stderr)
-				os.Exit(1)
+				parseErr = cli.ErrUsagePrinted
+				return
 			}
 			verbSequences = append(verbSequences, []string{"cat"})
 		}
@@ -309,16 +321,34 @@ func parseCommandLinePassTwo(
 	ignoresInput := false
 
 	// Load a .mlrrc file unless --norc was a main-flag on the command line.
+	// If --profile {name} / -P {name} was a main-flag, apply the settings
+	// from that [name] section of the .mlrrc file, after any global
+	// (pre-section) settings. These must be found before the .mlrrc file is
+	// loaded, which is before the main flag-sequences are processed.
 	loadMlrrc := true
+	mlrrcProfileName := ""
 	for _, flagSequence := range flagSequences {
 		lib.InternalCodingErrorIf(len(flagSequence) < 1)
-		if flagSequence[0] == "--norc" {
+		switch flagSequence[0] {
+		case "--norc":
 			loadMlrrc = false
-			break
+		case "--profile", "-P":
+			lib.InternalCodingErrorIf(len(flagSequence) < 2)
+			mlrrcProfileName = flagSequence[1]
 		}
 	}
 	if loadMlrrc {
-		loadMlrrcOrDie(options)
+		if err = loadMlrrcFiles(options, mlrrcProfileName); err != nil {
+			return nil, nil, err
+		}
+	} else if mlrrcProfileName != "" {
+		return nil, nil, &CLIError{
+			Kind: "generic",
+			Msg: fmt.Sprintf(
+				"mlr: --profile \"%s\" was specified along with --norc, which disables .mlrrc processing.",
+				mlrrcProfileName,
+			),
+		}
 	}
 
 	// Process the flag-sequences in order from pass one. We assume all the
@@ -331,7 +361,10 @@ func parseCommandLinePassTwo(
 		lib.InternalCodingErrorIf(argc == 0)
 
 		// Parse the main-flag into the options struct.
-		rc := cli.FLAG_TABLE.Parse(args, argc, &argi, options)
+		rc, flagErr := cli.FLAG_TABLE.Parse(args, argc, &argi, options)
+		if flagErr != nil {
+			return nil, nil, flagErr
+		}
 
 		// Should have been parsed OK in pass one.
 		lib.InternalCodingErrorIf(!rc)
@@ -363,9 +396,9 @@ func parseCommandLinePassTwo(
 	}
 
 	if terminalSequence != nil {
-		terminals.Dispatch(terminalSequence)
-		// They are expected to exit the process
-		panic("mlr: internal coding error: terminal did not exit the process")
+		// The terminal (help, repl, regtest, ...) runs here; its exit code
+		// rides an ExitRequest up to the entrypoint layer.
+		return nil, nil, &lib.ExitRequest{Code: terminals.Dispatch(terminalSequence)}
 	}
 
 	// Now process the verb-sequences from pass one, with options-struct set up
@@ -388,12 +421,8 @@ func parseCommandLinePassTwo(
 			true, // false for first pass of CLI-parse, true for second pass -- this is pass two
 		)
 		if err != nil {
-			if errors.Is(err, cli.ErrHelpRequested) {
-				os.Exit(0)
-			}
-			if errors.Is(err, cli.ErrUsagePrinted) {
-				os.Exit(1)
-			}
+			// Sentinel errors (ErrHelpRequested, ErrUsagePrinted) pass through
+			// here too; the entrypoint maps them to their exit codes.
 			return nil, nil, err
 		}
 		// Unparsable verb-setups should have been found in pass one.
@@ -441,8 +470,10 @@ func parseCommandLinePassTwo(
 	}
 
 	if options.DoInPlace && len(options.FileNames) == 0 {
-		fmt.Fprintf(os.Stderr, "%s: -I option (in-place operation) requires input files.\n", "mlr")
-		os.Exit(1)
+		return nil, nil, &CLIError{
+			Kind: "generic",
+			Msg:  "mlr: -I option (in-place operation) requires input files.",
+		}
 	}
 
 	if options.HaveRandSeed {

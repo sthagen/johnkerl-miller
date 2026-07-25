@@ -331,7 +331,11 @@ func transformerPutOrFilterParseCLI(
 			// loop (so individual if-statements don't need to). However,
 			// ParseWriterOptions expects it unadvanced.
 			largi := argi - 1
-			if cli.FLAG_TABLE.Parse(args, argc, &largi, options) {
+			handled, err := cli.FLAG_TABLE.Parse(args, argc, &largi, options)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
 				// This lets mlr main and mlr put have different output formats.
 				// Nothing else to handle here.
 				argi = largi
@@ -459,7 +463,8 @@ func NewTransformerPut(
 	// --explain is a validate/dry-run: report whether the DSL parsed and
 	// type-checked, then exit without reading the input stream. A parse/build
 	// error is returned so it flows through the normal error path (including
-	// --errors-json); a valid expression prints a confirmation and exits 0.
+	// --errors-json); a valid expression prints a confirmation and requests
+	// exit 0 via the ExitRequest sentinel.
 	if doExplain {
 		if err != nil {
 			return nil, err
@@ -469,11 +474,10 @@ func NewTransformerPut(
 			verbName = "filter"
 		}
 		if warningsAreFatal && hadWarnings {
-			fmt.Fprintf(os.Stderr, "mlr %s: DSL expression has warnings treated as fatal.\n", verbName)
-			os.Exit(1)
+			return nil, cli.VerbErrorf(verbName, "DSL expression has warnings treated as fatal.")
 		}
 		fmt.Printf("mlr %s: DSL expression is valid.\n", verbName)
-		os.Exit(0)
+		return nil, lib.NewExitZeroRequest()
 	}
 
 	if warningsAreFatal && hadWarnings {
@@ -481,11 +485,11 @@ func NewTransformerPut(
 			"%s: Exiting due to warnings treated as fatal.\n",
 			"mlr",
 		)
-		os.Exit(1)
+		return nil, &lib.ExitRequest{Code: 1}
 	}
 
 	if exitAfterParse {
-		os.Exit(0)
+		return nil, lib.NewExitZeroRequest()
 	}
 
 	if err != nil {
@@ -527,7 +531,7 @@ func (tr *TransformerPut) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	tr.runtimeState.OutputRecordsAndContexts = outputRecordsAndContexts
 
@@ -541,8 +545,7 @@ func (tr *TransformerPut) Transform(
 			tr.runtimeState.Update(nil, &context)
 			err := tr.cstRootNode.ExecuteBeginBlocks(tr.runtimeState)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 			tr.executedBeginBlocks = true
 		}
@@ -552,8 +555,7 @@ func (tr *TransformerPut) Transform(
 		// Execute the main block on the current input record
 		outrec, err := tr.cstRootNode.ExecuteMainBlock(tr.runtimeState)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		if !tr.suppressOutputRecord {
@@ -573,12 +575,11 @@ func (tr *TransformerPut) Transform(
 					if tr.runtimeState.FilterExpression.IsAbsent() {
 						filterBool = false
 					} else {
-						fmt.Fprintf(os.Stderr,
-							"Filter expression did not evaluate to boolean: got %s value %s",
+						return fmt.Errorf(
+							"mlr: filter expression did not evaluate to boolean: got %s value %s",
 							tr.runtimeState.FilterExpression.String(),
 							tr.runtimeState.FilterExpression.GetTypeName(),
 						)
-						os.Exit(1)
 					}
 				}
 			} else {
@@ -602,22 +603,23 @@ func (tr *TransformerPut) Transform(
 		if !tr.executedBeginBlocks {
 			err := tr.cstRootNode.ExecuteBeginBlocks(tr.runtimeState)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-				os.Exit(1)
+				return err
 			}
 		}
 
 		// Execute the end { ... } after the last input record
 		err := tr.cstRootNode.ExecuteEndBlocks(tr.runtimeState)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 
 		// Send all registered OutputHandlerManager instances the end-of-stream
 		// indicator.
-		tr.cstRootNode.ProcessEndOfStream()
+		if err := tr.cstRootNode.ProcessEndOfStream(); err != nil {
+			return err
+		}
 
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, types.NewEndOfStreamMarker(&context))
 	}
+	return nil
 }

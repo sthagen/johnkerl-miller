@@ -196,12 +196,7 @@ func NewTransformerReorder(
 			// Handles "a.*b"i Miller case-insensitive-regex specification
 			regex, err := lib.CompileMillerRegex(regexString)
 			if err != nil {
-				fmt.Fprintf(
-					os.Stderr,
-					"%s %s: cannot compile regex [%s]\n",
-					"mlr", verbNameReorder, regexString,
-				)
-				os.Exit(1)
+				return nil, cli.VerbErrorf(verbNameReorder, "cannot compile regex [%s]", regexString)
 			}
 			tr.regexes[i] = regex
 		}
@@ -215,7 +210,7 @@ func (tr *TransformerReorder) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 	if !inrecAndContext.EndOfStream {
 		tr.recordTransformerFunc(
@@ -225,6 +220,7 @@ func (tr *TransformerReorder) Transform(
 	} else {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
 	}
+	return nil
 }
 
 func (tr *TransformerReorder) reorderToStartNoRegex(

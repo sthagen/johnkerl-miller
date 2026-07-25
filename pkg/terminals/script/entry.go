@@ -10,6 +10,7 @@
 package script
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -19,7 +20,7 @@ import (
 	"github.com/johnkerl/miller/v6/pkg/lib"
 )
 
-func scriptUsage(verbName string, o *os.File, exitCode int) {
+func scriptUsage(verbName string, o *os.File) {
 	exeName := path.Base(os.Args[0])
 	fmt.Fprintf(o, "Usage: %s %s [options] -f {script file} | -e {expression} [zero or more data-file names]\n", exeName, verbName)
 	fmt.Fprint(o,
@@ -38,7 +39,6 @@ Or any --icsv, --ojson, etc. reader/writer options.
 
 Data-file names (or stdin if none) are the record input stream.
 `)
-	os.Exit(exitCode)
 }
 
 func ScriptMain(args []string) int {
@@ -58,7 +58,8 @@ func ScriptMain(args []string) int {
 		}
 
 		if args[argi] == "-h" || args[argi] == "--help" {
-			scriptUsage(scriptName, os.Stdout, 0)
+			scriptUsage(scriptName, os.Stdout)
+			return 0
 		} else if args[argi] == "-w" {
 			doWarnings = true
 			argi++
@@ -67,42 +68,46 @@ func ScriptMain(args []string) int {
 			argi++
 		} else if args[argi] == "-f" {
 			if argc-argi < 2 {
-				scriptUsage(scriptName, os.Stderr, 1)
+				scriptUsage(scriptName, os.Stderr)
+				return 1
 			}
 			argi++
 			filename, err := cli.VerbGetStringArg("script", "-f", args, &argi, argc)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-				os.Exit(1)
+				return 1
 			}
 			theseStrings, err := lib.LoadStringsFromFileOrDir(filename, ".mlr")
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "mlr script: cannot load script from \"%s\": %v\n", filename, err)
-				os.Exit(1)
+				return 1
 			}
 			dslStrings = append(dslStrings, theseStrings...)
 			haveDSLStrings = true
 		} else if args[argi] == "-e" {
 			if argc-argi < 2 {
-				scriptUsage(scriptName, os.Stderr, 1)
+				scriptUsage(scriptName, os.Stderr)
+				return 1
 			}
 			argi++
 			expr, err := cli.VerbGetStringArg("script", "-e", args, &argi, argc)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-				os.Exit(1)
+				return 1
 			}
 			dslStrings = append(dslStrings, expr)
 			haveDSLStrings = true
 		} else if args[argi] == "--load" {
 			if argc-argi < 2 {
-				scriptUsage(scriptName, os.Stderr, 1)
+				scriptUsage(scriptName, os.Stderr)
+				return 1
 			}
 			options.DSLPreloadFileNames = append(options.DSLPreloadFileNames, args[argi+1])
 			argi += 2
 		} else if args[argi] == "--mload" {
 			if argc-argi < 2 {
-				scriptUsage(scriptName, os.Stderr, 1)
+				scriptUsage(scriptName, os.Stderr)
+				return 1
 			}
 			argi++
 			for argi < argc && args[argi] != "--" {
@@ -112,15 +117,24 @@ func ScriptMain(args []string) int {
 			if argi < argc && args[argi] == "--" {
 				argi++
 			}
-		} else if cli.FLAG_TABLE.Parse(args, argc, &argi, options) {
+		} else if handled, flagErr := cli.FLAG_TABLE.Parse(args, argc, &argi, options); flagErr != nil {
+			var exitRequest *lib.ExitRequest
+			if errors.As(flagErr, &exitRequest) {
+				return exitRequest.Code
+			}
+			fmt.Fprintf(os.Stderr, "%v\n", flagErr)
+			return 1
+		} else if handled {
 		} else {
-			scriptUsage(scriptName, os.Stderr, 1)
+			scriptUsage(scriptName, os.Stderr)
+			return 1
 		}
 	}
 
 	if !haveDSLStrings {
 		fmt.Fprintf(os.Stderr, "mlr script: -f or -e is required\n")
-		scriptUsage(scriptName, os.Stderr, 1)
+		scriptUsage(scriptName, os.Stderr)
+		return 1
 	}
 
 	if err := cli.FinalizeReaderOptions(&options.ReaderOptions); err != nil {
@@ -139,25 +153,25 @@ func ScriptMain(args []string) int {
 	scr, err := NewScript(options, doWarnings, strictMode, dslStrings)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr script: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	scr.openFiles(filenames)
 	err = scr.run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr script: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	err = scr.bufferedRecordOutputStream.Flush()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr script: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	err = scr.closeBufferedOutputStream()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr script: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 	return 0
 }

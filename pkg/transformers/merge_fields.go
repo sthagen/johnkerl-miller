@@ -282,12 +282,8 @@ func NewTransformerMergeFields(
 		// Handles "a.*b"i Miller case-insensitive-regex specification
 		regex, err := lib.CompileMillerRegex(regexString)
 		if err != nil {
-			fmt.Fprintf(
-				os.Stderr,
-				"%s %s: cannot compile regex [%s]\n",
-				"mlr", verbNameCut, regexString,
-			)
-			os.Exit(1)
+			// (This formerly mis-reported itself as coming from the cut verb.)
+			return nil, cli.VerbErrorf(verbNameMergeFields, "cannot compile regex [%s]", regexString)
 		}
 		tr.valueFieldNameRegexes[i] = regex
 	}
@@ -321,9 +317,9 @@ func (tr *TransformerMergeFields) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
+	return tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 func (tr *TransformerMergeFields) transformByNameList(
@@ -331,10 +327,10 @@ func (tr *TransformerMergeFields) transformByNameList(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if inrecAndContext.EndOfStream {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
-		return
+		return nil
 	}
 
 	inrec := inrecAndContext.Record
@@ -374,6 +370,7 @@ func (tr *TransformerMergeFields) transformByNameList(
 	}
 
 	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
+	return nil
 }
 
 func (tr *TransformerMergeFields) transformByNameRegex(
@@ -381,10 +378,10 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if inrecAndContext.EndOfStream {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
-		return
+		return nil
 	}
 
 	inrec := inrecAndContext.Record
@@ -448,6 +445,7 @@ func (tr *TransformerMergeFields) transformByNameRegex(
 	}
 
 	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
+	return nil
 }
 
 // mlr merge-fields -c in_,out_ -a sum
@@ -461,10 +459,10 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if inrecAndContext.EndOfStream {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // end-of-stream marker
-		return
+		return nil
 	}
 
 	inrec := inrecAndContext.Record
@@ -553,4 +551,5 @@ func (tr *TransformerMergeFields) transformByCollapsing(
 	}
 
 	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext)
+	return nil
 }

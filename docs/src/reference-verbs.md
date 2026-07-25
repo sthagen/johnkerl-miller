@@ -233,6 +233,59 @@ orange 0.4802164827586204  290
 green  0.5129018241860459  1075
 </pre>
 
+## bootstrap-ci
+
+<pre class="pre-highlight-in-pair">
+<b>mlr bootstrap-ci --help</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+Usage: mlr bootstrap-ci [options]
+Computes bootstrap confidence intervals for statistics of given fields,
+accumulated across the input record stream: values are resampled with
+replacement many times, the statistic is computed on each resample, and the
+confidence interval is taken from percentiles of the resampled statistics.
+For each value field and statistic, outputs the full-data statistic in
+{field}_{stat}, along with confidence-interval endpoints in {field}_{stat}_lo
+and {field}_{stat}_hi. Use mlr --seed for reproducible results.
+See also mlr bootstrap and mlr stats1.
+Options:
+-a {mean,...} Names of statistics to bootstrap: one or more of the listed
+              values, as in mlr stats1 -a. Also accepts median (same as p50) and
+              percentiles p{n} for n in 0..100. Defaults to mean.
+-f {a,b,c}    Value-field names on which to compute statistics. Required.
+-g {d,e,f}    Optional group-by-field names.
+-n {n}        Number of bootstrap resamples. Must be positive. Defaults to 1000.
+-c {level}    Confidence level, strictly between 0 and 1. Defaults to 0.95.
+-i            Use interpolated percentiles, like R's type=7, for percentile
+              statistics as well as for the confidence-interval endpoints;
+              default like type=1.
+-h|--help     Show this message.
+Example: mlr --seed 12345 bootstrap-ci -f x,y
+Example: mlr --seed 12345 bootstrap-ci -a mean,median -f x -g shape -n 5000 -c 0.99
+</pre>
+
+While [bootstrap](reference-verbs.md#bootstrap) emits a single resampling of the input records -- leaving
+the statistics to a subsequent [stats1](reference-verbs.md#stats1) -- `bootstrap-ci` repeats the resampling
+many times, computes the requested statistics on each resample, and reports confidence intervals taken from
+percentiles of the resampled statistics. For example, to put 95% confidence intervals on the per-color means
+of the `u` column:
+
+<!--- hard-coded, not live-code, since random sampling would generate different data on each doc run
+    which would needlessly complicate git diff; this run is reproducible using --seed 12345 -->
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --c2p --seed 12345 bootstrap-ci -f u -g color data/colored-shapes.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+color  u_mean              u_mean_lo           u_mean_hi
+yellow 0.4971291160651098  0.4824881075725413  0.512947563340412
+red    0.49255964641241273 0.4843660191769008  0.5009657815126062
+purple 0.49400496322241666 0.47856893607705775 0.5107408590192641
+green  0.5048610595130744  0.48776011181244316 0.5226325915238951
+blue   0.5177171537414964  0.5042351204081628  0.532012486394558
+orange 0.49053241584158375 0.4593377557755773  0.523765551155115
+</pre>
+
 ## case
 
 <pre class="pre-highlight-in-pair">
@@ -1887,6 +1940,13 @@ Options:
 --ul                                 Emit unpaired records from the left file.
 --ur                                 Emit unpaired records from the right
                                      file(s).
+--ignore-empty                       Treat records with empty-string values in
+                                     any join-field as if that join-field were
+                                     absent, on both the left and right files.
+                                     Such records are never paired -- not even
+                                     with one another -- and are treated as
+                                     unpaired, subject to --np/--ul/--ur as
+                                     usual.
 -s|--sorted-input                    Require sorted input: records must be
                                      sorted lexically by their join-field names,
                                      else not all records will be paired. The
@@ -2080,6 +2140,55 @@ left_a left_b left_c right_a right_b right_c
 1      4      5      1       2       3
 1      2      3      1       4       5
 1      4      5      1       4       5
+</pre>
+
+By default, records with an empty-string value in a join field are joined just like any other value -- so two records which are both missing an ID, say, will be paired with one another even though that's rarely what's wanted:
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --csv cat data/join-ignore-empty-left.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+id,code
+3,0000ff
+2,00ff00
+4,ff0000
+,ffffff
+,000000
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --csv cat data/join-ignore-empty-right.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+id,color
+4,red
+2,green
+,white
+,black
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --csv join -j id -f data/join-ignore-empty-left.csv data/join-ignore-empty-right.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+id,code,color
+4,ff0000,red
+2,00ff00,green
+,ffffff,white
+,000000,white
+,ffffff,black
+,000000,black
+</pre>
+
+Use `--ignore-empty` to instead treat an empty-string join-field value as if the field were absent, on both the left and right files. Such records are never paired -- not even with one another:
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --csv join --ignore-empty -j id -f data/join-ignore-empty-left.csv data/join-ignore-empty-right.csv</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+id,code,color
+4,ff0000,red
+2,00ff00,green
 </pre>
 
 ## json-parse
@@ -3697,6 +3806,12 @@ Options:
                    case please avoid pprint-format output since end of input
                    stream will never be seen. Likewise, if input is coming from
                    `tail -f` be sure to use `--records-per-batch 1`.
+-w {n}             Sliding-window mode: compute statistics over a trailing
+                   window of up to n records (including the current one), rather
+                   than over the whole record stream. Windows are kept per group
+                   when -g is used. One output record is emitted per input
+                   record, with the windowed statistics appended to it. Not
+                   compatible with -s.
 -S                 No-op flag for backward compatibility with Miller 5.
 -F                 No-op flag for backward compatibility with Miller 5.
 -h|--help          Show this message.
@@ -3723,6 +3838,9 @@ Names of accumulators for -a, one or more of:
 Example: mlr stats1 -a min,p10,p50,p90,max -f value -g size,shape
 Example: mlr stats1 -a count,mode -f size
 Example: mlr stats1 -a count,mode -f size -g shape
+Example: mlr stats1 -a mean,min,max -f quantity -g name -w 7
+        This emits one output record per input record, with sliding-window
+         statistics over the last up-to-7 records for each name.
 Example: mlr stats1 -a count,mode --fr '^[a-h].*$' --gr '^k.*$'
         This computes count and mode statistics on all field names beginning
          with a through h, grouped by all field names starting with k.
@@ -3810,6 +3928,44 @@ shape    color_mode
 triangle red
 square   red
 circle   red
+</pre>
+
+With `-w {n}`, statistics are computed over a sliding window of the last up-to-`n`
+records -- within each group, when `-g` is used -- and one output record is emitted
+per input record, with the windowed statistics appended to it:
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv stats1 -a mean,min,max -f quantity -w 4</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+color  shape    flag  k  index quantity rate   quantity_mean      quantity_min quantity_max
+yellow triangle true  1  11    43.6498  9.8870 43.6498            43.6498      43.6498
+red    square   true  2  15    79.2778  0.0130 61.4638            43.6498      79.2778
+red    circle   true  3  16    13.8103  2.9010 45.579299999999996 13.8103      79.2778
+red    square   false 4  48    77.5542  7.4670 53.573025          13.8103      79.2778
+purple triangle false 5  51    81.2290  8.5910 62.96782499999999  13.8103      81.229
+red    square   false 6  64    77.1991  9.5310 62.44815           13.8103      81.229
+purple triangle false 7  65    80.1405  5.8240 79.0307            77.1991      81.229
+yellow circle   true  8  73    63.9785  4.2370 75.636775          63.9785      81.229
+yellow circle   true  9  87    63.5058  8.3350 71.20597500000001  63.5058      80.1405
+purple square   false 10 91    72.3735  8.2430 69.999575          63.5058      80.1405
+</pre>
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --icsv --opprint --from example.csv stats1 -a mean -f quantity -g shape -w 2</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+color  shape    flag  k  index quantity rate   quantity_mean
+yellow triangle true  1  11    43.6498  9.8870 43.6498
+red    square   true  2  15    79.2778  0.0130 79.2778
+red    circle   true  3  16    13.8103  2.9010 13.8103
+red    square   false 4  48    77.5542  7.4670 78.416
+purple triangle false 5  51    81.2290  8.5910 62.4394
+red    square   false 6  64    77.1991  9.5310 77.37665
+purple triangle false 7  65    80.1405  5.8240 80.68475000000001
+yellow circle   true  8  73    63.9785  4.2370 38.8944
+yellow circle   true  9  87    63.5058  8.3350 63.742149999999995
+purple square   false 10 91    72.3735  8.2430 74.78630000000001
 </pre>
 
 ## stats2
@@ -4007,15 +4163,15 @@ Options:
 
 Names of steppers for -a, comma-separated, one or more of:
   counter    Count instances of field(s) between successive records
-  delta      Compute differences in field(s) between successive records
+  delta      Compute differences in field(s) between successive records. Use delta or equivalently delta_1 for the previous record, or delta_{n} for n records back.
   ewma       Exponentially weighted moving average over successive records
   from-first Compute differences in field(s) from first record
-  ratio      Compute ratios in field(s) between successive records
+  ratio      Compute ratios in field(s) between successive records. Use ratio or equivalently ratio_1 for the previous record, or ratio_{n} for n records back.
   rprod      Compute running products of field(s) between successive records
   rsum       Compute running sums of field(s) between successive records
-  shift      Alias for shift_lag
-  shift_lag  Include value(s) in field(s) from the previous record, if any
-  shift_lead Include value(s) in field(s) from the next record, if any
+  shift      Alias for shift_lag. Use shift or equivalently shift_1 for the previous record, or shift_{n} for n records back.
+  shift_lag  Include value(s) in field(s) from the previous record, if any. Use shift_lag or equivalently shift_lag_1 for the previous record, or shift_lag_{n} for n records back.
+  shift_lead Include value(s) in field(s) from the next record, if any. Use shift_lead or equivalently shift_lead_1 for the next record, or shift_lead_{n} for n records forward.
   slwin      Sliding-window averages over m records back and n forward. E.g. slwin_7_2 for 7 back and 2 forward.
 
 Examples:
@@ -4025,6 +4181,12 @@ Examples:
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y
   mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y -g group_name
   mlr step -a slwin_9_0,slwin_0_9 -f x
+  mlr step -a shift_lag_12 -f sales
+
+The shift, shift_lag, shift_lead, delta, and ratio steppers accept an
+optional trailing count: shift_lag_{n} refers n records back, and
+shift_lead_{n} refers n records forward. The plain forms are equivalent
+to a count of 1: e.g. shift_lag is the same as shift_lag_1.
 
 Please see https://miller.readthedocs.io/en/latest/reference-verbs.html#filter or
 https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
@@ -4073,6 +4235,29 @@ pan pan 11    0.7930488423451967     0.6505816637259333     0.5026260055412137  
 zee pan 12    0.3676141320555616     0.23614420670296965    0.5985540091064224     -0.23093987705086083    1.4932943012538389  3
 eks pan 13    0.4915175580479536     0.7709126592971468     0.6117840605678454     -0.1202665025198918     2.2433809772769036  4
 eks zee 14    0.5207382318405251     0.34141681118811673    0.4915175580479536     0.02922067379257154     2.7641192091174287  5
+</pre>
+
+The `shift`, `shift_lag`, `shift_lead`, `delta`, and `ratio` steppers accept an optional trailing count: `shift_lag_{n}` refers `n` records back, and `shift_lead_{n}` refers `n` records forward. The plain forms are equivalent to a count of 1: e.g. `shift_lag` is the same as `shift_lag_1`.
+
+<pre class="pre-highlight-in-pair">
+<b>mlr --opprint step -a shift_lag,shift_lag_3,delta_3 -f x data/medium | head -15</b>
+</pre>
+<pre class="pre-non-highlight-in-pair">
+a   b   i     x                      y                      x_shift_lag            x_shift_lag_3          x_delta_3
+pan pan 1     0.3467901443380824     0.7268028627434533     -                      -                      0
+eks pan 2     0.7586799647899636     0.5221511083334797     0.3467901443380824     -                      0
+wye wye 3     0.20460330576630303    0.33831852551664776    0.7586799647899636     -                      0
+eks wye 4     0.38139939387114097    0.13418874328430463    0.20460330576630303    0.3467901443380824     0.03460924953305855
+wye pan 5     0.5732889198020006     0.8636244699032729     0.38139939387114097    0.7586799647899636     -0.185391044987963
+zee pan 6     0.5271261600918548     0.49322128674835697    0.5732889198020006     0.20460330576630303    0.3225228543255517
+eks zee 7     0.6117840605678454     0.1878849191181694     0.5271261600918548     0.38139939387114097    0.23038466669670443
+zee wye 8     0.5985540091064224     0.976181385699006      0.6117840605678454     0.5732889198020006     0.02526508930442184
+hat wye 9     0.03144187646093577    0.7495507603507059     0.5985540091064224     0.5271261600918548     -0.495684283630919
+pan wye 10    0.5026260055412137     0.9526183602969864     0.03144187646093577    0.6117840605678454     -0.10915805502663167
+pan pan 11    0.7930488423451967     0.6505816637259333     0.5026260055412137     0.5985540091064224     0.19449483323877426
+zee pan 12    0.3676141320555616     0.23614420670296965    0.7930488423451967     0.03144187646093577    0.3361722555946258
+eks pan 13    0.4915175580479536     0.7709126592971468     0.3676141320555616     0.5026260055412137     -0.01110844749326012
+eks zee 14    0.5207382318405251     0.34141681118811673    0.4915175580479536     0.7930488423451967     -0.27231061050467154
 </pre>
 
 <pre class="pre-highlight-in-pair">

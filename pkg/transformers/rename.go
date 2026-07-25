@@ -164,7 +164,10 @@ func NewTransformerRename(
 		tr.regexesAndReplacements = []*tRegexAndReplacement{}
 		for pe := oldToNewNames.Head; pe != nil; pe = pe.Next {
 			regexString := pe.Key
-			regex := lib.CompileMillerRegexOrDie(regexString)
+			regex, err := lib.CompileMillerRegex(regexString)
+			if err != nil {
+				return nil, err
+			}
 			replacement := pe.Value
 			_, replacementCaptureMatrix := lib.ReplacementHasCaptures(replacement)
 			regexAndReplacement := tRegexAndReplacement{
@@ -186,9 +189,9 @@ func (tr *TransformerRename) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
+	return tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts, inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
 func (tr *TransformerRename) transformWithoutRegexes(
@@ -196,7 +199,7 @@ func (tr *TransformerRename) transformWithoutRegexes(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 
@@ -209,6 +212,7 @@ func (tr *TransformerRename) transformWithoutRegexes(
 		}
 	}
 	*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // including end-of-stream marker
+	return nil
 }
 
 func (tr *TransformerRename) transformWithRegexes(
@@ -216,7 +220,7 @@ func (tr *TransformerRename) transformWithRegexes(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	if !inrecAndContext.EndOfStream {
 		inrec := inrecAndContext.Record
 
@@ -245,4 +249,5 @@ func (tr *TransformerRename) transformWithRegexes(
 	} else {
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // including end-of-stream marker
 	}
+	return nil
 }

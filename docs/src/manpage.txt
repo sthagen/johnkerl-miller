@@ -203,15 +203,16 @@
        for all things with "map" in their names.
 
 1mVERB LIST0m
-       altkv bar bootstrap case cat check clean-whitespace count-distinct count
-       count-similar cut decimate describe fill-down fill-empty filter flatten
-       format-values fraction gap grep group-by group-like gsub having-fields head
-       histogram json-parse json-stringify join label latin1-to-utf8 least-frequent
-       merge-fields most-frequent nest nothing put rank regularize
-       remove-empty-columns rename reorder repeat reshape sample sec2gmtdate sec2gmt
-       seqgen shuffle skip-trivial-records sort sort-within-records sparkline
-       sparsify split ssub stats1 stats2 step sub summary surv tac tail tee template
-       top utf8-to-latin1 unflatten uniq unspace unsparsify
+       altkv bar bootstrap bootstrap-ci case cat check clean-whitespace
+       count-distinct count count-similar cut decimate describe fill-down fill-empty
+       filter flatten format-values fraction gap grep group-by group-like gsub
+       having-fields head histogram json-parse json-stringify join label
+       latin1-to-utf8 least-frequent merge-fields most-frequent nest nothing put rank
+       regularize remove-empty-columns rename reorder repeat reshape sample
+       sec2gmtdate sec2gmt seqgen shuffle skip-trivial-records sort
+       sort-within-records sparkline sparsify split ssub stats1 stats2 step sub
+       summary surv tac tail tee template top utf8-to-latin1 unflatten uniq unspace
+       unsparsify
 
 1mFUNCTION LIST0m
        abs acos acosh antimode any append apply arrayify asin asinh asserting_absent
@@ -419,6 +420,7 @@
        --io {format name}       Use format name for input and output data. For
                                 example: `--io csv` is the same as `--csv`.
        --ipprint                Use PPRINT format for input data.
+       --irecutils              Use GNU recutils (.rec) format for input data.
        --itsv                   Use TSV format for input data.
        --itsvlite               Use TSV-lite format for input data.
        --iusv or --iusvlite     Use USV format for input data.
@@ -439,12 +441,15 @@
        --omd or --omarkdown     Use markdown-tabular format for output data.
        --onidx                  Use NIDX format for output data.
        --opprint                Use PPRINT format for output data.
+       --orecutils              Use GNU recutils (.rec) format for output data.
        --otsv                   Use TSV format for output data.
        --otsvlite               Use TSV-lite format for output data.
        --ousv or --ousvlite     Use USV format for output data.
        --oxtab                  Use XTAB format for output data.
        --oyaml                  Use YAML format for output data.
        --pprint or --p2p        Use PPRINT format for input and output data.
+       --recutils               Use GNU recutils (.rec) format for input and output
+                                data.
        --tsv or -t or --t2t     Use TSV format for input and output data.
        --tsvlite                Use TSV-lite format for input and output data.
        --usv or --usvlite       Use USV format for input and output data.
@@ -457,7 +462,7 @@
                                 csv` is the same as `--ocsv`.
 
 1mFLATTEN-UNFLATTEN FLAGS0m
-       These flags control how Miller converts record values which are maps or arrays, when input is JSON and output is non-JSON (flattening) or input is non-JSON and output is JSON (unflattening).
+       These flags control how Miller converts record values which are maps or arrays, when input is JSON/YAML and output is not (flattening) or input is not JSON/YAML and output is JSON/YAML (unflattening).
 
        See the flatten/unflatten doc page https://miller.readthedocs.io/en/latest/flatten-unflatten for more information.
 
@@ -465,21 +470,23 @@
                                 Separator for flattening multi-level JSON keys, e.g.
                                 `{"a":{"b":3}}` becomes `a:b => 3` for non-JSON
                                 formats. Defaults to `.`.
-       --no-auto-flatten        When output is non-JSON, suppress the default
+       --no-auto-flatten        When output is not JSON or YAML, suppress the default
                                 auto-flatten behavior. Default: if `$y = [7,8,9]`
                                 then this flattens to `y.1=7,y.2=8,y.3=9`, and
                                 similarly for maps. With `--no-auto-flatten`, instead
                                 we get `$y=[1, 2, 3]`.
-       --no-auto-unflatten      When input is non-JSON and output is JSON, suppress
-                                the default auto-unflatten behavior. Default: if the
-                                input has `y.1=7,y.2=8,y.3=9` then this unflattens to
-                                `$y=[7,8,9]`. With `--no-auto-flatten`, instead we
-                                get `${y.1}=7,${y.2}=8,${y.3}=9`.
+       --no-auto-unflatten      When input is not JSON or YAML and output is JSON or
+                                YAML, suppress the default auto-unflatten behavior.
+                                Default: if the input has `y.1=7,y.2=8,y.3=9` then
+                                this unflattens to `$y=[7,8,9]`. With
+                                `--no-auto-flatten`, instead we get
+                                `${y.1}=7,${y.2}=8,${y.3}=9`.
 
 1mFORMAT-CONVERSION KEYSTROKE-SAVER FLAGS0m
        As keystroke-savers for format-conversion you may use the following.
        The letters c, t, j, l, d, n, x, p, m, and y refer to formats CSV, TSV, JSON, JSON Lines,
        DKVP, NIDX, XTAB, PPRINT, markdown, and YAML, respectively. DCF is also supported (use --dcf for DCF in and out).
+       GNU recutils is also supported (use --recutils for recutils in and out).
 
        | In\out   | CSV      | TSV      | JSON     | JSONL | DKVP  | NIDX  | XTAB  | PPRINT | Markdown | YAML   |
        +----------+----------+----------+----------+-------+-------+-------+-------+--------+----------+--------+
@@ -652,6 +659,11 @@
        --ofmte {n}              Use --ofmte 6 as shorthand for --ofmt %.6e, etc.
        --ofmtf {n}              Use --ofmtf 6 as shorthand for --ofmt %.6f, etc.
        --ofmtg {n}              Use --ofmtg 6 as shorthand for --ofmt %.6g, etc.
+       --profile or -P {name}   Apply the settings from the [name] section of your
+                                .mlrrc file, after any global (pre-section) settings.
+                                It's an error if no such section exists in any .mlrrc
+                                file processed. For more information please see
+                                https://miller.readthedocs.io/en/latest/customization/.
        --records-per-batch {n}  This is an internal parameter for maximum number of
                                 records in a batch size. Normally this does not need
                                 to be modified, except when input is from `tail -f`.
@@ -900,6 +912,7 @@
                markdown " "    N/A    "\n"
                nidx     " "    N/A    "\n"
                pprint   " "    N/A    "\n"
+               recutils N/A    N/A    N/A
                tsv      "     "    N/A    "\n"
                xtab     "\n"   " "    "\n\n"
                yaml     N/A    N/A    N/A
@@ -1024,6 +1037,31 @@
        -n {n}    Number of samples to output. Defaults to number of input records. Must
                  be non-negative.
        -h|--help Show this message.
+
+   1mbootstrap-ci0m
+       Usage: mlr bootstrap-ci [options]
+       Computes bootstrap confidence intervals for statistics of given fields,
+       accumulated across the input record stream: values are resampled with
+       replacement many times, the statistic is computed on each resample, and the
+       confidence interval is taken from percentiles of the resampled statistics.
+       For each value field and statistic, outputs the full-data statistic in
+       {field}_{stat}, along with confidence-interval endpoints in {field}_{stat}_lo
+       and {field}_{stat}_hi. Use mlr --seed for reproducible results.
+       See also mlr bootstrap and mlr stats1.
+       Options:
+       -a {mean,...} Names of statistics to bootstrap: one or more of the listed
+                     values, as in mlr stats1 -a. Also accepts median (same as p50) and
+                     percentiles p{n} for n in 0..100. Defaults to mean.
+       -f {a,b,c}    Value-field names on which to compute statistics. Required.
+       -g {d,e,f}    Optional group-by-field names.
+       -n {n}        Number of bootstrap resamples. Must be positive. Defaults to 1000.
+       -c {level}    Confidence level, strictly between 0 and 1. Defaults to 0.95.
+       -i            Use interpolated percentiles, like R's type=7, for percentile
+                     statistics as well as for the confidence-interval endpoints;
+                     default like type=1.
+       -h|--help     Show this message.
+       Example: mlr --seed 12345 bootstrap-ci -f x,y
+       Example: mlr --seed 12345 bootstrap-ci -a mean,median -f x -g shape -n 5000 -c 0.99
 
    1mcase0m
        Usage: mlr case [options]
@@ -1500,6 +1538,13 @@
        --ul                                 Emit unpaired records from the left file.
        --ur                                 Emit unpaired records from the right
                                             file(s).
+       --ignore-empty                       Treat records with empty-string values in
+                                            any join-field as if that join-field were
+                                            absent, on both the left and right files.
+                                            Such records are never paired -- not even
+                                            with one another -- and are treated as
+                                            unpaired, subject to --np/--ul/--ur as
+                                            usual.
        -s|--sorted-input                    Require sorted input: records must be
                                             sorted lexically by their join-field names,
                                             else not all records will be paired. The
@@ -2202,6 +2247,12 @@
                           case please avoid pprint-format output since end of input
                           stream will never be seen. Likewise, if input is coming from
                           `tail -f` be sure to use `--records-per-batch 1`.
+       -w {n}             Sliding-window mode: compute statistics over a trailing
+                          window of up to n records (including the current one), rather
+                          than over the whole record stream. Windows are kept per group
+                          when -g is used. One output record is emitted per input
+                          record, with the windowed statistics appended to it. Not
+                          compatible with -s.
        -S                 No-op flag for backward compatibility with Miller 5.
        -F                 No-op flag for backward compatibility with Miller 5.
        -h|--help          Show this message.
@@ -2228,6 +2279,9 @@
        Example: mlr stats1 -a min,p10,p50,p90,max -f value -g size,shape
        Example: mlr stats1 -a count,mode -f size
        Example: mlr stats1 -a count,mode -f size -g shape
+       Example: mlr stats1 -a mean,min,max -f quantity -g name -w 7
+               This emits one output record per input record, with sliding-window
+                statistics over the last up-to-7 records for each name.
        Example: mlr stats1 -a count,mode --fr '^[a-h].*$' --gr '^k.*$'
                This computes count and mode statistics on all field names beginning
                 with a through h, grouped by all field names starting with k.
@@ -2304,15 +2358,15 @@
 
        Names of steppers for -a, comma-separated, one or more of:
          counter    Count instances of field(s) between successive records
-         delta      Compute differences in field(s) between successive records
+         delta      Compute differences in field(s) between successive records. Use delta or equivalently delta_1 for the previous record, or delta_{n} for n records back.
          ewma       Exponentially weighted moving average over successive records
          from-first Compute differences in field(s) from first record
-         ratio      Compute ratios in field(s) between successive records
+         ratio      Compute ratios in field(s) between successive records. Use ratio or equivalently ratio_1 for the previous record, or ratio_{n} for n records back.
          rprod      Compute running products of field(s) between successive records
          rsum       Compute running sums of field(s) between successive records
-         shift      Alias for shift_lag
-         shift_lag  Include value(s) in field(s) from the previous record, if any
-         shift_lead Include value(s) in field(s) from the next record, if any
+         shift      Alias for shift_lag. Use shift or equivalently shift_1 for the previous record, or shift_{n} for n records back.
+         shift_lag  Include value(s) in field(s) from the previous record, if any. Use shift_lag or equivalently shift_lag_1 for the previous record, or shift_lag_{n} for n records back.
+         shift_lead Include value(s) in field(s) from the next record, if any. Use shift_lead or equivalently shift_lead_1 for the next record, or shift_lead_{n} for n records forward.
          slwin      Sliding-window averages over m records back and n forward. E.g. slwin_7_2 for 7 back and 2 forward.
 
        Examples:
@@ -2322,6 +2376,12 @@
          mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y
          mlr step -a ewma -d 0.1,0.9 -o smooth,rough -f x,y -g group_name
          mlr step -a slwin_9_0,slwin_0_9 -f x
+         mlr step -a shift_lag_12 -f sales
+
+       The shift, shift_lag, shift_lead, delta, and ratio steppers accept an
+       optional trailing count: shift_lag_{n} refers n records back, and
+       shift_lead_{n} refers n records forward. The plain forms are equivalent
+       to a count of 1: e.g. shift_lag is the same as shift_lag_1.
 
        Please see https://miller.readthedocs.io/en/latest/reference-verbs.html#filter or
        https://en.wikipedia.org/wiki/Moving_average#Exponential_moving_average
@@ -4061,7 +4121,10 @@
        M_PI: the mathematical constant pi.
 
    1mNF0m
-       NF: evaluates to the number of fields in the current record.
+       NF: evaluates to the number of fields in the current record. Note that NF
+       is dynamic: it is re-evaluated at each reference, so if fields are added to or
+       removed from the current record -- even within a single put/filter expression
+       -- the value of NF changes accordingly.
 
    1mNR0m
        NR: evaluates to the number of the current record over all files
@@ -4089,4 +4152,4 @@
        MIME Type for Comma-Separated Values (CSV) Files, the Miller docsite
        https://miller.readthedocs.io
 
-                                  2026-07-08                         4mMILLER24m(1)
+                                  2026-07-15                         4mMILLER24m(1)

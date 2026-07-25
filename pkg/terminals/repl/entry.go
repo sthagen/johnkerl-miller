@@ -20,15 +20,17 @@
 package repl
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/johnkerl/miller/v6/pkg/cli"
+	"github.com/johnkerl/miller/v6/pkg/lib"
 )
 
-func replUsage(verbName string, o *os.File, exitCode int) {
+func replUsage(verbName string, o *os.File) {
 	exeName := path.Base(os.Args[0])
 	fmt.Fprintf(o, "Usage: %s %s [options] {zero or more data-file names}\n", exeName, verbName)
 
@@ -70,8 +72,6 @@ Or any --icsv, --ojson, etc. reader/writer options as for the main Miller comman
 Any data-file names are opened just as if you had waited and typed :open {filenames}
 at the Miller REPL prompt.
 `)
-
-	os.Exit(exitCode)
 }
 
 // Here the args are the full Miller command line: if the latter was "mlr
@@ -95,7 +95,8 @@ func ReplMain(args []string) int {
 		}
 
 		if args[argi] == "-h" || args[argi] == "--help" {
-			replUsage(replName, os.Stdout, 0)
+			replUsage(replName, os.Stdout)
+			return 0
 
 		} else if args[argi] == "-q" {
 			showStartupBanner = false
@@ -122,14 +123,16 @@ func ReplMain(args []string) int {
 
 		} else if args[argi] == "--load" {
 			if argc-argi < 2 {
-				replUsage(replName, os.Stderr, 1)
+				replUsage(replName, os.Stderr)
+				return 1
 			}
 			options.DSLPreloadFileNames = append(options.DSLPreloadFileNames, args[argi+1])
 			argi += 2
 
 		} else if args[argi] == "--mload" {
 			if argc-argi < 2 {
-				replUsage(replName, os.Stderr, 1)
+				replUsage(replName, os.Stderr)
+				return 1
 			}
 			argi += 1
 			for argi < argc && args[argi] != "--" {
@@ -140,10 +143,19 @@ func ReplMain(args []string) int {
 				argi += 1
 			}
 
-		} else if cli.FLAG_TABLE.Parse(args, argc, &argi, options) {
+		} else if handled, flagErr := cli.FLAG_TABLE.Parse(args, argc, &argi, options); flagErr != nil {
+			var exitRequest *lib.ExitRequest
+			if errors.As(flagErr, &exitRequest) {
+				return exitRequest.Code
+			}
+			fmt.Fprintf(os.Stderr, "%v\n", flagErr)
+			return 1
+
+		} else if handled {
 
 		} else {
-			replUsage(replName, os.Stderr, 1)
+			replUsage(replName, os.Stderr)
+			return 1
 		}
 	}
 
@@ -178,7 +190,7 @@ func ReplMain(args []string) int {
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	filenames := args[argi:]
@@ -189,18 +201,18 @@ func ReplMain(args []string) int {
 	err = repl.handleSession(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr %s: %v\n", repl.replName, err)
-		os.Exit(1)
+		return 1
 	}
 
 	err = repl.bufferedRecordOutputStream.Flush()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr %s: %v\n", repl.replName, err)
-		os.Exit(1)
+		return 1
 	}
 	err = repl.closeBufferedOutputStream()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "mlr %s: %v\n", repl.replName, err)
-		os.Exit(1)
+		return 1
 	}
 	return 0
 }

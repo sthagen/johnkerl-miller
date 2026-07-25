@@ -26,6 +26,7 @@ var joinOptions = []OptionSpec{
 	{Flag: "--np", Type: "bool", Desc: "Do not emit paired records."},
 	{Flag: "--ul", Type: "bool", Desc: "Emit unpaired records from the left file."},
 	{Flag: "--ur", Type: "bool", Desc: "Emit unpaired records from the right file(s)."},
+	{Flag: "--ignore-empty", Type: "bool", Desc: "Treat records with empty-string values in any join-field as if that join-field were absent, on both the left and right files. Such records are never paired -- not even with one another -- and are treated as unpaired, subject to --np/--ul/--ur as usual."},
 	{Flag: "-s", Aliases: []string{"--sorted-input"}, Type: "bool", Desc: "Require sorted input: records must be sorted lexically by their join-field names, else not all records will be paired. The only likely use case for this is with a left file which is too big to fit into system memory otherwise."},
 	{Flag: "-u", Type: "bool", Desc: "Enable unsorted input. (This is the default even without -u.) In this case, the entire left file will be loaded into memory."},
 	{Flag: "--prepipe", Arg: "{command}", Type: "string", Desc: "Shell command to prepipe the left-file input through. As in main input options; see mlr --help for details. If you wish to use a prepipe command for the main input as well as here, it must be specified there as well as here."},
@@ -54,10 +55,11 @@ type tJoinOptions struct {
 	leftJoinFieldNames   []string
 	rightJoinFieldNames  []string
 
-	allowUnsortedInput   bool
-	emitPairables        bool
-	emitLeftUnpairables  bool
-	emitRightUnpairables bool
+	allowUnsortedInput    bool
+	emitPairables         bool
+	emitLeftUnpairables   bool
+	emitRightUnpairables  bool
+	ignoreEmptyJoinFields bool
 
 	leftFileName string
 	prepipe      string
@@ -77,10 +79,11 @@ func newJoinOptions() *tJoinOptions {
 		leftJoinFieldNames:   nil,
 		rightJoinFieldNames:  nil,
 
-		allowUnsortedInput:   true,
-		emitPairables:        true,
-		emitLeftUnpairables:  false,
-		emitRightUnpairables: false,
+		allowUnsortedInput:    true,
+		emitPairables:         true,
+		emitLeftUnpairables:   false,
+		emitRightUnpairables:  false,
+		ignoreEmptyJoinFields: false,
 
 		leftFileName: "",
 		prepipe:      "",
@@ -222,6 +225,9 @@ func transformerJoinParseCLI(
 		case "--ur":
 			opts.emitRightUnpairables = true
 
+		case "--ignore-empty":
+			opts.ignoreEmptyJoinFields = true
+
 		case "-u":
 			opts.allowUnsortedInput = true
 
@@ -233,7 +239,11 @@ func transformerJoinParseCLI(
 			// loop (so individual if-statements don't need to). However,
 			// cli.Parse expects it unadvanced.
 			largi := argi - 1
-			if cli.FLAG_TABLE.Parse(args, argc, &largi, &opts.joinFlagOptions) {
+			handled, err := cli.FLAG_TABLE.Parse(args, argc, &largi, &opts.joinFlagOptions)
+			if err != nil {
+				return nil, err
+			}
+			if handled {
 				// This lets mlr main and mlr join have different input formats.
 				// Nothing else to handle here.
 				argi = largi
@@ -284,6 +294,18 @@ func transformerJoinParseCLI(
 	}
 
 	return transformer, nil
+}
+
+// anyValueIsEmpty returns true if any of the given values is present but
+// empty-string (mlrval "void"). Used for --ignore-empty, which treats such
+// join-field values as though the field were absent altogether.
+func anyValueIsEmpty(values []*mlrval.Mlrval) bool {
+	for _, value := range values {
+		if value != nil && value.IsVoid() {
+			return true
+		}
+	}
+	return false
 }
 
 type TransformerJoin struct {
@@ -342,13 +364,18 @@ func NewTransformerJoin(
 		// miss anything. This lets people do joins that would otherwise take
 		// too much RAM.
 
-		tr.joinBucketKeeper = utils.NewJoinBucketKeeper(
+		joinBucketKeeper, err := utils.NewJoinBucketKeeper(
 			// opts.prepipe,
 			opts.leftFileName,
 			&opts.joinFlagOptions.ReaderOptions,
 			opts.leftJoinFieldNames,
 			tr.leftKeepFieldNameSet,
+			opts.ignoreEmptyJoinFields,
 		)
+		if err != nil {
+			return nil, err
+		}
+		tr.joinBucketKeeper = joinBucketKeeper
 
 		tr.recordTransformerFunc = tr.transformDoublyStreaming
 	}
@@ -361,9 +388,9 @@ func (tr *TransformerJoin) Transform(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	HandleDefaultDownstreamDone(inputDownstreamDoneChannel, outputDownstreamDoneChannel)
-	tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts,
+	return tr.recordTransformerFunc(inrecAndContext, outputRecordsAndContexts,
 		inputDownstreamDoneChannel, outputDownstreamDoneChannel)
 }
 
@@ -374,14 +401,16 @@ func (tr *TransformerJoin) transformHalfStreaming(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	// This can't be done in the CLI-parser since it requires information which
 	// isn't known until after the CLI-parser is called.
 	//
 	// TODO: check if this is still true for the Go port, once everything else
 	// is done.
 	if !tr.ingested { // First call
-		tr.ingestLeftFile()
+		if err := tr.ingestLeftFile(); err != nil {
+			return err
+		}
 		tr.ingested = true
 	}
 
@@ -390,6 +419,12 @@ func (tr *TransformerJoin) transformHalfStreaming(
 		groupingKey, hasAllJoinKeys := inrec.GetSelectedValuesJoined(
 			tr.opts.rightJoinFieldNames,
 		)
+		if hasAllJoinKeys && tr.opts.ignoreEmptyJoinFields {
+			rightFieldValues, _ := inrec.GetSelectedValues(tr.opts.rightJoinFieldNames)
+			if anyValueIsEmpty(rightFieldValues) {
+				hasAllJoinKeys = false
+			}
+		}
 		if hasAllJoinKeys {
 			leftBucket := tr.leftBucketsByJoinFieldValues.Get(groupingKey)
 			if leftBucket == nil {
@@ -419,6 +454,7 @@ func (tr *TransformerJoin) transformHalfStreaming(
 		}
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, inrecAndContext) // emit end-of-stream marker
 	}
+	return nil
 }
 
 func (tr *TransformerJoin) transformDoublyStreaming(
@@ -426,7 +462,7 @@ func (tr *TransformerJoin) transformDoublyStreaming(
 	outputRecordsAndContexts *[]*types.RecordAndContext, // list of *types.RecordAndContext
 	inputDownstreamDoneChannel <-chan bool,
 	outputDownstreamDoneChannel chan<- bool,
-) {
+) error {
 	keeper := tr.joinBucketKeeper // keystroke-saver
 
 	if !rightRecAndContext.EndOfStream {
@@ -436,8 +472,15 @@ func (tr *TransformerJoin) transformDoublyStreaming(
 		rightFieldValues, hasAllJoinKeys := rightRec.ReferenceSelectedValues(
 			tr.opts.rightJoinFieldNames,
 		)
+		if hasAllJoinKeys && tr.opts.ignoreEmptyJoinFields && anyValueIsEmpty(rightFieldValues) {
+			hasAllJoinKeys = false
+		}
 		if hasAllJoinKeys {
-			isPaired = keeper.FindJoinBucket(rightFieldValues)
+			var err error
+			isPaired, err = keeper.FindJoinBucket(rightFieldValues)
+			if err != nil {
+				return err
+			}
 		}
 		if tr.opts.emitLeftUnpairables {
 			tr.outputLeftUnpaireds(keeper, outputRecordsAndContexts)
@@ -457,7 +500,9 @@ func (tr *TransformerJoin) transformDoublyStreaming(
 		}
 
 	} else { // end of record stream
-		keeper.FindJoinBucket(nil)
+		if _, err := keeper.FindJoinBucket(nil); err != nil {
+			return err
+		}
 
 		if tr.opts.emitLeftUnpairables {
 			tr.outputLeftUnpaireds(keeper, outputRecordsAndContexts)
@@ -465,6 +510,7 @@ func (tr *TransformerJoin) transformDoublyStreaming(
 
 		*outputRecordsAndContexts = append(*outputRecordsAndContexts, rightRecAndContext) // emit end-of-stream marker
 	}
+	return nil
 }
 
 func (tr *TransformerJoin) outputLeftUnpaireds(
@@ -484,15 +530,14 @@ func (tr *TransformerJoin) outputLeftUnpaireds(
 // Note: this logic is very similar to that in stream.go, which is what
 // processes the main/right files.
 
-func (tr *TransformerJoin) ingestLeftFile() {
+func (tr *TransformerJoin) ingestLeftFile() error {
 	readerOpts := &tr.opts.joinFlagOptions.ReaderOptions
 
 	// Instantiate the record-reader
 	// TODO: perhaps increase recordsPerBatch, and/or refactor
 	recordReader, err := input.Create(readerOpts, 1)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Set the initial context for the left-file.
@@ -521,8 +566,7 @@ func (tr *TransformerJoin) ingestLeftFile() {
 		select {
 
 		case err := <-errorChannel:
-			fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-			os.Exit(1)
+			return err
 
 		case leftrecsAndContexts := <-readerChannel:
 			// TODO: temp for batch-reader refactor
@@ -538,8 +582,7 @@ func (tr *TransformerJoin) ingestLeftFile() {
 				// before declaring the ingest complete.
 				select {
 				case err := <-errorChannel:
-					fmt.Fprintf(os.Stderr, "mlr: %v\n", err)
-					os.Exit(1)
+					return err
 				default:
 				}
 				done = true
@@ -554,6 +597,9 @@ func (tr *TransformerJoin) ingestLeftFile() {
 			groupingKey, leftFieldValues, ok := leftrec.GetSelectedValuesAndJoined(
 				tr.opts.leftJoinFieldNames,
 			)
+			if ok && tr.opts.ignoreEmptyJoinFields && anyValueIsEmpty(leftFieldValues) {
+				ok = false
+			}
 			if ok {
 				bucket := tr.leftBucketsByJoinFieldValues.Get(groupingKey)
 				if bucket == nil { // New key-field-value: new bucket and hash-map entry
@@ -568,6 +614,7 @@ func (tr *TransformerJoin) ingestLeftFile() {
 			}
 		}
 	}
+	return nil
 }
 
 // This helper method is used by the half-streaming/unsorted join, as well as

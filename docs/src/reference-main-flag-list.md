@@ -174,6 +174,7 @@ are overridden in all cases by setting output format to `format2`.
 * `--inidx`: Use NIDX format for input data.
 * `--io {format name}`: Use format name for input and output data. For example: `--io csv` is the same as `--csv`.
 * `--ipprint`: Use PPRINT format for input data.
+* `--irecutils`: Use GNU recutils (.rec) format for input data.
 * `--itsv`: Use TSV format for input data.
 * `--itsvlite`: Use TSV-lite format for input data.
 * `--iusv or --iusvlite`: Use USV format for input data.
@@ -193,12 +194,14 @@ are overridden in all cases by setting output format to `format2`.
 * `--omd or --omarkdown`: Use markdown-tabular format for output data.
 * `--onidx`: Use NIDX format for output data.
 * `--opprint`: Use PPRINT format for output data.
+* `--orecutils`: Use GNU recutils (.rec) format for output data.
 * `--otsv`: Use TSV format for output data.
 * `--otsvlite`: Use TSV-lite format for output data.
 * `--ousv or --ousvlite`: Use USV format for output data.
 * `--oxtab`: Use XTAB format for output data.
 * `--oyaml`: Use YAML format for output data.
 * `--pprint or --p2p`: Use PPRINT format for input and output data.
+* `--recutils`: Use GNU recutils (.rec) format for input and output data.
 * `--tsv or -t or --t2t`: Use TSV format for input and output data.
 * `--tsvlite`: Use TSV-lite format for input and output data.
 * `--usv or --usvlite`: Use USV format for input and output data.
@@ -210,7 +213,7 @@ are overridden in all cases by setting output format to `format2`.
 
 ## Flatten-unflatten flags
 
-These flags control how Miller converts record values which are maps or arrays, when input is JSON and output is non-JSON (flattening) or input is non-JSON and output is JSON (unflattening).
+These flags control how Miller converts record values which are maps or arrays, when input is JSON/YAML and output is not (flattening) or input is not JSON/YAML and output is JSON/YAML (unflattening).
 
 See the flatten/unflatten doc page https://miller.readthedocs.io/en/latest/flatten-unflatten for more information.
 
@@ -218,8 +221,8 @@ See the flatten/unflatten doc page https://miller.readthedocs.io/en/latest/flatt
 **Flags:**
 
 * `--flatsep or --jflatsep {string}`: Separator for flattening multi-level JSON keys, e.g. `{"a":{"b":3}}` becomes `a:b => 3` for non-JSON formats. Defaults to `.`.
-* `--no-auto-flatten`: When output is non-JSON, suppress the default auto-flatten behavior. Default: if `$y = [7,8,9]` then this flattens to `y.1=7,y.2=8,y.3=9`, and similarly for maps. With `--no-auto-flatten`, instead we get `$y=[1, 2, 3]`.
-* `--no-auto-unflatten`: When input is non-JSON and output is JSON, suppress the default auto-unflatten behavior. Default: if the input has `y.1=7,y.2=8,y.3=9` then this unflattens to `$y=[7,8,9]`.  With `--no-auto-flatten`, instead we get `${y.1}=7,${y.2}=8,${y.3}=9`.
+* `--no-auto-flatten`: When output is not JSON or YAML, suppress the default auto-flatten behavior. Default: if `$y = [7,8,9]` then this flattens to `y.1=7,y.2=8,y.3=9`, and similarly for maps. With `--no-auto-flatten`, instead we get `$y=[1, 2, 3]`.
+* `--no-auto-unflatten`: When input is not JSON or YAML and output is JSON or YAML, suppress the default auto-unflatten behavior. Default: if the input has `y.1=7,y.2=8,y.3=9` then this unflattens to `$y=[7,8,9]`.  With `--no-auto-flatten`, instead we get `${y.1}=7,${y.2}=8,${y.3}=9`.
 
 ## Format-conversion keystroke-saver flags
 
@@ -320,6 +323,7 @@ These are flags which don't fit into any other category.
 * `--ofmte {n}`: Use --ofmte 6 as shorthand for --ofmt %.6e, etc.
 * `--ofmtf {n}`: Use --ofmtf 6 as shorthand for --ofmt %.6f, etc.
 * `--ofmtg {n}`: Use --ofmtg 6 as shorthand for --ofmt %.6g, etc.
+* `--profile or -P {name}`: Apply the settings from the [name] section of your .mlrrc file, after any global (pre-section) settings. It's an error if no such section exists in any .mlrrc file processed. For more information please see https://miller.readthedocs.io/en/latest/customization/.
 * `--records-per-batch {n}`: This is an internal parameter for maximum number of records in a batch size. Normally this does not need to be modified, except when input is from `tail -f`. See also https://miller.readthedocs.io/en/latest/reference-main-flag-list/.
 * `--s-no-comment-strip {file name}`: Take command-line flags from file name, like -s, but with no comment-stripping. For more information please see https://miller.readthedocs.io/en/latest/scripting/.
 * `--seed {n}`: with `n` of the form `12345678` or `0xcafefeed`. For `put`/`filter` `urand`, `urandint`, and `urand32`.
@@ -526,6 +530,7 @@ Notes about all other separators:
         markdown " "    N/A    "\n"
         nidx     " "    N/A    "\n"
         pprint   " "    N/A    "\n"
+        recutils N/A    N/A    N/A
         tsv      "	"    N/A    "\n"
         xtab     "\n"   " "    "\n\n"
         yaml     N/A    N/A    N/A
