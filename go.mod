@@ -14,14 +14,14 @@ module github.com/johnkerl/miller/v6
 // Local development:
 // replace github.com/johnkerl/lumin => /Users/kerl/git/johnkerl/lumin
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/facette/natsort v0.0.0-20181210072756-2cd4dd1e2dcb
 	github.com/johnkerl/lumin v1.0.0
 	github.com/johnkerl/pgpg/go v1.0.0
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
-	github.com/klauspost/compress v1.19.2
+	github.com/klauspost/compress v1.20.0
 	github.com/kshedden/statmodel v0.0.0-20210519035403-ee97d3e48df1
 	github.com/lestrrat-go/strftime v1.2.0
 	github.com/mattn/go-isatty v0.0.24
@@ -30,7 +30,7 @@ require (
 	github.com/pkg/profile v1.7.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 	golang.org/x/term v0.45.0
 	golang.org/x/text v0.41.0
 	gopkg.in/yaml.v3 v3.0.1
