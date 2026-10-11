@@ -678,7 +678,9 @@ var MarkdownOnlyFlagSection = FlagSection{
 			help: "For markdown-tabular output, left-justify cells and pad each " +
 				"column to a uniform width, making the raw markdown source easier " +
 				"to read and maintain. (The rendered table is unaffected.) Implies " +
-				"--omd, so you do not need to also pass --omd.",
+				"--omd, so you do not need to also pass --omd. Unlike --md-aligned, " +
+				"this does not touch the input format, so it composes safely with " +
+				"e.g. --d2m regardless of flag order.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
 				options.WriterOptions.OutputFileFormat = "markdown"
 				options.WriterOptions.MarkdownAlignedOutput = true
@@ -692,8 +694,29 @@ var MarkdownOnlyFlagSection = FlagSection{
 			altNames: []string{"--markdown-aligned"},
 			help: "Use markdown-tabular format for input and output data, with " +
 				"left-justified and padded columns. Implies --md, so you do not " +
-				"need to also pass --md.",
+				"need to also pass --md. Since this sets both input and output " +
+				"format, it will refuse to run if an earlier flag already chose a " +
+				"different input or output format (e.g. --d2m); use --omd-aligned " +
+				"instead if you only want aligned markdown OUTPUT.",
 			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				// Note: the live InputFileFormat/OutputFileFormat fields are
+				// poisoned to "" for the duration of this call (see
+				// FlagTable.Parse), so the pre-existing values must be read
+				// from the "BeforeThisFlag" fields instead.
+				if f := options.ReaderOptions.inputFormatSetByFlag; f != "" && options.ReaderOptions.inputFormatBeforeThisFlag != "markdown" {
+					return fmt.Errorf(
+						"--md-aligned would override the input format already set by %s (%q); "+
+							"use --omd-aligned for aligned markdown output only, or drop one of these flags",
+						f, options.ReaderOptions.inputFormatBeforeThisFlag,
+					)
+				}
+				if f := options.WriterOptions.outputFormatSetByFlag; f != "" && options.WriterOptions.outputFormatBeforeThisFlag != "markdown" {
+					return fmt.Errorf(
+						"--md-aligned would override the output format already set by %s (%q); "+
+							"use --imd for markdown input only, or drop one of these flags",
+						f, options.WriterOptions.outputFormatBeforeThisFlag,
+					)
+				}
 				options.ReaderOptions.InputFileFormat = "markdown"
 				options.WriterOptions.OutputFileFormat = "markdown"
 				options.WriterOptions.MarkdownAlignedOutput = true
@@ -1209,6 +1232,37 @@ var FileFormatFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
 				options.ReaderOptions.InputFileFormat = "markdown"
 				options.WriterOptions.OutputFileFormat = "markdown"
+				*pargi += 1
+				return nil
+			},
+		},
+
+		{
+			name: "--ibox",
+			help: "Use Unicode box-drawing tabular format for input data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+
+		{
+			name: "--obox",
+			help: "Use Unicode box-drawing tabular format for output data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+
+		{
+			name: "--box",
+			help: "Use Unicode box-drawing tabular format for input and output data.",
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "box"
 				*pargi += 1
 				return nil
 			},
@@ -3050,6 +3104,285 @@ var FormatConversionKeystrokeSaverFlagSection = FlagSection{
 			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
 				options.ReaderOptions.InputFileFormat = "xtab"
 				options.WriterOptions.OutputFileFormat = "markdown"
+				*pargi += 1
+				return nil
+			},
+		},
+
+		// Box-format (Unicode box-drawing tabular) keystroke-savers, mirroring
+		// the markdown-tabular matrix above.
+		{
+			name: "--c2u",
+			help: "Use CSV for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "csv"
+				options.WriterOptions.OutputFileFormat = "box"
+				options.ReaderOptions.irsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2c",
+			help: "Use box-drawing-tabular for input, CSV for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "csv"
+				options.ReaderOptions.ifsWasSpecified = true
+				options.WriterOptions.orsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--t2u",
+			help: "Use TSV for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "tsv"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2t",
+			help: "Use box-drawing-tabular for input, TSV for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "tsv"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--d2u",
+			help: "Use DKVP for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "dkvp"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2d",
+			help: "Use box-drawing-tabular for input, DKVP for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "dkvp"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--n2u",
+			help: "Use NIDX for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "nidx"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2n",
+			help: "Use box-drawing-tabular for input, NIDX for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "nidx"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--j2u",
+			help: "Use JSON for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "json"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2j",
+			help: "Use box-drawing-tabular for input, JSON for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "json"
+				options.WriterOptions.WrapJSONOutputInOuterList = true
+				options.WriterOptions.JSONOutputMultiline = true
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--l2u",
+			help: "Use JSON Lines for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "json"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2l",
+			help: "Use box-drawing-tabular for input, JSON Lines for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "json"
+				options.WriterOptions.WrapJSONOutputInOuterList = false
+				options.WriterOptions.JSONOutputMultiline = false
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--p2u",
+			help: "Use PPRINT for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "pprint"
+				options.ReaderOptions.IFS = " "
+				options.WriterOptions.OutputFileFormat = "box"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2p",
+			help: "Use box-drawing-tabular for input, PPRINT for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "pprint"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name:                    "--y2u",
+			help:                    "Use YAML for input, box-drawing-tabular for output.",
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "yaml"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name:                    "--u2y",
+			help:                    "Use box-drawing-tabular for input, YAML for output.",
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "yaml"
+				options.WriterOptions.WrapYAMLOutputInOuterList = true
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--x2u",
+			help: "Use XTAB for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "xtab"
+				options.WriterOptions.OutputFileFormat = "box"
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2x",
+			help: "Use box-drawing-tabular for input, XTAB for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "xtab"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--m2u",
+			help: "Use markdown-tabular for input, box-drawing-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "markdown"
+				options.WriterOptions.OutputFileFormat = "box"
+				options.ReaderOptions.ifsWasSpecified = true
+				*pargi += 1
+				return nil
+			},
+		},
+		{
+			name: "--u2m",
+			help: "Use box-drawing-tabular for input, markdown-tabular for output.",
+			// For format-conversion keystroke-savers, a matrix is plenty -- we don't
+			// need to print a tedious 60-line list.
+			suppressFlagEnumeration: true,
+			parser: func(args []string, argc int, pargi *int, options *TOptions) error {
+				options.ReaderOptions.InputFileFormat = "box"
+				options.WriterOptions.OutputFileFormat = "markdown"
+				options.ReaderOptions.ifsWasSpecified = true
 				*pargi += 1
 				return nil
 			},
